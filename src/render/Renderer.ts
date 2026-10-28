@@ -1,5 +1,4 @@
 import type { Particles } from '@/fx/Particles';
-import type { DigState } from '@/game/dig/DigSystem';
 import type { PlayerPose } from './canvas2d/playerSprite';
 
 export interface RenderFrame {
@@ -7,7 +6,6 @@ export interface RenderFrame {
   cameraX: number;
   cameraY: number;
   player: PlayerPose & { x: number; y: number };
-  dig: DigState;
   particles: Particles;
   debug: { grid: boolean };
 }

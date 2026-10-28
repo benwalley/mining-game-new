@@ -1,11 +1,12 @@
 import type { EventBus } from '@/core/events/EventBus';
 import type { MaterialDef, MaterialRegistry } from '@/content/materials';
-import type { DigTuning } from '@/content/tuning';
+import type { DigTuning, InputTuning } from '@/content/tuning';
 import type { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
 import type { Contact, MoveIntent } from '../player/PlayerController';
 import type { Player } from '../player/Player';
 import type { ChunkMirror } from '../world/ChunkMirror';
+import { crackStage, damageFromProgress, MAX_DAMAGE } from './crack';
 import { chooseDigTarget, type DigTarget } from './digTarget';
 
 /** Read-only view of the current dig, for rendering cracks and the debug overlay. */
@@ -32,7 +33,9 @@ export function canDig(material: MaterialDef, toolPower: number, t: DigTuning): 
 
 /**
  * Turns "pushing into a solid tile" into dig progress, crack stages and breaks.
- * Breaks are applied to the local mirror immediately and sent to the sim.
+ * Progress lives in the tile's damage, so a half-dug tile stays half-dug when
+ * the player walks away (and across reloads). Changes are applied to the local
+ * mirror immediately and sent to the sim.
  */
 export class DigSystem {
   toolPower: number;
@@ -40,9 +43,12 @@ export class DigSystem {
   private progress = 0;
   private swingTimer = 0;
   private blocked = false;
+  /** Damage not yet sent to the sim, keyed by "x,y". */
+  private readonly pendingDamage = new Map<string, { x: number; y: number; damage: number }>();
 
   constructor(
     private readonly tuning: DigTuning,
+    private readonly input: InputTuning,
     private readonly materials: MaterialRegistry,
     private readonly mirror: ChunkMirror,
     private readonly sim: SimClient,
@@ -70,8 +76,14 @@ export class DigSystem {
   }
 
   private get stage(): number {
-    const stages = this.tuning.crackStages;
-    return Math.min(stages, Math.floor(this.progress * (stages + 1)));
+    return crackStage(damageFromProgress(this.progress), this.tuning.crackStages);
+  }
+
+  /** Sends unsaved tile damage to the sim. Called on target changes, crack stages and page hide. */
+  flush(): void {
+    if (this.pendingDamage.size === 0) return;
+    this.sim.send({ type: 'damageTiles', changes: [...this.pendingDamage.values()] });
+    this.pendingDamage.clear();
   }
 
   update(player: Player, intent: MoveIntent, contact: Contact, dt: number): void {
@@ -81,15 +93,20 @@ export class DigSystem {
       intentY: intent.y,
       grounded: contact.grounded,
       climbing: player.climbing,
+      clinging: player.cling !== 'none',
       solid: this.mirror.isSolid,
       flushTolerance: this.tuning.flushTolerance,
+      diagonalMinRatio: this.input.diagonalMinRatio,
     });
     // Never dig into chunks that haven't arrived yet.
     const target = next && this.mirror.isLoaded(next.x, next.y) ? next : null;
 
     if (!sameTile(target, this.target)) {
+      this.flush();
       this.target = target;
-      this.progress = 0;
+      this.progress = target
+        ? Math.max(0, this.mirror.damageAt(target.x, target.y)) / MAX_DAMAGE
+        : 0;
       this.swingTimer = 0;
       this.blocked = false;
     }
@@ -116,11 +133,17 @@ export class DigSystem {
       return;
     }
 
+    const stageBefore = this.stage;
     this.progress += dt / digTimeFor(material, this.toolPower, this.tuning);
     if (this.progress >= 1) {
       this.breakTile(target, material);
       return;
     }
+    const damage = damageFromProgress(this.progress);
+    const stageChanged = this.stage !== stageBefore;
+    this.mirror.setDamage(target.x, target.y, damage, stageChanged);
+    this.pendingDamage.set(`${target.x},${target.y}`, { ...tilePos(target), damage });
+    if (stageChanged) this.flush();
     if (swing) {
       this.events.emit('digHit', {
         ...tilePos(target),
@@ -132,6 +155,8 @@ export class DigSystem {
   }
 
   private breakTile(target: DigTarget, material: MaterialDef): void {
+    // Breaking clears the tile's damage on both sides; no need to send it.
+    this.pendingDamage.delete(`${target.x},${target.y}`);
     this.mirror.setMaterial(target.x, target.y, this.materials.air.numId);
     this.sim.send({ type: 'digTile', x: target.x, y: target.y, toolPower: this.toolPower });
     this.events.emit('tileBroken', { ...tilePos(target), material: material.numId });

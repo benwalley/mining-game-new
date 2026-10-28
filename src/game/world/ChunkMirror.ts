@@ -63,6 +63,19 @@ export class ChunkMirror {
     for (const l of this.listeners) l.tileChanged(x, y);
   }
 
+  damageAt(x: number, y: number): number {
+    return this.store.damageAt(x, y);
+  }
+
+  /**
+   * Records tile damage. Listeners only hear about it when `redraw` is set
+   * (the visible crack stage changed), so digging doesn't redraw every frame.
+   */
+  setDamage(x: number, y: number, damage: number, redraw: boolean): void {
+    if (!this.store.setDamage(x, y, damage) || !redraw) return;
+    for (const l of this.listeners) l.tileChanged(x, y);
+  }
+
   applyChanges(changes: readonly TileChange[]): void {
     for (const c of changes) this.setMaterial(c.x, c.y, c.material);
   }

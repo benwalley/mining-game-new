@@ -20,6 +20,7 @@ import { PointerGestureInput } from '@/input/PointerGestureInput';
 import { PROTOCOL_VERSION, type WorldInfo } from '@/protocol/messages';
 import type { SimClient } from '@/protocol/SimClient';
 import { CanvasRenderer } from '@/render/canvas2d/CanvasRenderer';
+import { orientationFor } from '@/render/canvas2d/playerSprite';
 import type { Renderer } from '@/render/Renderer';
 import { debugGrid, debugInfo, debugVisible, toolPower } from '@/ui/stores/gameStore';
 import { GameLoop } from './GameLoop';
@@ -100,7 +101,7 @@ export class Game {
     );
     this.player = new Player(tuning.player);
     this.controller = new PlayerController(tuning.player, tuning.input, this.events);
-    this.dig = new DigSystem(tuning.dig, materials, this.mirror, sim, this.events);
+    this.dig = new DigSystem(tuning.dig, tuning.input, materials, this.mirror, sim, this.events);
     toolPower.value = this.dig.toolPower;
     this.camera = new Camera(tuning.camera, tuning.player, world.dims);
     this.particles = new Particles(256, createRng(`fx/${world.seed}`), tuning.fx.particleGravity);
@@ -155,6 +156,7 @@ export class Game {
     const onResize = (): void => this.renderer.resize();
     const onHide = (): void => {
       this.loop.stop();
+      this.dig.flush();
       this.syncPlayer(true);
       this.deps.sim.send({ type: 'setPaused', paused: true });
       this.deps.sim.send({ type: 'flush' });
@@ -263,16 +265,15 @@ export class Game {
     );
     if (++this.frameCount % STREAM_EVERY_FRAMES === 0) this.streamTick();
 
-    const dig = this.dig.state;
     this.renderer.render({
       cameraX: this.camera.x,
       cameraY: this.camera.y,
       player: {
         x,
         y: y + p.stepOffsetY,
-        facing: p.facing,
-        vx: p.vx,
-        grounded: p.grounded,
+        ...orientationFor(p.cling, p.clingSide, p.facing, p.climbDir),
+        speed: p.cling === 'wall' ? p.vy : p.vx,
+        onSurface: p.grounded || p.cling !== 'none',
         digDir: p.digDir,
         swing: Math.min(1, p.swingTime / this.deps.tuning.dig.swingInterval),
         squash: p.squashTimer / this.deps.tuning.player.landSquashTime,
@@ -280,7 +281,6 @@ export class Game {
         time: performance.now() / 1000,
         appearance: p.appearance,
       },
-      dig,
       particles: this.particles,
       debug: { grid: debugGrid.value },
     });

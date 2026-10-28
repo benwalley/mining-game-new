@@ -30,7 +30,7 @@ export class CanvasRenderer implements Renderer {
     if (!ctx) throw new Error('2D canvas not supported');
     this.ctx = ctx;
     this.atlas = TileAtlas.generate(materials, crackStages);
-    this.cache = new ChunkCache(mirror, this.atlas, materials, mirror.dims.surfaceY);
+    this.cache = new ChunkCache(mirror, this.atlas, materials, mirror.dims.surfaceY, crackStages);
     mirror.addListener(this.cache);
     this.resize();
   }
@@ -94,18 +94,6 @@ export class CanvasRenderer implements Renderer {
           chunkScreen,
         );
       }
-    }
-
-    // Cracks on the tile being dug.
-    const { dig } = frame;
-    if (dig.target && dig.stage > 0) {
-      this.atlas.drawCrack(
-        ctx,
-        dig.stage,
-        ox + dig.target.x * tile,
-        oy + dig.target.y * tile,
-        tile,
-      );
     }
 
     this.drawParticles(frame, ox, oy, tile);

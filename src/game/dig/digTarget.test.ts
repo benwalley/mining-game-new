@@ -12,8 +12,10 @@ const base = (solid: SolidFn, x: number, y: number): DigContext => ({
   intentY: 0,
   grounded: true,
   climbing: false,
+  clinging: false,
   solid,
   flushTolerance: 0.05,
+  diagonalMinRatio: 0.414,
 });
 
 describe('chooseDigTarget', () => {
@@ -60,6 +62,16 @@ describe('chooseDigTarget', () => {
     const small = { ...base(ceiling, 1.5, 2), intentY: -1 };
     small.box = { ...small.box, h: 0.8 };
     expect(chooseDigTarget(small)).toEqual({ x: 1, y: 0, dir: 'up' });
+  });
+
+  it('never digs on an up-diagonal, which climbs instead', () => {
+    const ctx = { ...base(wall, 3.625, 3), intentX: 0.7, intentY: -0.7 };
+    expect(chooseDigTarget(ctx)).toBeNull();
+  });
+
+  it('digs sideways while clinging to a wall in mid-air', () => {
+    const ctx = { ...base(wall, 3.625, 2.5), intentX: 1, grounded: false, clinging: true };
+    expect(chooseDigTarget(ctx)?.dir).toBe('right');
   });
 
   it('does not dig sideways in mid-air', () => {

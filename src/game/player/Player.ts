@@ -19,6 +19,12 @@ export class Player {
 
   grounded = false;
   climbing = false;
+  /** Holding onto a wall or ceiling (see PlayerController). */
+  cling: 'none' | 'wall' | 'ceiling' = 'none';
+  /** Which side the wall is on while clinging to one. */
+  clingSide: 1 | -1 = 1;
+  /** Last direction moved along a wall: -1 up, 1 down. */
+  climbDir: 1 | -1 = -1;
   coyoteTimer = 0;
   jumpBufferTimer = 0;
   /** True from takeoff until the jump is cut or peaks. */

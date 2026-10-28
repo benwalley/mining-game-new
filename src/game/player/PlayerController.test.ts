@@ -73,6 +73,59 @@ describe('PlayerController', () => {
     expect(player.x).toBeGreaterThan(5);
   });
 
+  describe('clinging', () => {
+    // A 5-tall wall on the right, open floor on the left.
+    const tower = grid([
+      '..........',
+      '.....#####',
+      '.....#####',
+      '.....#####',
+      '.....#####',
+      '.....#####',
+      '##########',
+    ]);
+
+    it('walks up a wall with an up-diagonal and mantles onto the top', () => {
+      const { player, run } = simulate(tower, 4.5, 6);
+      run(0.3, { x: 1, y: 0 }); // Reach the wall.
+      run(0.4, { x: 0.7, y: -0.7 });
+      expect(player.cling).toBe('wall');
+      expect(player.y).toBeLessThan(5);
+      run(1.2, { x: 0.7, y: -0.7 });
+      expect(player.y).toBe(1);
+      expect(player.x).toBeGreaterThan(5);
+    });
+
+    it('falls off when the finger lifts', () => {
+      const { player, run } = simulate(tower, 4.5, 6);
+      run(0.3, { x: 1, y: 0 });
+      run(0.4, { x: 0.7, y: -0.7 });
+      run(0.6, { x: 0, y: 0 });
+      expect(player.cling).toBe('none');
+      expect(player.y).toBe(6);
+    });
+
+    it('does not climb when pushing straight into a wall from the ground', () => {
+      const { player, run } = simulate(tower, 4.5, 6);
+      run(0.6, { x: 1, y: 0 });
+      expect(player.cling).toBe('none');
+      expect(player.y).toBe(6);
+    });
+
+    it('walks along a ceiling and drops when released', () => {
+      const room = grid(['##########', '..........', '..........', '##########']);
+      const { player, run } = simulate(room, 2.5, 3);
+      run(0.3, { x: 0.6, y: -0.8 }); // Jump into the ceiling and grab it.
+      expect(player.cling).toBe('ceiling');
+      const startX = player.x;
+      run(0.4, { x: 0.8, y: -0.6 });
+      expect(player.y - player.h).toBeCloseTo(1);
+      expect(player.x).toBeGreaterThan(startX + 1);
+      run(0.6, { x: 0, y: 0 });
+      expect(player.y).toBe(3);
+    });
+  });
+
   it('auto-climbs a 1-tile ledge', () => {
     const ledge = grid(['..........', '..........', '..........', '.....#####', '##########']);
     const { player, run } = simulate(ledge, 2.5, 4);

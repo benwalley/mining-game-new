@@ -29,6 +29,11 @@ a production build.
   Push into a solid tile to dig it. Drag up to jump, or to climb inside a 1-wide shaft. 1-tile
   ledges are climbed automatically, and a jump that reaches the top row of a 2-tile ledge pulls
   you onto it. Lift to stop. Long-press a tile to inspect it in the debug overlay.
+- **Walls and ceilings:** drag diagonally up into a wall (up-right against a wall on your
+  right) to walk up it. Straight up or down walks along it, and straight into it digs. Under a
+  ceiling, an up-diagonal walks along it and straight up digs. You cling only while holding
+  toward the surface; lift your finger to drop. Half-dug tiles keep their cracks, so you can
+  come back and finish them.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `[` and `]` change pick power.
 
@@ -93,7 +98,7 @@ Built: the player, a one-tile mole in a miner's helmet, drawn in layers with gea
 body, back) so armor and packs can be added in `playerSprite.ts` without redrawing the body.
 Swipe movement (8-directional, with a dead zone and speed from drag distance), 4-way digging
 with auto-assist, coyote time, jump buffering and a variable jump height, shaft climbing,
-auto-climbing 1-tile ledges and mantling 2-tile ones, 3 crack stages, debris particles, synthesized
+auto-climbing 1-tile ledges and mantling 2-tile ones, walking on walls and ceilings, persistent 3-stage cracks, debris particles, synthesized
 per-material dig sounds, haptics (Android vibration; the iOS 18 switch trick, untested on a
 device), camera follow with look-ahead, a flat test world (material bands, pockets, steps, a
 gap, caves, a shaft), and instant resume.

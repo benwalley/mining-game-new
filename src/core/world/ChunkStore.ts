@@ -55,12 +55,36 @@ export class ChunkStore {
     return chunk.material[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] as number;
   }
 
-  /** Sets a tile's material. Returns false if the chunk isn't loaded or the tile is out of bounds. */
+  /**
+   * Sets a tile's material and clears its damage, since damage belongs to the
+   * material that took it. Returns false if the chunk isn't loaded or the tile
+   * is out of bounds.
+   */
   setMaterial(x: number, y: number, material: number): boolean {
-    if (!this.inBounds(x, y)) return false;
-    const chunk = this.chunks.get(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+    const chunk = this.chunkAt(x, y);
     if (!chunk) return false;
-    chunk.material[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] = material;
+    const i = tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
+    chunk.material[i] = material;
+    chunk.damage[i] = 0;
     return true;
+  }
+
+  /** Damage (0–255) at a world tile, `UNLOADED` if its chunk isn't loaded. */
+  damageAt(x: number, y: number): number {
+    const chunk = this.chunkAt(x, y);
+    if (!chunk) return UNLOADED;
+    return chunk.damage[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] as number;
+  }
+
+  setDamage(x: number, y: number, damage: number): boolean {
+    const chunk = this.chunkAt(x, y);
+    if (!chunk) return false;
+    chunk.damage[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] = damage;
+    return true;
+  }
+
+  private chunkAt(x: number, y: number): ChunkData | undefined {
+    if (!this.inBounds(x, y)) return undefined;
+    return this.chunks.get(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
   }
 }

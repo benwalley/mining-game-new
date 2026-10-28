@@ -1,3 +1,4 @@
+import { shapeOf } from '../player/intentShape';
 import { EPS, bodyRows, canStepUp, type Box, type SolidFn } from '../physics/tileCollision';
 
 export type DigDirection = 'left' | 'right' | 'up' | 'down';
@@ -15,22 +16,30 @@ export interface DigContext {
   intentY: number;
   grounded: boolean;
   climbing: boolean;
+  /** Holding onto a wall or ceiling. */
+  clinging: boolean;
   solid: SolidFn;
   /** How close (in tiles) the body must be to a face to dig it. */
   flushTolerance: number;
+  /** Drags steeper than this ratio on both axes are diagonals (see intentShape). */
+  diagonalMinRatio: number;
 }
 
 /**
- * Picks the tile the player means to dig. Digging is 4-directional: diagonal
- * input digs along its dominant axis (the doc's auto-assist). Only faces the
- * body is pressed against can be dug, so walking never digs by accident.
+ * Picks the tile the player means to dig. Digging is 4-directional. An
+ * up-diagonal never digs: it climbs walls and walks ceilings. Other diagonals
+ * dig along their dominant axis (the doc's auto-assist). Only faces the body
+ * is pressed against can be dug, so walking never digs by accident.
  */
 export function chooseDigTarget(ctx: DigContext): DigTarget | null {
   const { box, intentX, intentY, solid, flushTolerance: tol } = ctx;
   const ax = Math.abs(intentX);
   const ay = Math.abs(intentY);
   if (ax === 0 && ay === 0) return null;
-  const supported = ctx.grounded || ctx.climbing;
+  if (shapeOf({ x: intentX, y: intentY }, ctx.diagonalMinRatio).diagonal && intentY < 0) {
+    return null;
+  }
+  const supported = ctx.grounded || ctx.climbing || ctx.clinging;
 
   if (ax >= ay) {
     if (!supported) return null;

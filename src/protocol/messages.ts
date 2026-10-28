@@ -7,7 +7,7 @@ import type { WorldDims } from '@/core/world/constants';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export interface PlayerSnapshot {
   x: number;
@@ -31,11 +31,20 @@ export interface TileChange {
   material: number;
 }
 
+export interface DamageChange {
+  x: number;
+  y: number;
+  /** 0–254; 255 would mean broken, which is sent as `digTile` instead. */
+  damage: number;
+}
+
 export type ToSim =
   | { type: 'init'; protocol: number; worldId: string }
   | { type: 'requestChunks'; chunks: ChunkCoord[] }
   | { type: 'releaseChunks'; chunks: ChunkCoord[] }
   | { type: 'digTile'; x: number; y: number; toolPower: number }
+  /** Partial dig progress, so half-dug tiles stay half-dug. */
+  | { type: 'damageTiles'; changes: DamageChange[] }
   | { type: 'playerState'; player: PlayerSnapshot }
   | { type: 'setPaused'; paused: boolean }
   /** Save everything dirty right now (page is hiding or closing). */

@@ -4,9 +4,14 @@ import type { Appearance, GearSlot } from '@/game/player/appearance';
 import type { Ctx2D } from './surface';
 
 export interface PlayerPose {
+  /** Facing in the sprite's own frame, after `rotation` (see orientationFor). */
   facing: 1 | -1;
-  vx: number;
-  grounded: boolean;
+  /** Rotation in radians, a multiple of π/2, so pixels stay crisp. */
+  rotation: number;
+  /** Speed along whatever surface the mole is on. */
+  speed: number;
+  onSurface: boolean;
+  /** World direction being dug. */
   digDir: DigDirection | null;
   /** 0–1 through the current pick swing. */
   swing: number;
@@ -55,12 +60,48 @@ const GEAR: Record<string, GearDrawer> = {
 const BEHIND_BODY: readonly GearSlot[] = ['back'];
 const OVER_BODY: readonly GearSlot[] = ['body', 'head'];
 
-const STRIKE_ANGLE: Record<DigDirection, number> = {
-  left: 0,
-  right: 0,
-  up: -Math.PI / 2,
-  down: Math.PI / 2,
+const DIG_VECTOR: Record<DigDirection, [number, number]> = {
+  left: [-1, 0],
+  right: [1, 0],
+  up: [0, -1],
+  down: [0, 1],
 };
+
+/** The sprite rotates about this point (near the hitbox center) onto walls and ceilings. */
+const PIVOT_Y = -6;
+
+export type Cling = 'none' | 'wall' | 'ceiling';
+
+/**
+ * How to stand the sprite on its current surface: feet toward the wall or
+ * ceiling, nose toward the direction of travel.
+ */
+export function orientationFor(
+  cling: Cling,
+  wallSide: 1 | -1,
+  worldFacing: 1 | -1,
+  climbDir: 1 | -1,
+): { rotation: number; facing: 1 | -1 } {
+  if (cling === 'ceiling') return { rotation: Math.PI, facing: worldFacing === 1 ? -1 : 1 };
+  if (cling === 'wall') {
+    // On a right wall the sprite's +x points up the wall; on a left wall, down.
+    const up = climbDir < 0;
+    return wallSide > 0
+      ? { rotation: -Math.PI / 2, facing: up ? 1 : -1 }
+      : { rotation: Math.PI / 2, facing: up ? -1 : 1 };
+  }
+  return { rotation: 0, facing: worldFacing };
+}
+
+/** Pick strike angle in the sprite's frame for a world dig direction. */
+function strikeAngle(dir: DigDirection, rotation: number, facing: 1 | -1): number {
+  const [wx, wy] = DIG_VECTOR[dir];
+  const cos = Math.cos(-rotation);
+  const sin = Math.sin(-rotation);
+  const lx = wx * cos - wy * sin;
+  const ly = wx * sin + wy * cos;
+  return Math.atan2(ly, lx * facing);
+}
 /** Pick carried over the shoulder when not digging. */
 const REST_ANGLE = -0.9;
 const WIND_UP = 1.8;
@@ -71,7 +112,7 @@ const WIND_UP = 1.8;
  * pick toward whatever it's digging.
  */
 export function drawPlayer(ctx: Ctx2D, pose: PlayerPose): void {
-  const moving = pose.grounded && Math.abs(pose.vx) > 0.5;
+  const moving = pose.onSurface && Math.abs(pose.speed) > 0.5;
   const step = moving ? Math.round(Math.sin(pose.walkPhase * Math.PI)) : 0;
   // Waddle bob while walking; a slow breath while idle.
   const bob = moving ? (step === 0 ? -1 : 0) : Math.floor(pose.time * 1.6) % 2 === 0 ? 0 : -1;
@@ -79,6 +120,11 @@ export function drawPlayer(ctx: Ctx2D, pose: PlayerPose): void {
   const squashX = 1 + 0.2 * pose.squash;
 
   ctx.save();
+  if (pose.rotation !== 0) {
+    ctx.translate(0, PIVOT_Y);
+    ctx.rotate(pose.rotation);
+    ctx.translate(0, -PIVOT_Y);
+  }
   ctx.scale(pose.facing * squashX, squashY);
   const p = painter(ctx);
 
@@ -143,7 +189,7 @@ function drawGear(p: Painter, pose: PlayerPose, slot: GearSlot): void {
 function drawPick(ctx: Ctx2D, p: Painter, pose: PlayerPose): void {
   let angle = REST_ANGLE;
   if (pose.digDir) {
-    const strike = STRIKE_ANGLE[pose.digDir];
+    const strike = strikeAngle(pose.digDir, pose.rotation, pose.facing);
     // Fast strike for the first 35% of the swing, then a slower wind-up.
     const s = pose.swing;
     const wound = s < 0.35 ? 1 - s / 0.35 : (s - 0.35) / 0.65;

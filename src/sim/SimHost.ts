@@ -6,6 +6,7 @@ import type { Tuning } from '@/content/tuning';
 import {
   PROTOCOL_VERSION,
   type ChunkCoord,
+  type DamageChange,
   type FromSim,
   type MessagePort,
   type PlayerSnapshot,
@@ -84,6 +85,9 @@ export class SimHost {
         return;
       case 'digTile':
         this.digTile(msg.x, msg.y, msg.toolPower);
+        return;
+      case 'damageTiles':
+        this.damageTiles(msg.changes);
         return;
       case 'playerState':
         this.player = msg.player;
@@ -255,6 +259,18 @@ export class SimHost {
       type: 'tilesChanged',
       changes: [{ x, y, material: world.chunks.materialAt(x, y) }],
     });
+  }
+
+  private damageTiles(changes: readonly DamageChange[]): void {
+    const world = this.requireWorld();
+    for (const { x, y, damage } of changes) {
+      const def = this.deps.materials.get(world.chunks.materialAt(x, y));
+      if (!def || !def.solid || def.indestructible) continue;
+      const clamped = Math.max(0, Math.min(254, Math.round(damage)));
+      if (world.chunks.setDamage(x, y, clamped)) {
+        this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+      }
+    }
   }
 
   private tick(): void {

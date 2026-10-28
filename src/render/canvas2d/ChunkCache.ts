@@ -2,6 +2,7 @@ import { DirtyRect } from '@/core/world/DirtyRect';
 import type { ChunkData } from '@/core/world/chunk';
 import { CHUNK_MASK, CHUNK_SHIFT, CHUNK_SIZE, TILE_PX, chunkKey } from '@/core/world/constants';
 import type { MaterialRegistry } from '@/content/materials';
+import { crackStage } from '@/game/dig/crack';
 import type { ChunkMirror, MirrorListener } from '@/game/world/ChunkMirror';
 import { createSurface, type Ctx2D, type Surface } from './surface';
 import type { TileAtlas } from './TileAtlas';
@@ -33,6 +34,7 @@ export class ChunkCache implements MirrorListener {
     private readonly atlas: TileAtlas,
     materials: MaterialRegistry,
     private readonly surfaceY: number,
+    private readonly crackStages: number,
   ) {
     this.drawable = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.drawable[m.numId] = m.visual ? 1 : 0;
@@ -127,6 +129,8 @@ export class ChunkCache implements MirrorListener {
       if (!solid(x - 1, y)) ctx.fillRect(px, py, 1, TILE_PX);
       if (!solid(x + 1, y)) ctx.fillRect(px + TILE_PX - 1, py, 1, TILE_PX);
       ctx.globalAlpha = 1;
+      // Partly dug tiles keep their cracks.
+      this.atlas.drawCrack(ctx, crackStage(mirror.damageAt(x, y), this.crackStages), px, py);
       return;
     }
 

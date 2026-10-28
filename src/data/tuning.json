@@ -6,7 +6,8 @@
     "tapMaxMs": 200,
     "tapMaxMovePx": 10,
     "longPressMs": 450,
-    "jumpMinUpRatio": 0.5
+    "jumpMinUpRatio": 0.5,
+    "diagonalMinRatio": 0.414
   },
   "player": {
     "width": 0.8,

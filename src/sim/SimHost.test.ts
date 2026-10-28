@@ -86,4 +86,34 @@ describe.each([
     expect(host.last('worldReset')).toBeDefined();
     expect(await store.loadMeta(worldId)).toBeUndefined();
   });
+
+  it('keeps partial dig damage across a resume and clears it when the tile breaks', async () => {
+    const store = await makeStore();
+    const worldId = `${WORLD}-d`;
+    const idx = (spawn.y % CHUNK_SIZE) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE);
+    const first = createHost(store);
+    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await first.send({ type: 'requestChunks', chunks: [spawnChunk, [0, spawnChunk[1]]] });
+    await first.send({
+      type: 'damageTiles',
+      changes: [
+        { x: spawn.x, y: spawn.y, damage: 120 },
+        { x: 0, y: spawn.y, damage: 200 }, // Bedrock: ignored.
+      ],
+    });
+    await first.send({ type: 'flush' });
+
+    const second = createHost(store);
+    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await second.send({ type: 'requestChunks', chunks: [spawnChunk, [0, spawnChunk[1]]] });
+    const chunks = second.out.flatMap((m) => (m.type === 'chunk' ? [m.chunk] : []));
+    const home = chunks.find((c) => c.cx === spawnChunk[0])!;
+    const wall = chunks.find((c) => c.cx === 0)!;
+    expect(home.damage[idx]).toBe(120);
+    expect(wall.damage[(spawn.y % CHUNK_SIZE) * CHUNK_SIZE]).toBe(0);
+
+    await second.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+    await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    expect(second.last('chunk')!.chunk.damage[idx]).toBe(0);
+  });
 });
