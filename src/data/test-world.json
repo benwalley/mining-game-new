@@ -188,6 +188,41 @@
       "w": 14,
       "h": 3,
       "label": "wide flat room in dirt (cave-in test)"
+    },
+    {
+      "op": "pool",
+      "fluid": "spore-gas",
+      "x": 140,
+      "y": 40,
+      "w": 6,
+      "h": 3,
+      "label": "sealed spore gas pocket"
+    },
+    {
+      "op": "carve",
+      "x": 120,
+      "y": 30,
+      "w": 16,
+      "h": 4,
+      "label": "firedamp room"
+    },
+    {
+      "op": "pool",
+      "fluid": "firedamp",
+      "x": 120,
+      "y": 30,
+      "w": 16,
+      "h": 2,
+      "label": "firedamp under the room's roof"
+    },
+    {
+      "op": "pool",
+      "fluid": "lava",
+      "x": 137,
+      "y": 30,
+      "w": 3,
+      "h": 3,
+      "label": "lava behind the firedamp room's wall (dig x 136, y 31)"
     }
   ]
 }

@@ -12,7 +12,15 @@ import type { Haptics } from './haptics';
  * Minimum gap between repeats of a sound. Quenching, creaking and landing can
  * happen dozens of times a tick; one per window is plenty.
  */
-const SOUND_GAP_MS = { hiss: 90, creak: 300, rumble: 150, thud: 70, trickle: 150 };
+const SOUND_GAP_MS = {
+  hiss: 90,
+  creak: 300,
+  rumble: 150,
+  thud: 70,
+  trickle: 150,
+  whoomph: 250,
+  vent: 400,
+};
 
 const DIR_VECTORS = {
   left: [1, 0],
@@ -68,10 +76,23 @@ export class FeedbackDirector {
         dirY: -1,
       });
     });
-    events.on('hurt', () => {
-      this.audio.hurt();
+    events.on('hurt', (e) => {
+      if (e.cause === 'gas') this.audio.cough();
+      else this.audio.hurt();
       this.haptics.tick();
     });
+    events.on('ignite', (e) => {
+      this.throttled('whoomph', () => {
+        this.audio.whoomph();
+        this.haptics.pulse();
+      });
+      this.particles.burst(e.x + 0.5, e.y + 0.5, 6, [palette.ember, palette.gold], {
+        speed: 4,
+        life: 0.4,
+        dirY: -1,
+      });
+    });
+    events.on('vent', () => this.throttled('vent', () => this.audio.vent()));
     events.on('quench', () => this.throttled('hiss', () => this.audio.hiss()));
     events.on('creak', (e) => {
       this.throttled('creak', () => this.audio.creak());

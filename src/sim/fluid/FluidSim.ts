@@ -29,10 +29,12 @@ export interface FluidOutputs {
 const idx = (x: number, y: number): number => tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
 
 /**
- * Water and lava as a cellular automaton over the chunks' fluid layer. Each
- * tick a fluid tile first falls, then spreads sideways toward lower neighbors
- * until level. There is no pressure, so fluid never climbs. Thick fluids move
- * on one tick in `flowEvery`. Reactions (lava touching water) run every tick.
+ * Liquids and gases as a cellular automaton over the chunks' fluid layer. Each
+ * tick a liquid tile first falls (a gas first rises), then spreads sideways
+ * toward lower neighbors until level. There is no pressure, so liquid never
+ * climbs. Thick fluids move on one tick in `flowEvery`; thin gas fades; gas in
+ * open sky blows away. Reactions (lava touching water, firedamp touching lava
+ * or flame) run every tick.
  *
  * Only awake tiles are visited: anything that moves wakes its neighbors for
  * the next tick, and a tile that can't move goes to sleep, so a settled lake
@@ -176,18 +178,35 @@ export class FluidSim {
       return;
     }
     if (def.reactions.length > 0 && this.react(chunk, i, x, y, def)) return;
+    const gas = def.kind === 'gas';
+    if (gas && y < this.chunks.dims.surfaceY) {
+      // Gas reaching open sky blows away.
+      this.drop(chunk, i, x, y, chunk.fluidAmount[i]!);
+      return;
+    }
+    if (def.decay && chunk.fluidAmount[i]! <= def.decay.maxAmount) {
+      this.wake(x, y, x, y); // Keep visiting until it's gone.
+      // Stagger tiles so a thin cloud fades unevenly rather than all at once.
+      if ((this.tickCount + x * 7 + y * 13) % def.decay.everyTicks === 0) {
+        this.drop(chunk, i, x, y, 1);
+        if (chunk.fluidAmount[i] === 0) return;
+      }
+    }
     if (this.tickCount % def.flowEvery !== 0) {
       this.wake(x, y, x, y);
       return;
     }
 
+    // Liquids fall, gases rise. Either pushes the other kind out of its way.
+    const vy = y + (gas ? -1 : 1);
+    if (this.swap(chunk, i, x, y, x, vy, def)) return;
     let a = chunk.fluidAmount[i]!;
-    const below = this.open(x, y + 1, type);
-    if (below) {
-      const room = FLUID_MAX - below.fluidAmount[idx(x, y + 1)]!;
+    const next = this.open(x, vy, type);
+    if (next) {
+      const room = FLUID_MAX - next.fluidAmount[idx(x, vy)]!;
       if (room > 0) {
         const m = Math.min(a, room);
-        this.move(chunk, i, x, y, below, x, y + 1, m, type);
+        this.move(chunk, i, x, y, next, x, vy, m, type);
         a -= m;
         if (a === 0) return;
       }
@@ -195,6 +214,14 @@ export class FluidSim {
 
     const d1 = flip ? 1 : -1;
     const d2 = -d1;
+    // A liquid spreading sideways into gas pushes the gas out too.
+    if (
+      !gas &&
+      a >= 2 &&
+      (this.swap(chunk, i, x, y, x + d1, y, def) || this.swap(chunk, i, x, y, x + d2, y, def))
+    ) {
+      return;
+    }
     const n1 = this.open(x + d1, y, type);
     const n2 = this.open(x + d2, y, type);
     const b1 = n1 ? n1.fluidAmount[idx(x + d1, y)]! : FLUID_MAX;
@@ -215,13 +242,56 @@ export class FluidSim {
     } else if (ok2) {
       this.move(chunk, i, x, y, n2, x + d2, y, (a - b2) >> 1, type);
     } else if (a === 1) {
-      // A lone unit drips off a ledge instead of sitting at its edge forever.
-      if (n1 && b1 === 0 && this.hasRoomBelow(x + d1, y, type)) {
+      // A lone unit drips off a ledge (or slips past a gas's ceiling edge) instead
+      // of sitting at its edge forever.
+      const dy = gas ? -1 : 1;
+      if (n1 && b1 === 0 && this.hasRoom(x + d1, y + dy, type)) {
         this.move(chunk, i, x, y, n1, x + d1, y, 1, type);
-      } else if (n2 && b2 === 0 && this.hasRoomBelow(x + d2, y, type)) {
+      } else if (n2 && b2 === 0 && this.hasRoom(x + d2, y + dy, type)) {
         this.move(chunk, i, x, y, n2, x + d2, y, 1, type);
       }
     }
+  }
+
+  /** Removes `amount` from a tile and wakes its neighbors, which may flow into the space. */
+  private drop(chunk: ChunkData, i: number, x: number, y: number, amount: number): void {
+    const left = Math.max(0, chunk.fluidAmount[i]! - amount);
+    chunk.fluidAmount[i] = left;
+    if (left === 0) chunk.fluidType[i] = 0;
+    this.changedAt(x, y);
+    this.wake(x - 1, y - 1, x + 1, y + 1);
+  }
+
+  /**
+   * Trades places with a fluid of the other kind at (tx, ty): a liquid sinking
+   * into gas, or gas rising into a liquid, so bubbles rise and floods push gas out.
+   */
+  private swap(
+    chunk: ChunkData,
+    i: number,
+    x: number,
+    y: number,
+    tx: number,
+    ty: number,
+    def: FluidDef,
+  ): boolean {
+    const other = this.cellAt(tx, ty);
+    if (!other) return false;
+    const j = idx(tx, ty);
+    if (this.solid[other.material[j]!]) return false;
+    const t = other.fluidType[j]!;
+    if (t === 0 || t === def.id || this.fluids.get(t)?.kind === def.kind) return false;
+    const amount = other.fluidAmount[j]!;
+    other.fluidType[j] = def.id;
+    other.fluidAmount[j] = chunk.fluidAmount[i]!;
+    chunk.fluidType[i] = t;
+    chunk.fluidAmount[i] = amount;
+    this.stampsFor(chunkKey(other.cx, other.cy))[j] = this.stamp;
+    this.stampsFor(chunkKey(chunk.cx, chunk.cy))[i] = this.stamp;
+    this.changedAt(x, y);
+    this.changedAt(tx, ty);
+    this.wake(Math.min(x, tx) - 1, Math.min(y, ty) - 1, Math.max(x, tx) + 1, Math.max(y, ty) + 1);
+    return true;
   }
 
   /** Runs this fluid's first matching reaction with a 4-neighbor. */
@@ -235,18 +305,24 @@ export class FluidSim {
         const ni = idx(nx, ny);
         if (other.fluidType[ni] !== r.touching || other.fluidAmount[ni] === 0) continue;
 
-        chunk.material[i] = r.becomes;
-        chunk.damage[i] = 0;
-        chunk.fluidType[i] = 0;
-        chunk.fluidAmount[i] = 0;
-        const left = other.fluidAmount[ni]! - r.consumes;
-        other.fluidAmount[ni] = Math.max(0, left);
-        if (left <= 0) other.fluidType[ni] = 0;
+        if ('material' in r.result) {
+          chunk.material[i] = r.result.material;
+          chunk.damage[i] = 0;
+          chunk.fluidType[i] = 0;
+          chunk.fluidAmount[i] = 0;
+          this.out.materials.push({ x, y, material: r.result.material });
+        } else {
+          chunk.fluidType[i] = r.result.fluid;
+        }
+        if (r.consumes > 0) {
+          const left = other.fluidAmount[ni]! - r.consumes;
+          other.fluidAmount[ni] = Math.max(0, left);
+          if (left <= 0) other.fluidType[ni] = 0;
+        }
 
         this.changedAt(x, y);
         this.changedAt(nx, ny);
-        this.out.materials.push({ x, y, material: r.becomes });
-        this.out.events.push({ kind: r.event, x, y });
+        if (r.event) this.out.events.push({ kind: r.event, x, y });
         this.wake(
           Math.min(x, nx) - 1,
           Math.min(y, ny) - 1,
@@ -297,9 +373,9 @@ export class FluidSim {
     return t === 0 || t === type ? chunk : undefined;
   }
 
-  private hasRoomBelow(x: number, y: number, type: number): boolean {
-    const below = this.open(x, y + 1, type);
-    return below !== undefined && below.fluidAmount[idx(x, y + 1)]! < FLUID_MAX;
+  private hasRoom(x: number, y: number, type: number): boolean {
+    const chunk = this.open(x, y, type);
+    return chunk !== undefined && chunk.fluidAmount[idx(x, y)]! < FLUID_MAX;
   }
 
   private cellAt(x: number, y: number): ChunkData | undefined {

@@ -103,6 +103,23 @@ export class AudioService {
     this.noiseBurst(this.rng.range(2500, 3500), 0.8, 0.25, 0.15);
   }
 
+  /** Firedamp catching: a rushing whoomph. */
+  whoomph(): void {
+    this.noiseBurst(600, 0.5, 0.5, 0.8);
+    this.sweep(160, 45, 0.45, 0.5);
+  }
+
+  /** Gas escaping from a pocket you just opened. */
+  vent(): void {
+    this.noiseBurst(this.rng.range(3000, 4000), 0.9, 0.45, 0.35);
+  }
+
+  /** Breathing spores. */
+  cough(): void {
+    this.noiseBurst(this.rng.range(700, 900), 1.5, 0.12, 0.45);
+    this.sweep(220, 140, 0.1, 0.25);
+  }
+
   hurt(): void {
     this.sweep(260, 110, 0.18, 0.35);
     this.noiseBurst(420, 1, 0.08, 0.3);

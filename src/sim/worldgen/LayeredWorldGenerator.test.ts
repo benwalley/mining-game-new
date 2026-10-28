@@ -77,11 +77,13 @@ describe('LayeredWorldGenerator', () => {
 });
 
 describe('LayeredWorldGenerator pools', () => {
-  // One generated band per fluid: stone (aquifers and lakes) and magma (lava lakes).
-  const bands = [
-    { fluid: 'water', from: config.layers[1]!.fromDepth, to: config.layers[2]!.fromDepth },
-    { fluid: 'lava', from: config.layers[4]!.fromDepth, to: config.layers[5]!.fromDepth },
-  ];
+  const band = (fluid: string, layer: number) => ({
+    fluid,
+    from: config.layers[layer]!.fromDepth,
+    to: config.layers[layer + 1]!.fromDepth,
+  });
+  // One generated band per fluid: aquifers and lakes, lava lakes, and the gas pockets.
+  const bands = [band('water', 1), band('lava', 4), band('spore-gas', 3), band('firedamp', 4)];
 
   it.each(bands)('places $fluid that starts perfectly still', ({ fluid, from, to }) => {
     const store = new ChunkStore(gen.dims, materials.bedrock.numId);
@@ -104,7 +106,9 @@ describe('LayeredWorldGenerator pools', () => {
     const sim = new FluidSim(store, solid, fluids);
     for (const chunk of store.values()) sim.wakeChunk(chunk.cx, chunk.cy);
     // Long enough for thick fluids to get a turn to move.
-    for (let t = 0; t < fluids.require(fluid).flowEvery + 1; t++) sim.tick();
+    // (The band may hold other fluids too, so wait for the slowest.)
+    const slowest = Math.max(...fluids.all.map((f) => f.flowEvery).filter(Number.isFinite));
+    for (let t = 0; t <= slowest; t++) sim.tick();
     expect(sim.drain().changed.size).toBe(0);
     expect(sim.sleeping).toBe(true);
   });

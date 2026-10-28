@@ -19,20 +19,35 @@ export const NO_FLUID: FluidContact = { fluid: 0, submersion: 0, headFluid: 0 };
 const EYE = 0.7;
 const depthByType = new Float64Array(16);
 
-/** Top edge of the fluid in a tile: the full tile under more of the same fluid, else its amount. */
-function surfaceOf(fluidAt: FluidFn, x: number, y: number, packed: number): number {
-  return fluidAt(x, y - 1) >> 4 === packed >> 4 ? y : y + 1 - (packed & 15) / FLUID_MAX;
+const NO_GAS = new Uint8Array(16);
+
+/**
+ * Top edge of the fluid in a tile: a gas fills the whole tile, and so does a
+ * liquid under more of itself; otherwise a liquid fills to its amount.
+ */
+function surfaceOf(
+  fluidAt: FluidFn,
+  x: number,
+  y: number,
+  packed: number,
+  gas: Uint8Array,
+): number {
+  if (gas[packed >> 4] || fluidAt(x, y - 1) >> 4 === packed >> 4) return y;
+  return y + 1 - (packed & 15) / FLUID_MAX;
 }
 
-/** How deep the body sits in fluid, sampled down its center column. */
-export function senseFluid(box: Box, fluidAt: FluidFn): FluidContact {
+/**
+ * How deep the body sits in fluid, sampled down its center column. `gas`
+ * flags gas fluid ids (1 = gas).
+ */
+export function senseFluid(box: Box, fluidAt: FluidFn, gas: Uint8Array = NO_GAS): FluidContact {
   const col = Math.floor(box.x);
   const top = box.y - box.h;
   depthByType.fill(0);
   for (let row = Math.floor(top); row <= Math.floor(box.y - 1e-6); row++) {
     const f = fluidAt(col, row);
     if (f === 0) continue;
-    const overlap = Math.min(row + 1, box.y) - Math.max(surfaceOf(fluidAt, col, row, f), top);
+    const overlap = Math.min(row + 1, box.y) - Math.max(surfaceOf(fluidAt, col, row, f, gas), top);
     if (overlap > 0) depthByType[f >> 4] += overlap;
   }
   let fluid = 0;
@@ -43,6 +58,6 @@ export function senseFluid(box: Box, fluidAt: FluidFn): FluidContact {
   const eyeY = box.y - box.h * EYE;
   const atEye = fluidAt(col, Math.floor(eyeY));
   const headFluid =
-    atEye !== 0 && eyeY >= surfaceOf(fluidAt, col, Math.floor(eyeY), atEye) ? atEye >> 4 : 0;
+    atEye !== 0 && eyeY >= surfaceOf(fluidAt, col, Math.floor(eyeY), atEye, gas) ? atEye >> 4 : 0;
   return { fluid, submersion: fluid ? Math.min(1, depthByType[fluid]! / box.h) : 0, headFluid };
 }

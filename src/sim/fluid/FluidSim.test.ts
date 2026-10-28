@@ -10,19 +10,25 @@ const materials = loadMaterials();
 const fluids = loadFluids(materials);
 const WATER = fluids.require('water').id;
 const LAVA = fluids.require('lava').id;
+const SPORES = fluids.require('spore-gas').id;
+const FIREDAMP = fluids.require('firedamp').id;
+const FLAME = fluids.require('flame').id;
 const STONE = materials.require('stone').numId;
 const OBSIDIAN = materials.require('obsidian').numId;
 
 const solid = new Uint8Array(materials.maxNumId + 1);
 for (const m of materials.all) solid[m.numId] = m.solid ? 1 : 0;
 
+const FLUID_CHARS: Record<string, number> = { w: WATER, l: LAVA, g: SPORES, f: FIREDAMP };
+
 /**
- * Builds a 2×2-chunk world from rows: '#' stone, '.' air, 'w' full water,
- * 'l' full lava. Everything outside the drawing is stone.
+ * Builds a 2×2-chunk world from rows: '#' stone, '.' air, and full tiles of
+ * 'w' water, 'l' lava, 'g' spore gas, 'f' firedamp. Everything outside the
+ * drawing is stone. Rows above `surfaceY` are open sky.
  */
-function world(rows: string[], at: { x: number; y: number } = { x: 0, y: 0 }) {
+function world(rows: string[], at: { x: number; y: number } = { x: 0, y: 0 }, surfaceY = 0) {
   const store = new ChunkStore(
-    { width: CHUNK_SIZE * 2, height: CHUNK_SIZE * 2, surfaceY: 0 },
+    { width: CHUNK_SIZE * 2, height: CHUNK_SIZE * 2, surfaceY },
     materials.bedrock.numId,
   );
   for (let cy = 0; cy < 2; cy++) {
@@ -36,8 +42,9 @@ function world(rows: string[], at: { x: number; y: number } = { x: 0, y: 0 }) {
     const chunk = store.get(x >> 5, y >> 5)!;
     const i = tileIndex(x & 31, y & 31);
     chunk.material[i] = ch === '#' ? STONE : materials.air.numId;
-    if (ch === 'w' || ch === 'l') {
-      chunk.fluidType[i] = ch === 'w' ? WATER : LAVA;
+    const fluid = FLUID_CHARS[ch];
+    if (fluid) {
+      chunk.fluidType[i] = fluid;
       chunk.fluidAmount[i] = 8;
     }
   };
@@ -155,5 +162,52 @@ describe('FluidSim', () => {
     w.run(1);
     const rect = w.sim.drain().changed.get(0)!;
     expect([rect.minY, rect.maxY]).toEqual([0, 1]);
+  });
+
+  it('lets gas rise and spread under a ceiling', () => {
+    const w = world(['#....#', '#....#', '#....#', '#.g..#', '######']);
+    w.run(40);
+    expect(w.cell(2, 3).amount).toBe(0);
+    const roof = [1, 2, 3, 4].map((x) => w.cell(x, 0).amount);
+    expect(roof.every((a) => a > 0)).toBe(true);
+  });
+
+  it('bubbles gas up through water and lets water push gas aside', () => {
+    const w = world(['#w#', '#w#', '#g#', '###']);
+    w.run(10);
+    expect(w.cell(1, 0).type).toBe(SPORES);
+    expect(w.cell(1, 2).type).toBe(WATER);
+  });
+
+  it('fades thin gas away', () => {
+    const w = world(['#....#', '#....#', '######']);
+    w.sim.setFluid(2, 0, SPORES, 2);
+    w.run(400);
+    expect(w.total(SPORES)).toBe(0);
+    expect(w.sim.sleeping).toBe(true);
+  });
+
+  it('blows gas away in open sky', () => {
+    const w = world(['#.#', '#.#', '#g#', '###'], { x: 0, y: 0 }, 2);
+    w.run(20);
+    expect(w.total(SPORES)).toBe(0);
+  });
+
+  it('ignites firedamp touching lava; the flash runs through the cloud and burns out', () => {
+    const w = world(['#fffff#', '#.....#', '#....l#', '#######']);
+    // The lava has to reach the cloud first: it sits below. Bring the gas down to it.
+    w.store.get(0, 0)!.fluidType[tileIndex(5, 1)] = FIREDAMP;
+    w.store.get(0, 0)!.fluidAmount[tileIndex(5, 1)] = 8;
+    w.sim.wake(0, 0, 7, 3);
+    w.run(1);
+    expect(w.cell(5, 1).type).toBe(FLAME);
+    const ignite = w.sim.drain().events.filter((e) => e.kind === 'ignite');
+    expect(ignite).toHaveLength(1);
+    w.run(8);
+    expect(w.total(FIREDAMP)).toBe(0);
+    w.run(20);
+    expect(w.total(FLAME)).toBe(0);
+    // Terrain is untouched.
+    expect(w.cell(3, 0).material).toBe(materials.air.numId);
   });
 });

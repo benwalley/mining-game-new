@@ -53,6 +53,7 @@ const PUSH = 0.15;
  */
 export class PlayerController {
   private readonly jumpVelocity: number;
+  private readonly gasIds: Uint8Array;
 
   constructor(
     private readonly tuning: PlayerTuning,
@@ -61,6 +62,8 @@ export class PlayerController {
     private readonly fluids: SwimOptions,
   ) {
     this.jumpVelocity = Math.sqrt(2 * tuning.gravity * tuning.jumpHeight);
+    this.gasIds = new Uint8Array(16);
+    for (const f of fluids.fluids.all) this.gasIds[f.id] = f.kind === 'gas' ? 1 : 0;
   }
 
   sense(player: Player, solid: SolidFn, fluidAt: FluidFn = noFluidAt): Contact {
@@ -71,7 +74,7 @@ export class PlayerController {
       wallLeft: touching(box, 'left', solid),
       wallRight: touching(box, 'right', solid),
       canClimb: inShaft(box, solid),
-      fluid: fluidAt === noFluidAt ? NO_FLUID : senseFluid(box, fluidAt),
+      fluid: fluidAt === noFluidAt ? NO_FLUID : senseFluid(box, fluidAt, this.gasIds),
     };
   }
 
@@ -111,7 +114,9 @@ export class PlayerController {
     this.updateCling(player, intent, shape, contact, dt);
     const slipping = player.gripTimer > 0;
     const { swim } = this.fluids;
-    const inFluid = this.fluids.fluids.get(contact.fluid.fluid);
+    // Only liquids hold the mole up; gases are just air to move through.
+    const body = this.fluids.fluids.get(contact.fluid.fluid);
+    const inFluid = body?.kind === 'liquid' ? body : undefined;
     const swimming =
       inFluid !== undefined &&
       contact.fluid.submersion >= swim.minSubmersion &&

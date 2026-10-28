@@ -127,14 +127,15 @@ interface Cavern {
 
 interface Pool extends Cavern {
   fluid: number;
-  /** Rows at or below this are filled. */
-  level: number;
+  /** Filled rows, inclusive: a liquid fills from the bottom up, a gas from the top down. */
+  from: number;
+  to: number;
 }
 
 /** How a tile relates to the pools near it. */
 const enum PoolHit {
   None,
-  /** Inside a pool: air, and fluid at or below its level. */
+  /** Inside a pool: air, and fluid in its filled rows. */
   Inside,
   /** The solid shell around a pool's filled part. */
   Shell,
@@ -292,7 +293,8 @@ export class LayeredWorldGenerator implements WorldGenerator {
         g.material[j] = this.tileAt(x, y, top, bounds, caverns, pools);
         if (pools.length > 0 && this.poolAt(x, y, pools) === PoolHit.Inside) {
           g.pool[j] = 1;
-          if (y >= this.hitPool!.level) g.fluid[j] = this.hitPool!.fluid;
+          const p = this.hitPool!;
+          if (y >= p.from && y <= p.to) g.fluid[j] = p.fluid;
         }
       }
     }
@@ -488,7 +490,8 @@ export class LayeredWorldGenerator implements WorldGenerator {
         this.hitPool = p;
         return PoolHit.Inside;
       }
-      if (y >= p.level - 1 && (dx / (p.rx + shell)) ** 2 + (dy / (p.ry + shell)) ** 2 <= 1) {
+      const near = y >= p.from - 1 && y <= p.to + 1;
+      if (near && (dx / (p.rx + shell)) ** 2 + (dy / (p.ry + shell)) ** 2 <= 1) {
         hit = PoolHit.Shell;
       }
     }
@@ -526,8 +529,12 @@ export class LayeredWorldGenerator implements WorldGenerator {
               Math.abs(p.y - y) < p.ry + ry + poolShell * 2,
           );
           if (nearSpawn || overlaps) continue;
-          const level = Math.floor(y + ry - 2 * ry * spec.fill);
-          out.push({ x, y, rx, ry, fluid, level });
+          const depth = 2 * ry * spec.fill;
+          if (fluids.isGas(fluid)) {
+            out.push({ x, y, rx, ry, fluid, from: -Infinity, to: Math.ceil(y - ry + depth) });
+          } else {
+            out.push({ x, y, rx, ry, fluid, from: Math.floor(y + ry - depth), to: Infinity });
+          }
           break;
         }
       }

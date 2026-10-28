@@ -1,6 +1,7 @@
 import { ChunkStore } from '@/core/world/ChunkStore';
-import { chunkTransferables, cloneChunk, type ChunkData } from '@/core/world/chunk';
+import { chunkTransferables, cloneChunk, tileIndex, type ChunkData } from '@/core/world/chunk';
 import {
+  CHUNK_MASK,
   CHUNK_SHIFT,
   CHUNK_SIZE,
   UNLOADED,
@@ -279,12 +280,31 @@ export class SimHost {
       // An opening can let neighboring fluid in, loosen sand, or undermine a ceiling.
       world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
       world.solids.removed(x, y);
+      if (this.gasNextTo(world.chunks, x, y)) {
+        this.post({ type: 'simEvents', events: [{ kind: 'vent', x, y }] });
+      }
     }
     // Always answer with the authoritative value so a rejected dig is corrected.
     this.post({
       type: 'tilesChanged',
       changes: [{ x, y, material: world.chunks.materialAt(x, y) }],
     });
+  }
+
+  /** Whether a gas sits next to (x, y): digging there opens a pocket. */
+  private gasNextTo(chunks: ChunkStore, x: number, y: number): boolean {
+    for (const [dx, dy] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const) {
+      const chunk = chunks.get((x + dx) >> CHUNK_SHIFT, (y + dy) >> CHUNK_SHIFT);
+      if (!chunk || !chunks.inBounds(x + dx, y + dy)) continue;
+      const i = tileIndex((x + dx) & CHUNK_MASK, (y + dy) & CHUNK_MASK);
+      if (chunk.fluidAmount[i]! > 0 && this.deps.fluids.isGas(chunk.fluidType[i]!)) return true;
+    }
+    return false;
   }
 
   private damageTiles(changes: readonly DamageChange[]): void {

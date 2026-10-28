@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development. Pools: fill 1 is a sealed aquifer; below 1 is a lake whose air can open into caves. poolShell is the rock kept around a pool's fluid so it starts still. support (off while ceilings can't collapse): natural ceilings that can't span their gap are rebuilt in the first reinforce material strong enough; where none is, natural columns are added.",
+  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development. Pools: fill 1 is a sealed pocket; below 1 is a lake (or, for a gas, a cloud under the roof) whose open part can join caves. poolShell is the rock kept around a pool's fluid so it starts still. support (off while ceilings can't collapse): natural ceilings that can't span their gap are rebuilt in the first reinforce material strong enough; where none is, natural columns are added.",
   "width": 384,
   "depth": 3000,
   "surfaceY": 48,
@@ -291,6 +291,22 @@
       "rx": [12, 24],
       "ry": [6, 10],
       "fill": 0.5
+    },
+    {
+      "layer": "fungal",
+      "fluid": "spore-gas",
+      "count": 14,
+      "rx": [3, 7],
+      "ry": [2, 4],
+      "fill": 1
+    },
+    {
+      "layer": "magma",
+      "fluid": "firedamp",
+      "count": 12,
+      "rx": [3, 7],
+      "ry": [2, 4],
+      "fill": 1
     }
   ],
   "support": {

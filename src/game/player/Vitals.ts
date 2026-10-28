@@ -6,9 +6,9 @@ import type { FluidContact } from '../physics/fluidContact';
 import type { Player } from './Player';
 
 /**
- * Health and breath. Breath drains while the head is under fluid and refills
- * in air; at zero the player starts drowning. Harmful fluids (lava) hurt on
- * contact. Health regenerates after a while out of danger and never drops
+ * Health and breath. Breath drains while the head is under a liquid and
+ * refills otherwise; at zero the player starts drowning. Harmful fluids hurt
+ * on contact (lava, flame) or when breathed (spore gas). Health regenerates after a while out of danger and never drops
  * below `minHealth`: hazards can't kill until rescue exists (phase 3).
  */
 export class Vitals {
@@ -30,16 +30,22 @@ export class Vitals {
 
   update(player: Player, fluid: FluidContact, dt: number): void {
     const t = this.tuning;
-    if (fluid.headFluid !== 0) {
+    const head = this.fluids.get(fluid.headFluid);
+    if (head?.kind === 'liquid') {
       player.breath = Math.max(0, player.breath - dt);
     } else {
       player.breath = Math.min(t.breathSeconds, player.breath + dt * t.breathRefillRate);
     }
 
-    const harmful = this.fluids.get(fluid.fluid)?.damagePerSecond ?? 0;
-    const touching = fluid.submersion > 0.05 && harmful > 0;
+    const body = this.fluids.get(fluid.fluid);
+    const touching =
+      body?.harm === 'contact' && body.damagePerSecond > 0 && fluid.submersion > 0.05;
+    const breathing = head?.harm === 'breath' && head.damagePerSecond > 0;
     const drowning = player.breath === 0;
-    const damage = (touching ? harmful : 0) + (drowning ? t.drownDamagePerSecond : 0);
+    const damage =
+      (touching ? body.damagePerSecond : 0) +
+      (breathing ? head.damagePerSecond : 0) +
+      (drowning ? t.drownDamagePerSecond : 0);
 
     this.sinceHurtEvent += dt;
     if (damage > 0) {
@@ -48,7 +54,7 @@ export class Vitals {
       if (this.sinceHurtEvent >= t.hurtEventInterval) {
         this.sinceHurtEvent = 0;
         this.events.emit('hurt', {
-          cause: touching ? 'fluid' : 'drowning',
+          cause: touching ? 'fluid' : breathing ? 'gas' : 'drowning',
           fluid: touching ? fluid.fluid : fluid.headFluid,
         });
       }

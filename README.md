@@ -42,6 +42,11 @@ flat test world instead (each keeps its own save).
   while your head is under; when they run out you start drowning. Lava burns on contact.
   Health shows top right when hurt, with a red vignette, and regenerates after a few seconds
   out of danger. Until rescue arrives in phase 3, nothing can take you below 1 HP.
+- **Gas:** gases rise and pool under ceilings as a haze, and digging into a pocket hisses.
+  Green spore gas (Fungal deep) makes the mole cough and hurts while breathed. Pale
+  firedamp (Magma belt) is safe to breathe, but if it touches lava a flash fire runs
+  through the whole cloud and burns anyone inside. Blocks are never broken. Water pushes
+  gas out of its way, thin gas fades, and gas reaching open sky blows away.
 - **Falling sand:** dig under sand and it slips for a moment, then the whole column falls.
   Anything landing on the mole hurts and pops it out on top. Ceilings don't collapse for
   now (see Status).
@@ -144,8 +149,18 @@ with flowstone ceilings and natural columns, is off too (`support.enabled` in
 `worldgen.json`). The test world has a wide flat dirt room (x 100–113, y 34–36) for trying
 it.
 
-**Phase 1, still to come:** heat and gas; simulation zones (fluids and solids run in every
-loaded chunk for now) and full saving.
+**Phase 1, slice 4 (done):** gas. Gases share the fluid layer (`fluids.json`, `kind: "gas"`):
+they rise, spread under ceilings, swap places with liquids, fade when thin, and vanish in
+the sky. Reactions can now turn one fluid into another, which is how firedamp touching lava
+or flame becomes a short-lived flame that lights the cave. World gen adds sealed spore gas
+pockets in the Fungal deep and firedamp pockets in the Magma belt. The test world has a
+spore pocket (x 140–145, y 40–42) and a firedamp room (x 120–135, y 30–33) with lava
+behind its east wall: dig x 136, y 31 to set it off.
+
+**Phase 1, still to come (reordered):** simulation zones and the 60 fps phone gate (fluids
+and solids run in every loaded chunk for now), then heat (a temperature field from depth
+and lava, warnings only). Melting and igniting at heat limits move to phase 2 with fire,
+torches and furnaces; cave-ins come back there with support beams.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

@@ -11,6 +11,8 @@ import { Vitals } from './Vitals';
 const fluids = loadFluids(loadMaterials());
 const WATER = fluids.require('water').id;
 const LAVA = fluids.require('lava').id;
+const SPORES = fluids.require('spore-gas').id;
+const FIREDAMP = fluids.require('firedamp').id;
 const t = tuning.vitals;
 
 function setup() {
@@ -57,5 +59,19 @@ describe('Vitals', () => {
     run(0.5, { fluid: LAVA, submersion: 0.2, headFluid: 0 });
     expect(player.health).toBeLessThan(t.maxHealth);
     expect(hurts[0]).toEqual({ cause: 'fluid', fluid: LAVA });
+  });
+
+  it('hurts while breathing spore gas, without using up breath', () => {
+    const { player, run, hurts } = setup();
+    run(1, { fluid: SPORES, submersion: 1, headFluid: SPORES });
+    expect(player.breath).toBe(t.breathSeconds);
+    expect(player.health).toBeLessThan(t.maxHealth);
+    expect(hurts[0]?.cause).toBe('gas');
+  });
+
+  it('lets the mole breathe firedamp safely', () => {
+    const { player, run } = setup();
+    run(2, { fluid: FIREDAMP, submersion: 1, headFluid: FIREDAMP });
+    expect(player.health).toBe(t.maxHealth);
   });
 });

@@ -1,28 +1,97 @@
 {
   "version": 1,
-  "notes": "Fluids live in a tile's fluid layer (amount 0-8) on top of a non-solid material. ids are persisted in saves: never change or reuse them. 0 means no fluid. flowEvery: the fluid moves on one tick in N (lava is thick). light: emitted at full depth. damagePerSecond: to the player while touching it. swimSpeedScale and moveScale scale the player's swim and walk speeds inside it.",
+  "notes": "Fluids live in a tile's fluid layer (amount 0-8) on top of a non-solid material. ids are persisted in saves: never change or reuse them; 0 means no fluid. kind: liquids fall and fill tiles from the bottom; gases rise, fill the whole tile (amount is concentration) and vanish in open sky. Liquids push gases out of their way. flowEvery: moves on one tick in N (0: never moves). light: emitted at full amount. damagePerSecond applies on 'contact' (any part of the body) or 'breath' (head inside). decay: tiles at or below maxAmount lose one unit every everyTicks ticks (thin gas fades; flames burn out). swimSpeedScale and moveScale scale the player's swim and walk speeds in liquids. Reactions: a tile of `fluid` touching `touching` turns into the material `becomes` or the fluid `becomesFluid`, and removes `consumes` from the touching tile.",
   "fluids": [
     {
       "id": 1,
       "key": "water",
       "name": "Water",
+      "kind": "liquid",
       "flowEvery": 1,
       "light": 0,
       "damagePerSecond": 0,
+      "harm": "contact",
       "swimSpeedScale": 1,
       "moveScale": 0.6,
-      "visual": { "color": "water", "surface": "sky", "opacity": 0.6 }
+      "visual": {
+        "color": "water",
+        "surface": "sky",
+        "opacity": 0.6
+      }
     },
     {
       "id": 2,
       "key": "lava",
       "name": "Lava",
+      "kind": "liquid",
       "flowEvery": 4,
       "light": 12,
       "damagePerSecond": 30,
+      "harm": "contact",
       "swimSpeedScale": 0.45,
       "moveScale": 0.35,
-      "visual": { "color": "lava", "surface": "ember", "opacity": 0.95 }
+      "visual": {
+        "color": "lava",
+        "surface": "ember",
+        "opacity": 0.95
+      }
+    },
+    {
+      "id": 3,
+      "key": "spore-gas",
+      "name": "Spore gas",
+      "kind": "gas",
+      "flowEvery": 2,
+      "light": 0,
+      "damagePerSecond": 6,
+      "harm": "breath",
+      "decay": {
+        "maxAmount": 2,
+        "everyTicks": 60
+      },
+      "visual": {
+        "color": "glow",
+        "surface": "glow",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": 4,
+      "key": "firedamp",
+      "name": "Firedamp",
+      "kind": "gas",
+      "flowEvery": 2,
+      "light": 0,
+      "damagePerSecond": 0,
+      "harm": "breath",
+      "decay": {
+        "maxAmount": 2,
+        "everyTicks": 60
+      },
+      "visual": {
+        "color": "sandLight",
+        "surface": "sandLight",
+        "opacity": 0.35
+      }
+    },
+    {
+      "id": 5,
+      "key": "flame",
+      "name": "Flame",
+      "kind": "gas",
+      "flowEvery": 0,
+      "light": 14,
+      "damagePerSecond": 80,
+      "harm": "contact",
+      "decay": {
+        "maxAmount": 8,
+        "everyTicks": 1
+      },
+      "visual": {
+        "color": "ember",
+        "surface": "gold",
+        "opacity": 0.85
+      }
     }
   ],
   "reactions": [
@@ -32,6 +101,20 @@
       "becomes": "obsidian",
       "consumes": 4,
       "event": "quench"
+    },
+    {
+      "fluid": "firedamp",
+      "touching": "lava",
+      "becomesFluid": "flame",
+      "consumes": 0,
+      "event": "ignite"
+    },
+    {
+      "fluid": "firedamp",
+      "touching": "flame",
+      "becomesFluid": "flame",
+      "consumes": 0,
+      "event": null
     }
   ]
 }

@@ -10,9 +10,11 @@ export interface GameEvents {
   landed: { speed: number };
   inspect: { x: number; y: number };
   splash: { x: number; y: number; fluid: number; speed: number };
-  hurt: { cause: 'drowning' | 'fluid' | 'crushed'; fluid: number };
+  hurt: { cause: 'drowning' | 'fluid' | 'gas' | 'crushed'; fluid: number };
   // From the sim (see SimEventKind):
   quench: SimEvent;
+  ignite: SimEvent;
+  vent: SimEvent;
   creak: SimEvent;
   collapse: SimEvent;
   loose: SimEvent;

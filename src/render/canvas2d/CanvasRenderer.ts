@@ -22,6 +22,7 @@ interface FluidStyle {
   color: string;
   surface: string;
   opacity: number;
+  gas: boolean;
 }
 
 /** Canvas 2D renderer with crisp whole-number pixel scaling. */
@@ -39,6 +40,8 @@ export class CanvasRenderer implements Renderer {
   /** Indexed by fluid id. */
   private readonly fluidStyles: (FluidStyle | undefined)[] = [];
   private readonly fluidPaths: { body: Path2D; surface: Path2D; any: boolean }[] = [];
+  /** Gas haze by packed fluid (type << 4 | amount), since its strength sets its alpha. */
+  private gasPaths = new Map<number, Path2D>();
   private sprite: { canvas: Surface; ctx: Ctx2D; scale: number } | null = null;
 
   constructor(
@@ -55,6 +58,7 @@ export class CanvasRenderer implements Renderer {
         color: palette[f.visual.color],
         surface: palette[f.visual.surface],
         opacity: f.visual.opacity,
+        gas: f.kind === 'gas',
       };
     }
     for (let level = 0; level < 16; level++) {
@@ -163,8 +167,9 @@ export class CanvasRenderer implements Renderer {
   }
 
   /**
-   * Fluid in a tile range: a body filled to its amount (or the whole tile
-   * under more of the same fluid) and a lighter surface line on top.
+   * Fluid in a tile range. A liquid is a body filled to its amount (or the
+   * whole tile under more of itself) with a lighter surface line on top; a gas
+   * is a haze over the whole tile, thicker where it's stronger.
    */
   private drawFluids(
     ctx: Ctx2D,
@@ -182,6 +187,7 @@ export class CanvasRenderer implements Renderer {
     for (let id = 0; id < this.fluidStyles.length; id++) {
       paths[id] = { body: new Path2D(), surface: new Path2D(), any: false };
     }
+    this.gasPaths.clear();
     const fluidAt = this.mirror.fluidAt;
     for (let y = ty0; y <= ty1; y++) {
       for (let x = tx0; x <= tx1; x++) {
@@ -190,8 +196,14 @@ export class CanvasRenderer implements Renderer {
         const type = fluidType(f);
         const path = paths[type];
         if (!path) continue;
-        path.any = true;
         const sx = ox + x * tile;
+        if (this.fluidStyles[type]?.gas) {
+          let haze = this.gasPaths.get(f);
+          if (!haze) this.gasPaths.set(f, (haze = new Path2D()));
+          haze.rect(sx, oy + y * tile, tile, tile);
+          continue;
+        }
+        path.any = true;
         const bottom = oy + (y + 1) * tile;
         if (fluidType(fluidAt(x, y - 1)) === type) {
           path.body.rect(sx, bottom - tile, tile, tile);
@@ -211,6 +223,12 @@ export class CanvasRenderer implements Renderer {
       ctx.fill(path.body);
       ctx.fillStyle = style.surface;
       ctx.fill(path.surface);
+    }
+    for (const [f, haze] of this.gasPaths) {
+      const style = this.fluidStyles[fluidType(f)]!;
+      ctx.globalAlpha = style.opacity * alphaScale * (0.25 + (0.75 * fluidAmount(f)) / FLUID_MAX);
+      ctx.fillStyle = style.color;
+      ctx.fill(haze);
     }
     ctx.globalAlpha = 1;
   }
