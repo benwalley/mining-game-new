@@ -8,8 +8,11 @@ import type { GameEvents } from '@/game/events';
 import type { AudioService } from './AudioService';
 import type { Haptics } from './haptics';
 
-/** Quenching can happen dozens of times a tick; one hiss per window is plenty. */
-const HISS_MIN_MS = 90;
+/**
+ * Minimum gap between repeats of a sound. Quenching, creaking and landing can
+ * happen dozens of times a tick; one per window is plenty.
+ */
+const SOUND_GAP_MS = { hiss: 90, creak: 300, rumble: 150, thud: 70, trickle: 150 };
 
 const DIR_VECTORS = {
   left: [1, 0],
@@ -20,7 +23,7 @@ const DIR_VECTORS = {
 
 /** Turns gameplay events into sound, haptics and particles. Gameplay never calls these directly. */
 export class FeedbackDirector {
-  private lastHissAt = -Infinity;
+  private readonly lastSoundAt = new Map<keyof typeof SOUND_GAP_MS, number>();
 
   constructor(
     events: EventBus<GameEvents>,
@@ -69,12 +72,40 @@ export class FeedbackDirector {
       this.audio.hurt();
       this.haptics.tick();
     });
-    events.on('quench', () => {
-      const now = performance.now();
-      if (now - this.lastHissAt < HISS_MIN_MS) return;
-      this.lastHissAt = now;
-      this.audio.hiss();
+    events.on('quench', () => this.throttled('hiss', () => this.audio.hiss()));
+    events.on('creak', (e) => {
+      this.throttled('creak', () => this.audio.creak());
+      // Dust sifting down from the failing tile.
+      this.dust(e.x + 0.5, e.y + 1, e.material, 2);
     });
+    events.on('collapse', (e) => {
+      this.throttled('rumble', () => {
+        this.audio.rumble();
+        this.haptics.pulse();
+      });
+      if (e.material !== undefined) this.debris(e.x, e.y, e.material, 6, 3);
+    });
+    events.on('loose', (e) => {
+      this.throttled('trickle', () => this.audio.trickle());
+      this.dust(e.x + 0.5, e.y + 1, e.material, 4);
+    });
+    events.on('land', (e) => {
+      this.throttled('thud', () => this.audio.thud());
+      this.dust(e.x + 0.5, e.y + 1, e.material, 3);
+    });
+  }
+
+  private throttled(sound: keyof typeof SOUND_GAP_MS, play: () => void): void {
+    const now = performance.now();
+    if (now - (this.lastSoundAt.get(sound) ?? -Infinity) < SOUND_GAP_MS[sound]) return;
+    this.lastSoundAt.set(sound, now);
+    play();
+  }
+
+  /** A few slow motes drifting down. */
+  private dust(x: number, y: number, material: number | undefined, count: number): void {
+    const color = material === undefined ? palette.fog : this.materials.colorOf(material, 'light');
+    this.particles.burst(x, y, count, [color, palette.fog], { speed: 0.8, life: 0.7, dirY: 1 });
   }
 
   private debris(

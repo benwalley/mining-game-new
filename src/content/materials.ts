@@ -2,7 +2,16 @@ import materialsData from '@/data/materials.json';
 import { isColorName, palette, type ColorName } from './palette';
 
 export type TilePattern =
-  'bedrock' | 'soil' | 'grain' | 'smooth' | 'fiber' | 'block' | 'vein' | 'crystal' | 'spots';
+  | 'bedrock'
+  | 'soil'
+  | 'grain'
+  | 'smooth'
+  | 'fiber'
+  | 'block'
+  | 'vein'
+  | 'crystal'
+  | 'spots'
+  | 'rubble';
 
 export interface MaterialVisual {
   base: ColorName;
@@ -43,6 +52,7 @@ const PATTERNS: readonly TilePattern[] = [
   'vein',
   'crystal',
   'spots',
+  'rubble',
 ];
 
 /** Lookup of all materials by numeric id and by key. */
@@ -51,6 +61,8 @@ export class MaterialRegistry {
   private readonly byKey = new Map<string, MaterialDef>();
   readonly air: MaterialDef;
   readonly bedrock: MaterialDef;
+  /** What collapsed ceilings become; it remembers what it was in the tile's origin. */
+  readonly rubble: MaterialDef;
 
   constructor(defs: readonly MaterialDef[]) {
     for (const def of defs) {
@@ -61,6 +73,7 @@ export class MaterialRegistry {
     }
     this.air = this.require('air');
     this.bedrock = this.require('bedrock');
+    this.rubble = this.require('rubble');
     if (this.air.numId !== 0) throw new Error('Material "air" must have numId 0');
   }
 
@@ -76,6 +89,11 @@ export class MaterialRegistry {
     const def = this.byKey.get(key);
     if (!def) throw new Error(`Unknown material "${key}"`);
     return def;
+  }
+
+  /** Loose materials (sand, rubble) fall when nothing solid is under them. */
+  falls(def: MaterialDef): boolean {
+    return def.trait === 'falls';
   }
 
   /** Numeric ids are dense, so this is a safe upper bound for lookup tables. */

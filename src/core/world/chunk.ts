@@ -19,6 +19,8 @@ export interface ChunkData {
   material: Uint16Array;
   /** Dig/structural damage, 0–255. */
   damage: Uint8Array;
+  /** What a tile was made from, for tiles that remember it (rubble); 0 otherwise. */
+  origin: Uint16Array;
   fluidType: Uint8Array;
   /** 0–8. */
   fluidAmount: Uint8Array;
@@ -30,6 +32,7 @@ export interface ChunkData {
 export const CHUNK_FIELDS = [
   'material',
   'damage',
+  'origin',
   'fluidType',
   'fluidAmount',
   'temperature',
@@ -47,6 +50,7 @@ export function createChunk(cx: number, cy: number): ChunkData {
     cy,
     material: new Uint16Array(CHUNK_AREA),
     damage: new Uint8Array(CHUNK_AREA),
+    origin: new Uint16Array(CHUNK_AREA),
     fluidType: new Uint8Array(CHUNK_AREA),
     fluidAmount: new Uint8Array(CHUNK_AREA),
     temperature: new Int16Array(CHUNK_AREA),
@@ -61,6 +65,7 @@ export function cloneChunk(chunk: ChunkData): ChunkData {
     cy: chunk.cy,
     material: chunk.material.slice(),
     damage: chunk.damage.slice(),
+    origin: chunk.origin.slice(),
     fluidType: chunk.fluidType.slice(),
     fluidAmount: chunk.fluidAmount.slice(),
     temperature: chunk.temperature.slice(),

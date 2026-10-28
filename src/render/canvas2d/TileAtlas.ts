@@ -5,7 +5,8 @@ import { createSurface, type Ctx2D, type Surface } from './surface';
 
 /**
  * One image holding every tile sprite. Row 0: materials by numId. Row 1:
- * backdrop, then crack stages. Generated in code today; `fromImage` lets a
+ * backdrop, then crack stages. Row 2: rubble made from each material, by the
+ * origin material's numId. Generated in code today; `fromImage` lets a
  * hand-drawn PNG with the same layout replace it later.
  */
 export class TileAtlas {
@@ -16,9 +17,12 @@ export class TileAtlas {
 
   static generate(materials: MaterialRegistry, crackStages: number): TileAtlas {
     const cols = Math.max(materials.maxNumId + 1, TileAtlas.CRACK_COL + crackStages);
-    const { canvas, ctx } = createSurface(cols * TILE_PX, 2 * TILE_PX);
+    const { canvas, ctx } = createSurface(cols * TILE_PX, 3 * TILE_PX);
     for (const m of materials.all) {
-      if (m.visual) drawMaterialTile(ctx, m.key, m.visual, m.numId * TILE_PX, 0);
+      if (!m.visual) continue;
+      drawMaterialTile(ctx, m.key, m.visual, m.numId * TILE_PX, 0);
+      const rubble = { ...m.visual, pattern: 'rubble' as const };
+      drawMaterialTile(ctx, `rubble/${m.key}`, rubble, m.numId * TILE_PX, 2 * TILE_PX);
     }
     drawBackdropTile(ctx, TileAtlas.BACKDROP_COL * TILE_PX, TILE_PX);
     for (let s = 1; s <= crackStages; s++) {
@@ -33,6 +37,25 @@ export class TileAtlas {
 
   drawMaterial(ctx: Ctx2D, numId: number, dx: number, dy: number, size = TILE_PX): void {
     ctx.drawImage(this.image, numId * TILE_PX, 0, TILE_PX, TILE_PX, dx, dy, size, size);
+  }
+
+  /** Rubble that remembers `origin`; plain rubble (`fallback`) when it doesn't. */
+  drawRubble(ctx: Ctx2D, origin: number, fallback: number, dx: number, dy: number): void {
+    if (origin === 0) {
+      this.drawMaterial(ctx, fallback, dx, dy);
+      return;
+    }
+    ctx.drawImage(
+      this.image,
+      origin * TILE_PX,
+      2 * TILE_PX,
+      TILE_PX,
+      TILE_PX,
+      dx,
+      dy,
+      TILE_PX,
+      TILE_PX,
+    );
   }
 
   drawBackdrop(ctx: Ctx2D, dx: number, dy: number, size = TILE_PX): void {

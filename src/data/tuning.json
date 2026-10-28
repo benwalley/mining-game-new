@@ -89,5 +89,12 @@
     "breathRefillRate": 4,
     "drownDamagePerSecond": 12,
     "hurtEventInterval": 0.4
+  },
+  "support": {
+    "failSeconds": 2.5,
+    "chainFailSeconds": 0.6,
+    "looseSeconds": 0.4,
+    "dustEverySeconds": 0.35,
+    "fallHitDamage": 15
   }
 }

@@ -8,7 +8,7 @@ import type { WorldDims } from '@/core/world/constants';
  * When a record's shape changes: bump SAVE_VERSION and add a migration from the
  * previous version. Never edit an existing migration.
  */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface WorldMeta {
   saveVersion: number;
@@ -28,6 +28,7 @@ export interface ChunkRecord {
   cy: number;
   material: Uint16Array;
   damage: Uint8Array;
+  origin: Uint16Array;
   fluidType: Uint8Array;
   fluidAmount: Uint8Array;
   temperature: Int16Array;
@@ -45,9 +46,12 @@ export interface EntityRecord<T = unknown> {
 type Migration = (record: Record<string, unknown>) => Record<string, unknown>;
 
 /** migrations[n] upgrades a record from version n to n + 1. */
-const chunkMigrations: Record<number, Migration> = {};
-const metaMigrations: Record<number, Migration> = {};
-const entityMigrations: Record<number, Migration> = {};
+const chunkMigrations: Record<number, Migration> = {
+  // v2 added `origin` (what rubble was made from).
+  1: (r) => ({ ...r, origin: new Uint16Array((r.material as Uint16Array).length) }),
+};
+const metaMigrations: Record<number, Migration> = { 1: (r) => r };
+const entityMigrations: Record<number, Migration> = { 1: (r) => r };
 
 function migrate<T>(record: { saveVersion: number }, migrations: Record<number, Migration>): T {
   let current = record as unknown as Record<string, unknown> & { saveVersion: number };
@@ -79,6 +83,7 @@ export function decodeChunk(record: ChunkRecord): ChunkData {
     cy: r.cy,
     material: r.material,
     damage: r.damage,
+    origin: r.origin,
     fluidType: r.fluidType,
     fluidAmount: r.fluidAmount,
     temperature: r.temperature,

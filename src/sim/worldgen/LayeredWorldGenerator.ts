@@ -7,7 +7,46 @@ import type { MaterialRegistry } from '@/content/materials';
 import type { WorldGenerator } from './WorldGenerator';
 
 /** Bump when the generation code changes in a way that alters output. */
-const CODE_VERSION = 2;
+const CODE_VERSION = 3;
+
+/** How far the support pass looks along a ceiling row for something to rest on. */
+const SUPPORT_SCAN = 48;
+/** How far it looks up for a ceiling and down for a floor when placing a column. */
+const COLUMN_SCAN = 96;
+const PAD_X = SUPPORT_SCAN + 1;
+const PAD_Y = COLUMN_SCAN + 1;
+
+/** How a ceiling run ends on one side. */
+const enum End {
+  /** Open space: the ceiling steps up. */
+  Air,
+  /** A tile resting on something: support. */
+  Pillar,
+  /** Still going when the scan stopped. */
+  Limit,
+}
+
+interface Run {
+  a: number;
+  b: number;
+  left: End;
+  right: End;
+}
+
+/** Raw terrain over a chunk and the margin around it, before the support pass. */
+interface Region {
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  material: Uint16Array;
+  /** Fluid id for tiles inside a pool's filled part. */
+  fluid: Uint8Array;
+  /** 1 inside a pool (filled or not); columns never go there. */
+  pool: Uint8Array;
+  /** First ground row per column. */
+  top: Int32Array;
+}
 
 export interface LayeredWorldConfig {
   width: number;
@@ -40,6 +79,12 @@ export interface LayeredWorldConfig {
     maxDepth?: number;
   }[];
   caverns: { layer: string; count: number; rx: number[]; ry: number[] }[];
+  /**
+   * Natural ceilings must obey the support rule. Over-long ones are rebuilt in
+   * the first `reinforce` material strong enough; where even the last can't
+   * span it, columns of `column` are added.
+   */
+  support: { reinforce: string[]; column: string };
   /** Rock around a pool's fluid that caves never cut, so pools start sealed and still. */
   poolShell: number;
   /**
@@ -112,6 +157,12 @@ export class LayeredWorldGenerator implements WorldGenerator {
   private readonly layers: Layer[];
   private readonly caverns: Cavern[];
   private readonly pools: Pool[];
+  private readonly solidById: Uint8Array;
+  private readonly spanById: Float64Array;
+  private readonly reinforce: { material: number; span: number }[];
+  private readonly column: number;
+  private readonly columnSpacing: number;
+  private cached: ChunkData | null = null;
   /** The pool matched by the last `poolAt` call that returned Inside. */
   private hitPool: Pool | null = null;
 
@@ -132,6 +183,20 @@ export class LayeredWorldGenerator implements WorldGenerator {
     this.air = materials.air.numId;
 
     const id = (key: string): number => materials.require(key).numId;
+    this.solidById = new Uint8Array(materials.maxNumId + 1);
+    this.spanById = new Float64Array(materials.maxNumId + 1);
+    for (const m of materials.all) {
+      this.solidById[m.numId] = m.solid ? 1 : 0;
+      this.spanById[m.numId] = m.indestructible ? Infinity : m.supportSpan;
+    }
+    this.reinforce = config.support.reinforce
+      .map((key) => materials.require(key))
+      .map((m) => ({ material: m.numId, span: m.supportSpan }))
+      .sort((p, q) => p.span - q.span);
+    const strongest = this.reinforce.at(-1)?.span ?? 0;
+    this.column = id(config.support.column);
+    // Columns this far apart leave no ceiling tile beyond the strongest span.
+    this.columnSpacing = 2 * strongest + 1;
     this.layers = config.layers.map((l, i) => ({
       fromDepth: l.fromDepth,
       base: id(l.base),
@@ -159,49 +224,165 @@ export class LayeredWorldGenerator implements WorldGenerator {
     const chunk = createChunk(cx, cy);
     const x0 = cx * CHUNK_SIZE;
     const y0 = cy * CHUNK_SIZE;
-    // Caverns are few; keep only those that can reach this chunk.
-    const caverns = this.caverns.filter(
-      (c) =>
-        c.x + c.rx * 1.3 >= x0 &&
-        c.x - c.rx * 1.3 < x0 + CHUNK_SIZE &&
-        c.y + c.ry * 1.3 >= y0 &&
-        c.y - c.ry * 1.3 < y0 + CHUNK_SIZE,
-    );
-    const pools = this.pools.filter((p) => {
-      const s = this.config.poolShell + 1;
-      return (
-        p.x + p.rx + s >= x0 &&
-        p.x - p.rx - s < x0 + CHUNK_SIZE &&
-        p.y + p.ry + s >= y0 &&
-        p.y - p.ry - s < y0 + CHUNK_SIZE
-      );
-    });
-    const bounds = new Float64Array(this.layers.length);
-    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-      const x = x0 + lx;
-      const top = this.surfaceTop(x);
-      this.layerBounds(x, bounds);
-      for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-        const y = y0 + ly;
+    // The support pass reads beyond the chunk, so generate raw terrain with a margin.
+    const g = this.region(x0 - PAD_X, y0 - PAD_Y, CHUNK_SIZE + 2 * PAD_X, CHUNK_SIZE + 2 * PAD_Y);
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const u = lx + PAD_X;
+        const v = ly + PAD_Y;
+        const j = v * g.w + u;
         const i = tileIndex(lx, ly);
-        chunk.material[i] = this.tileAt(x, y, top, bounds, caverns, pools);
-        if (pools.length > 0 && this.poolAt(x, y, pools) === PoolHit.Inside) {
-          const pool = this.hitPool!;
-          if (y >= pool.level) {
-            chunk.fluidType[i] = pool.fluid;
-            chunk.fluidAmount[i] = FLUID_MAX;
-          }
+        chunk.material[i] = this.supported(g, u, v);
+        if (g.fluid[j]) {
+          chunk.fluidType[i] = g.fluid[j]!;
+          chunk.fluidAmount[i] = FLUID_MAX;
         }
       }
     }
     return chunk;
   }
 
-  /** Material at a world tile. Slow path for tests and tools. */
+  /** Material at a world tile. Slow path for tests and tools (generates its chunk). */
   materialAt(x: number, y: number): number {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cy = Math.floor(y / CHUNK_SIZE);
+    if (this.cached?.cx !== cx || this.cached.cy !== cy) this.cached = this.generateChunk(cx, cy);
+    return this.cached.material[tileIndex(x - cx * CHUNK_SIZE, y - cy * CHUNK_SIZE)]!;
+  }
+
+  private region(x0: number, y0: number, w: number, h: number): Region {
+    // Caverns and pools are few; keep only those that can reach the region.
+    const caverns = this.caverns.filter(
+      (c) =>
+        c.x + c.rx * 1.3 >= x0 &&
+        c.x - c.rx * 1.3 < x0 + w &&
+        c.y + c.ry * 1.3 >= y0 &&
+        c.y - c.ry * 1.3 < y0 + h,
+    );
+    const s = this.config.poolShell + 1;
+    const pools = this.pools.filter(
+      (p) =>
+        p.x + p.rx + s >= x0 &&
+        p.x - p.rx - s < x0 + w &&
+        p.y + p.ry + s >= y0 &&
+        p.y - p.ry - s < y0 + h,
+    );
+    const g: Region = {
+      x0,
+      y0,
+      w,
+      h,
+      material: new Uint16Array(w * h),
+      fluid: new Uint8Array(w * h),
+      pool: new Uint8Array(w * h),
+      top: new Int32Array(w),
+    };
     const bounds = new Float64Array(this.layers.length);
-    this.layerBounds(x, bounds);
-    return this.tileAt(x, y, this.surfaceTop(x), bounds, this.caverns, this.pools);
+    for (let u = 0; u < w; u++) {
+      const x = x0 + u;
+      const top = this.surfaceTop(x);
+      g.top[u] = top;
+      this.layerBounds(x, bounds);
+      for (let v = 0; v < h; v++) {
+        const y = y0 + v;
+        const j = v * w + u;
+        g.material[j] = this.tileAt(x, y, top, bounds, caverns, pools);
+        if (pools.length > 0 && this.poolAt(x, y, pools) === PoolHit.Inside) {
+          g.pool[j] = 1;
+          if (y >= this.hitPool!.level) g.fluid[j] = this.hitPool!.fluid;
+        }
+      }
+    }
+    return g;
+  }
+
+  /**
+   * The support pass for one tile: a ceiling tile that can't span its gap is
+   * rebuilt in stronger rock, and a cave tile under a ceiling no rock can span
+   * may become part of a natural column. Pure in the region, so neighboring
+   * chunks agree.
+   */
+  private supported(g: Region, u: number, v: number): number {
+    const m = g.material[v * g.w + u]!;
+    if (this.solidById[m]) {
+      if (this.solidAt(g, u, v + 1) || this.spanById[m] === Infinity) return m;
+      const d = this.distance(this.runAt(g, u, v), u);
+      if (d <= this.spanById[m]!) return m;
+      const fix = this.reinforce.find((r) => r.span >= d) ?? this.reinforce.at(-1);
+      return fix && fix.span > this.spanById[m]! ? fix.material : m;
+    }
+    if (g.pool[v * g.w + u] || g.y0 + v < g.top[u]!) return m;
+    return this.isColumn(g, u, v) ? this.column : m;
+  }
+
+  private isColumn(g: Region, u: number, v: number): boolean {
+    let c = -1;
+    for (let t = v - 1; t >= Math.max(0, v - COLUMN_SCAN); t--) {
+      if (g.pool[t * g.w + u]) return false;
+      if (this.solidAt(g, u, t)) {
+        c = t;
+        break;
+      }
+    }
+    if (c < 0) return false;
+    const run = this.runAt(g, u, c);
+    const site =
+      (g.x0 + u) % this.columnSpacing === 0 ||
+      (run.left === End.Air && u === run.a) ||
+      (run.right === End.Air && u === run.b);
+    if (!site) return false;
+    const strongest = this.reinforce.at(-1)?.span ?? 0;
+    let needed = false;
+    for (let t = run.a; t <= run.b && !needed; t++) needed = this.distance(run, t) > strongest;
+    if (!needed) return false;
+    // The column must stand on a floor within reach, outside any pool.
+    for (let t = v + 1; t <= Math.min(g.h - 1, c + COLUMN_SCAN); t++) {
+      if (g.pool[t * g.w + u]) return false;
+      if (this.solidAt(g, u, t)) return true;
+    }
+    return false;
+  }
+
+  /** The exposed ceiling run through (u, row): tiles with open space under them. */
+  private runAt(g: Region, u: number, row: number): Run {
+    const run: Run = { a: u, b: u, left: End.Limit, right: End.Limit };
+    for (let i = 1; i <= SUPPORT_SCAN; i++) {
+      const t = u - i;
+      if (!this.solidAt(g, t, row)) {
+        run.left = End.Air;
+        break;
+      }
+      if (this.solidAt(g, t, row + 1)) {
+        run.left = End.Pillar;
+        break;
+      }
+      run.a = t;
+    }
+    for (let i = 1; i <= SUPPORT_SCAN; i++) {
+      const t = u + i;
+      if (!this.solidAt(g, t, row)) {
+        run.right = End.Air;
+        break;
+      }
+      if (this.solidAt(g, t, row + 1)) {
+        run.right = End.Pillar;
+        break;
+      }
+      run.b = t;
+    }
+    return run;
+  }
+
+  private distance(run: Run, u: number): number {
+    const left = run.left === End.Pillar ? u - run.a + 1 : Infinity;
+    const right = run.right === End.Pillar ? run.b - u + 1 : Infinity;
+    return Math.min(left, right);
+  }
+
+  /** Solid in the raw terrain; the region's edges count as solid. */
+  private solidAt(g: Region, u: number, v: number): boolean {
+    if (u < 0 || v < 0 || u >= g.w || v >= g.h) return true;
+    return this.solidById[g.material[v * g.w + u]!] === 1;
   }
 
   /** Index into `config.layers` for a world tile (ignores caves). */

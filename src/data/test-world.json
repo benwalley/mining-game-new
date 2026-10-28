@@ -180,6 +180,14 @@
       "w": 9,
       "h": 3,
       "label": "lava basin in the chamber floor"
+    },
+    {
+      "op": "carve",
+      "x": 100,
+      "y": 34,
+      "w": 14,
+      "h": 3,
+      "label": "wide flat room in dirt (cave-in test)"
     }
   ]
 }

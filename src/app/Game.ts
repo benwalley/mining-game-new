@@ -20,7 +20,13 @@ import { ChunkMirror, fluidAmount, fluidType } from '@/game/world/ChunkMirror';
 import { ChunkStreamer } from '@/game/world/ChunkStreamer';
 import { KeyboardInput } from '@/input/KeyboardInput';
 import { PointerGestureInput } from '@/input/PointerGestureInput';
-import { PROTOCOL_VERSION, type WorldInfo, type WorldKind } from '@/protocol/messages';
+import {
+  PROTOCOL_VERSION,
+  type TileChange,
+  type WorldInfo,
+  type WorldKind,
+} from '@/protocol/messages';
+import { overlapsSolid } from '@/game/physics/tileCollision';
 import type { SimClient } from '@/protocol/SimClient';
 import { CanvasRenderer } from '@/render/canvas2d/CanvasRenderer';
 import { orientationFor } from '@/render/canvas2d/playerSprite';
@@ -176,13 +182,18 @@ export class Game {
         this.streamer.received(chunk.cx, chunk.cy);
         this.mirror.addChunk(chunk);
       }),
-      sim.on('tilesChanged', ({ changes }) => this.mirror.applyChanges(changes)),
+      sim.on('tilesChanged', ({ changes }) => {
+        this.mirror.applyChanges(changes);
+        this.checkCrushed(changes);
+      }),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
       sim.on('simEvents', ({ events }) => {
         for (const e of events) if (this.nearView(e.x, e.y)) this.events.emit(e.kind, e);
       }),
-      sim.on('simStats', ({ tickMs, awakeTiles }) => {
-        this.simStats = `${tickMs.toFixed(2)} ms/tick · ${awakeTiles} fluid tiles awake`;
+      sim.on('simStats', ({ tickMs, awakeTiles, solidsActive }) => {
+        this.simStats =
+          `${tickMs.toFixed(2)} ms/tick · ${awakeTiles} fluid tiles awake` +
+          ` · ${solidsActive} solids moving`;
       }),
       sim.on('saved', ({ at }) => {
         this.lastSave = new Date(at).toLocaleTimeString();
@@ -281,6 +292,34 @@ export class Game {
     const cur = hud.value;
     if (cur.health === health && cur.breath === breath) return;
     hud.value = { health, maxHealth: t.maxHealth, breath };
+  }
+
+  /** Something solid landed inside the mole: it hurts, and the mole pops out on top. */
+  private checkCrushed(changes: readonly TileChange[]): void {
+    const p = this.player;
+    const left = p.x - p.w / 2;
+    const top = p.y - p.h;
+    const hit = changes.some(
+      (c) =>
+        this.mirror.isSolid(c.x, c.y) &&
+        c.x + 1 > left &&
+        c.x < left + p.w &&
+        c.y + 1 > top &&
+        c.y < p.y,
+    );
+    if (!hit) return;
+    this.vitals.hit(p, this.deps.tuning.support.fallHitDamage);
+    // Nearest free spot: straight up first (on top of what fell), then to either side.
+    for (let up = 0; up <= 3; up++) {
+      for (const dx of [0, -1, 1]) {
+        const box = { x: p.x + dx, y: Math.floor(p.y) - up, w: p.w, h: p.h };
+        if (overlapsSolid(box, this.mirror.isSolid)) continue;
+        p.stepOffsetX -= box.x - p.x;
+        p.stepOffsetY -= box.y - p.y;
+        p.placeAt(box.x, box.y);
+        return;
+      }
+    }
   }
 
   private nearView(x: number, y: number): boolean {
@@ -417,10 +456,11 @@ export class Game {
     const x = Math.floor(t.x);
     const y = Math.floor(t.y);
     const m = this.deps.materials.get(this.mirror.materialAt(x, y));
+    const origin = this.deps.materials.get(this.mirror.originAt(x, y));
     const f = this.mirror.fluidAt(x, y);
     const fluid = f ? ` + ${this.deps.fluids.get(fluidType(f))?.name} ${fluidAmount(f)}/8` : '';
     this.inspected = m
-      ? `${m.name}${fluid} @${x},${y}: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
+      ? `${m.name}${origin ? ` of ${origin.name.toLowerCase()}` : ''}${fluid} @${x},${y}: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
         ` heat ${m.heatLimit} span ${m.supportSpan} fuel ${m.fuel}${m.trait ? ` [${m.trait}]` : ''}`
       : `unloaded @${x},${y}`;
     this.haptics.tick();

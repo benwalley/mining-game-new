@@ -42,6 +42,13 @@ flat test world instead (each keeps its own save).
   while your head is under; when they run out you start drowning. Lava burns on contact.
   Health shows top right when hurt, with a red vignette, and regenerates after a few seconds
   out of danger. Until rescue arrives in phase 3, nothing can take you below 1 HP.
+- **Cave-ins:** a ceiling tile holds if it is within its material's support span of a tile
+  resting on something, counting sideways along its row (dirt 2, stone 5, slate 7,
+  flowstone 14). So a room can be twice the span wide, and stepped or arched ceilings hold
+  themselves up; long flat ceilings don't. A failing ceiling creaks, sheds dust and cracks
+  for 2.5 s, then falls as rubble. Rubble remembers what it was, digs fast, and keeps
+  falling until it lands. Sand slips for a moment, then falls when you dig under it.
+  Anything landing on the mole hurts and pops it out on top.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `[` and `]`
   change pick power, and `P` cycles what a tap pours (nothing, water, lava). The overlay's
@@ -60,7 +67,8 @@ src/
   data/              ALL tunable numbers and content: materials, palette, tuning, test world
   protocol/          Typed main <-> sim messages and the SimClient
   sim/               Runs in a Web Worker: SimHost (authoritative world), world generation,
-                     the fluid simulation, persistence (IndexedDB, versioned save format)
+                     fluids, falling solids and cave-ins, persistence (IndexedDB,
+                     versioned save format with migrations)
   game/              Main-thread gameplay: player movement, digging, camera, chunk mirror
                      and streaming
   input/             Pointer (swipe) and keyboard input
@@ -129,8 +137,17 @@ each wrapped in a rock shell so it starts still. The test world has a surface po
 aquifer, and an aquifer above a lava basin for a waterfall test. The player swims, has breath
 and health, and gets hurt by lava and drowning (never below 1 HP).
 
-**Phase 1, still to come:** falling sand and cave-ins; heat and gas; simulation zones (fluids
-run in every loaded chunk for now) and full saving.
+**Phase 1, slice 3 (done):** falling sand and cave-ins (`src/sim/solid/`). The support rule
+is in `support.ts`. Nothing is scanned every tick: a dig or a fall queues checks for the
+tiles it could affect. Failing ceilings get a 2.5 s warning, and knock-on failures after a
+collapse get 0.6 s, so collapses grow into domes. Rubble keeps its origin material in a new
+per-tile `origin` field (save format v2, with a migration). World gen runs a support pass,
+so natural caves start sound: over-long ceilings are rebuilt in stone or pale flowstone,
+and flowstone columns are added where nothing can span the gap. Arched caves are left
+as they are. The test world has a wide flat dirt room (x 100–113, y 34–36) for cave-in tests.
+
+**Phase 1, still to come:** heat and gas; simulation zones (fluids and solids run in every
+loaded chunk for now) and full saving.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

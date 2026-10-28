@@ -45,6 +45,20 @@ function nugget(ctx: Ctx2D, rng: Rng, v: MaterialVisual, ox: number, oy: number)
   px(ctx, v.accentLight ?? v.light, ox + x, oy + y);
 }
 
+/** Loose chunks of a material with dark gaps between them. */
+function rubble(ctx: Ctx2D, rng: Rng, v: MaterialVisual, ox: number, oy: number): void {
+  px(ctx, 'ink', ox, oy, N, N);
+  for (let i = 0; i < 9; i++) {
+    const w = rng.int(3, 7);
+    const h = rng.int(3, 6);
+    const x = rng.int(0, N - w + 1);
+    const y = rng.int(0, N - h + 1);
+    px(ctx, v.dark, ox + x, oy + y + 1, w, h);
+    px(ctx, i % 3 === 0 && v.accent ? v.accent : v.base, ox + x, oy + y, w, h - 1);
+    px(ctx, v.light, ox + x, oy + y, w - 1, 1);
+  }
+}
+
 export function drawMaterialTile(
   ctx: Ctx2D,
   key: string,
@@ -111,6 +125,9 @@ export function drawMaterialTile(
         px(ctx, v.accent ?? v.light, ox + x, oy + y, 3, 2);
         px(ctx, v.light, ox + x + 1, oy + y + 2);
       }
+      break;
+    case 'rubble':
+      rubble(ctx, rng, v, ox, oy);
       break;
     case 'bedrock':
       for (let y = 0; y < N; y++) {

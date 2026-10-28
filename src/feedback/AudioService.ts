@@ -80,6 +80,29 @@ export class AudioService {
     this.noiseBurst(this.rng.range(4500, 6000), 0.7, 0.35, 0.3);
   }
 
+  /** A ceiling under strain: a low groan with grit in it. */
+  creak(): void {
+    this.sweep(this.rng.range(85, 110), 55, 0.45, 0.3);
+    this.noiseBurst(this.rng.range(250, 350), 2.5, 0.3, 0.18);
+  }
+
+  /** A ceiling giving way. */
+  rumble(): void {
+    this.noiseBurst(140, 0.6, 0.45, 0.7);
+    this.sweep(75, 32, 0.5, 0.55);
+  }
+
+  /** A falling tile hitting the ground. */
+  thud(): void {
+    this.sweep(this.rng.range(95, 120), 45, 0.12, 0.35);
+    this.noiseBurst(500, 0.8, 0.08, 0.25);
+  }
+
+  /** Sand starting to slip. */
+  trickle(): void {
+    this.noiseBurst(this.rng.range(2500, 3500), 0.8, 0.25, 0.15);
+  }
+
   hurt(): void {
     this.sweep(260, 110, 0.18, 0.35);
     this.noiseBurst(420, 1, 0.08, 0.3);

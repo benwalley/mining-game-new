@@ -455,6 +455,46 @@
         "accent": "violet",
         "pattern": "crystal"
       }
+    },
+    {
+      "numId": 22,
+      "key": "rubble",
+      "name": "Rubble",
+      "solid": true,
+      "hardness": 1,
+      "toughness": 1,
+      "weight": 5,
+      "heatLimit": 8,
+      "conductivity": null,
+      "supportSpan": 0,
+      "fuel": 0,
+      "trait": "falls",
+      "visual": {
+        "base": "stone",
+        "dark": "coal",
+        "light": "pebble",
+        "pattern": "rubble"
+      }
+    },
+    {
+      "numId": 23,
+      "key": "flowstone",
+      "name": "Flowstone",
+      "solid": true,
+      "hardness": 5,
+      "toughness": 6,
+      "weight": 6,
+      "heatLimit": 9,
+      "conductivity": null,
+      "supportSpan": 14,
+      "fuel": 0,
+      "trait": null,
+      "visual": {
+        "base": "pebble",
+        "dark": "stone",
+        "light": "bone",
+        "pattern": "smooth"
+      }
     }
   ]
 }

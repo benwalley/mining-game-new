@@ -56,17 +56,24 @@ export class ChunkStore {
   }
 
   /**
-   * Sets a tile's material and clears its damage, since damage belongs to the
-   * material that took it. Returns false if the chunk isn't loaded or the tile
-   * is out of bounds.
+   * Sets a tile's material and clears its damage and origin, since both belong
+   * to the material. Returns false if the chunk isn't loaded or the tile is out
+   * of bounds.
    */
-  setMaterial(x: number, y: number, material: number): boolean {
+  setMaterial(x: number, y: number, material: number, origin = 0): boolean {
     const chunk = this.chunkAt(x, y);
     if (!chunk) return false;
     const i = tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
     chunk.material[i] = material;
     chunk.damage[i] = 0;
+    chunk.origin[i] = origin;
     return true;
+  }
+
+  /** The material a tile remembers being (rubble), 0 if none or unloaded. */
+  originAt(x: number, y: number): number {
+    const chunk = this.chunkAt(x, y);
+    return chunk ? (chunk.origin[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] as number) : 0;
   }
 
   /** Damage (0–255) at a world tile, `UNLOADED` if its chunk isn't loaded. */

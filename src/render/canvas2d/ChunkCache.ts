@@ -28,6 +28,7 @@ export class ChunkCache implements MirrorListener {
   private readonly entries = new Map<number, CacheEntry>();
   private readonly pool: { canvas: Surface; ctx: Ctx2D }[] = [];
   private readonly drawable: Uint8Array;
+  private readonly rubble: number;
 
   constructor(
     private readonly mirror: ChunkMirror,
@@ -36,6 +37,7 @@ export class ChunkCache implements MirrorListener {
     private readonly surfaceY: number,
     private readonly crackStages: number,
   ) {
+    this.rubble = materials.rubble.numId;
     this.drawable = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.drawable[m.numId] = m.visual ? 1 : 0;
   }
@@ -120,7 +122,8 @@ export class ChunkCache implements MirrorListener {
 
     const solid = mirror.isSolid;
     if (this.drawable[m] === 1) {
-      this.atlas.drawMaterial(ctx, m, px, py);
+      if (m === this.rubble) this.atlas.drawRubble(ctx, mirror.originAt(x, y), m, px, py);
+      else this.atlas.drawMaterial(ctx, m, px, py);
       // Outline faces exposed to open space so tunnels read clearly.
       ctx.globalAlpha = EDGE_ALPHA;
       ctx.fillStyle = '#0d0b10';

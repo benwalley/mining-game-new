@@ -10,5 +10,6 @@ export type FxTuning = Tuning['fx'];
 export type LightTuning = Tuning['light'];
 export type SwimTuning = Tuning['swim'];
 export type VitalsTuning = Tuning['vitals'];
+export type SupportTuning = Tuning['support'];
 
 export const tuning: Tuning = tuningData;

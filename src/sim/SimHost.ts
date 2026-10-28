@@ -24,6 +24,7 @@ import {
   type WorldInfo,
 } from '@/protocol/messages';
 import { FluidSim } from './fluid/FluidSim';
+import { SolidSim } from './solid/SolidSim';
 import type { SaveStore } from './persistence/SaveStore';
 import { SAVE_VERSION, type WorldMeta } from './persistence/saveFormat';
 import type { WorldGenerator } from './worldgen/WorldGenerator';
@@ -56,6 +57,7 @@ export class SimHost {
     generator: WorldGenerator;
     chunks: ChunkStore;
     fluids: FluidSim;
+    solids: SolidSim;
   };
   private player: PlayerSnapshot | null = null;
   private playerDirty = false;
@@ -173,6 +175,7 @@ export class SimHost {
       generator,
       chunks,
       fluids: new FluidSim(chunks, this.solidById, this.deps.fluids),
+      solids: new SolidSim(chunks, this.deps.materials, this.deps.tuning.support),
       info: {
         worldId,
         seed: meta.seed,
@@ -273,8 +276,9 @@ export class SimHost {
     if (canDig) {
       world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
       this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
-      // An opening can let neighboring fluid in.
+      // An opening can let neighboring fluid in, loosen sand, or undermine a ceiling.
       world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
+      world.solids.removed(x, y);
     }
     // Always answer with the authoritative value so a rejected dig is corrected.
     this.post({
@@ -305,6 +309,14 @@ export class SimHost {
     world.meta.playTimeMs += dt * 1000;
 
     const started = performance.now();
+    world.solids.tick(1 / this.deps.tuning.sim.ticksPerSecond);
+    const solids = world.solids.drain();
+    for (let i = 0; i < solids.touched.length; i += 2) {
+      world.fluids.touch(solids.touched[i]!, solids.touched[i + 1]!);
+    }
+    for (const key of solids.chunks) this.dirtyChunks.add(key);
+    if (solids.tiles.length > 0) this.post({ type: 'tilesChanged', changes: solids.tiles });
+    if (solids.events.length > 0) this.post({ type: 'simEvents', events: solids.events });
     world.fluids.tick();
     this.publish(world.fluids);
     this.statsTickMs += performance.now() - started;
@@ -314,6 +326,7 @@ export class SimHost {
         type: 'simStats',
         tickMs: this.statsTickMs / Math.max(1, this.statsTicks),
         awakeTiles: world.fluids.awakeTiles,
+        solidsActive: world.solids.active,
       });
       this.statsSince = t;
       this.statsTicks = 0;
@@ -345,6 +358,7 @@ export class SimHost {
   private evict(cx: number, cy: number): void {
     this.world?.chunks.delete(cx, cy);
     this.world?.fluids.forgetChunk(cx, cy);
+    this.world?.solids.forgetChunk(cx, cy);
   }
 
   /** Writes dirty chunks, the player and world meta. Serialized: never two saves at once. */

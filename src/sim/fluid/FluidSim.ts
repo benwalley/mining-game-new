@@ -109,6 +109,12 @@ export class FluidSim {
     return true;
   }
 
+  /** Something else moved fluid at this tile (a falling block): publish it and wake it. */
+  touch(x: number, y: number): void {
+    this.changedAt(x, y);
+    this.wake(x - 1, y - 1, x + 1, y + 1);
+  }
+
   /** Hands over everything that changed since the last call. */
   drain(): FluidOutputs {
     const out = this.out;

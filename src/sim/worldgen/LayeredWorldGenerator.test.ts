@@ -5,6 +5,7 @@ import { loadMaterials } from '@/content/materials';
 import { ChunkStore } from '@/core/world/ChunkStore';
 import { CHUNK_SIZE } from '@/core/world/constants';
 import { FluidSim } from '../fluid/FluidSim';
+import { isUnsupported, type SupportView } from '../solid/support';
 import { LayeredWorldGenerator, type LayeredWorldConfig } from './LayeredWorldGenerator';
 
 const materials = loadMaterials();
@@ -107,4 +108,42 @@ describe('LayeredWorldGenerator pools', () => {
     expect(sim.drain().changed.size).toBe(0);
     expect(sim.sleeping).toBe(true);
   });
+});
+
+describe('LayeredWorldGenerator support', () => {
+  it.each(config.layers.map((l, i) => ({ layer: l.key, i })))(
+    'leaves $layer caves standing under the support rule',
+    ({ i }) => {
+      const from = config.layers[i]!.fromDepth;
+      const cy0 = Math.floor((config.surfaceY + from) / CHUNK_SIZE) + 1;
+      const store = new ChunkStore(gen.dims, materials.bedrock.numId);
+      for (let cy = cy0; cy < cy0 + 6; cy++) {
+        for (let cx = 0; cx < config.width / CHUNK_SIZE; cx++) store.set(gen.generateChunk(cx, cy));
+      }
+      const view: SupportView = {
+        solid: (x, y) => {
+          const m = store.materialAt(x, y);
+          return m < 0 || materials.get(m)!.solid;
+        },
+        span: (x, y) => {
+          const m = materials.get(store.materialAt(x, y))!;
+          return m.indestructible ? Infinity : m.supportSpan;
+        },
+      };
+      let ceilings = 0;
+      const failing: string[] = [];
+      for (let y = cy0 * CHUNK_SIZE; y < (cy0 + 6) * CHUNK_SIZE - 1; y++) {
+        for (let x = 0; x < config.width; x++) {
+          if (!view.solid(x, y) || view.solid(x, y + 1)) continue;
+          // Loose tiles (sand) fall instead; they aren't ceilings.
+          if (materials.falls(materials.get(store.materialAt(x, y))!)) continue;
+          ceilings++;
+          if (isUnsupported(view, x, y)) failing.push(`${x},${y}`);
+        }
+      }
+      expect(ceilings).toBeGreaterThan(100);
+      // A few can remain where no column fits (a pool or a deep pit below).
+      expect(failing.length / ceilings).toBeLessThan(0.01);
+    },
+  );
 });

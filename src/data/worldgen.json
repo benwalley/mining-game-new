@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development. Pools: fill 1 is a sealed aquifer; below 1 is a lake whose air can open into caves. poolShell is the rock kept around a pool's fluid so it starts still.",
+  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development. Pools: fill 1 is a sealed aquifer; below 1 is a lake whose air can open into caves. poolShell is the rock kept around a pool's fluid so it starts still. support: natural ceilings that can't span their gap are rebuilt in the first reinforce material strong enough; where none is, natural columns are added.",
   "width": 384,
   "depth": 3000,
   "surfaceY": 48,
@@ -292,5 +292,9 @@
       "ry": [6, 10],
       "fill": 0.5
     }
-  ]
+  ],
+  "support": {
+    "reinforce": ["stone", "flowstone"],
+    "column": "flowstone"
+  }
 }

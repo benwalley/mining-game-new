@@ -20,6 +20,14 @@ export class Vitals {
     private readonly events: EventBus<GameEvents>,
   ) {}
 
+  /** A one-off blow, such as falling rubble. */
+  hit(player: Player, damage: number): void {
+    player.health = Math.max(this.tuning.minHealth, player.health - damage);
+    player.sinceHurt = 0;
+    this.sinceHurtEvent = 0;
+    this.events.emit('hurt', { cause: 'crushed', fluid: 0 });
+  }
+
   update(player: Player, fluid: FluidContact, dt: number): void {
     const t = this.tuning;
     if (fluid.headFluid !== 0) {

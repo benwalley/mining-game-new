@@ -21,7 +21,12 @@ export interface FluidReaction {
   event: SimEventKind;
 }
 
-export type SimEventKind = 'quench';
+/**
+ * World events the sim reports for feedback: lava quenched; a ceiling tile
+ * starts to fail (and keeps shedding dust); it collapses; loose sand starts
+ * to slip; a falling tile lands.
+ */
+export type SimEventKind = 'quench' | 'creak' | 'collapse' | 'loose' | 'land';
 
 export interface FluidDef {
   /** Stable id persisted in saves (the tile's fluidType). Never change or reuse. */
