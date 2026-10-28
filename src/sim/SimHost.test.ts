@@ -4,6 +4,7 @@ import testWorldConfig from '@/data/test-world.json';
 import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
+import type { ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE } from '@/core/world/constants';
 import { PROTOCOL_VERSION, type FromSim, type ToSim } from '@/protocol/messages';
 import { IdbSaveStore } from './persistence/IdbSaveStore';
@@ -127,6 +128,14 @@ describe.each([
     const first = createHost(store);
     await first.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await first.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const waterIn = (chunk: ChunkData) => {
+      let total = 0;
+      chunk.fluidType.forEach((t, i) => {
+        if (t === water) total += chunk.fluidAmount[i]!;
+      });
+      return total;
+    };
+    const before = waterIn(first.last('chunk')!.chunk);
     await first.send({ type: 'pourFluid', x: spawn.x, y: spawn.y - 4, fluid: water, amount: 8 });
     for (let t = 0; t < 30; t++) first.host.tick();
     const patches = first.out.flatMap((m) => (m.type === 'fluidsChanged' ? m.patches : []));
@@ -137,12 +146,8 @@ describe.each([
     await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
     const chunk = second.last('chunk')!.chunk;
-    let total = 0;
-    chunk.fluidType.forEach((t, i) => {
-      if (t === water) total += chunk.fluidAmount[i]!;
-    });
     // The poured water fell to the ground and was saved there.
-    expect(total).toBe(8);
+    expect(waterIn(chunk)).toBe(before + 8);
     expect(chunk.fluidAmount[(spawn.y - 4) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE)]).toBe(0);
   });
 

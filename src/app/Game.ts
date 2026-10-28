@@ -476,9 +476,12 @@ export class Game {
     if (code === 'KeyP') this.cyclePour();
   }
 
-  /** Debug: what a tap pours: nothing, water, or lava. */
+  /** Debug: what a tap pours: nothing, then each fluid in turn. */
   cyclePour(): void {
-    const order = ['off', 'water', 'lava'] as const;
+    const order = [
+      'off',
+      ...this.deps.fluids.all.filter((f) => f.key !== 'flame').map((f) => f.key),
+    ];
     debugPour.value = order[(order.indexOf(debugPour.value) + 1) % order.length]!;
   }
 }

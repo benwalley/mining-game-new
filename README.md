@@ -52,8 +52,9 @@ flat test world instead (each keeps its own save).
   now (see Status).
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `[` and `]`
-  change pick power, and `P` cycles what a tap pours (nothing, water, lava). The overlay's
-  "tap" button does the same on phones; each tap pours a 3×3 block.
+  change pick power, and `P` cycles what a tap pours (nothing, then each fluid: water, lava,
+  spore gas, firedamp). The overlay's "tap" button does the same on phones; each tap pours a
+  3×3 block.
 
 ## Architecture
 
@@ -153,9 +154,18 @@ it.
 they rise, spread under ceilings, swap places with liquids, fade when thin, and vanish in
 the sky. Reactions can now turn one fluid into another, which is how firedamp touching lava
 or flame becomes a short-lived flame that lights the cave. World gen adds sealed spore gas
-pockets in the Fungal deep and firedamp pockets in the Magma belt. The test world has a
-spore pocket (x 140–145, y 40–42) and a firedamp room (x 120–135, y 30–33) with lava
-behind its east wall: dig x 136, y 31 to set it off.
+pockets in the Fungal deep and firedamp pockets in the Magma belt.
+
+**Test spots near spawn** (`?world=test`; spawn is x 96 on the surface, everything is a few
+tiles down):
+
+- **Spore gas pocket**, x 87–90: dig down at x 88.
+- **Firedamp room with lava behind its east wall**, x 98–103: dig down at spawn to the floor
+  (y 30) and tunnel right, so the gas can't escape up your shaft. Then dig the east wall
+  from the floor to set it off.
+- **Sand slab over a pit**, x 117–121 (just past the jump gap): dig any of it and it drops.
+- **Water pocket over lava**, x 124–126: dig down at x 125, then dig the floor under the
+  water.
 
 **Phase 1, still to come (reordered):** simulation zones and the 60 fps phone gate (fluids
 and solids run in every loaded chunk for now), then heat (a temperature field from depth

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Phase 0 flat test world. Coordinates are world tiles (y grows downward). Changing this file resets saved test worlds.",
+  "notes": "Phase 0 flat test world. Coordinates are world tiles (y grows downward). Changing this file resets saved test worlds. Spawn is at x 96 on the surface (y 24). Test spots near spawn sit just under the surface: dig down at the x in each label.",
   "width": 192,
   "height": 320,
   "surfaceY": 24,
@@ -192,37 +192,72 @@
     {
       "op": "pool",
       "fluid": "spore-gas",
-      "x": 140,
-      "y": 40,
-      "w": 6,
+      "x": 87,
+      "y": 27,
+      "w": 4,
       "h": 3,
-      "label": "sealed spore gas pocket"
+      "label": "near spawn: spore gas pocket (dig down at x 88)"
     },
     {
       "op": "carve",
-      "x": 120,
-      "y": 30,
-      "w": 16,
+      "x": 98,
+      "y": 27,
+      "w": 6,
       "h": 4,
-      "label": "firedamp room"
+      "label": "near spawn: firedamp room. Enter from the side so the gas stays put: dig down at spawn (x 96) to the floor (y 30), then tunnel right"
     },
     {
       "op": "pool",
       "fluid": "firedamp",
-      "x": 120,
-      "y": 30,
-      "w": 16,
-      "h": 2,
-      "label": "firedamp under the room's roof"
+      "x": 98,
+      "y": 27,
+      "w": 6,
+      "h": 3,
+      "label": "near spawn: firedamp filling the room's top"
     },
     {
       "op": "pool",
       "fluid": "lava",
-      "x": 137,
-      "y": 30,
-      "w": 3,
+      "x": 105,
+      "y": 29,
+      "w": 2,
       "h": 3,
-      "label": "lava behind the firedamp room's wall (dig x 136, y 31)"
+      "label": "near spawn: lava behind the firedamp room's east wall (dig right from the floor)"
+    },
+    {
+      "op": "carve",
+      "x": 117,
+      "y": 24,
+      "w": 5,
+      "h": 3,
+      "label": "near spawn: pit under a sand slab"
+    },
+    {
+      "op": "fill",
+      "material": "sand",
+      "x": 117,
+      "y": 23,
+      "w": 5,
+      "h": 1,
+      "label": "near spawn: sand slab over the pit (dig any of it and it drops)"
+    },
+    {
+      "op": "pool",
+      "fluid": "water",
+      "x": 124,
+      "y": 26,
+      "w": 3,
+      "h": 2,
+      "label": "near spawn: water pocket (dig down at x 125)"
+    },
+    {
+      "op": "pool",
+      "fluid": "lava",
+      "x": 124,
+      "y": 29,
+      "w": 3,
+      "h": 2,
+      "label": "near spawn: lava under the water pocket (dig the floor at y 28)"
     }
   ]
 }
