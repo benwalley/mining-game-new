@@ -6,6 +6,7 @@ import { tuning } from '@/content/tuning';
 import type { ToSim } from '@/protocol/messages';
 import { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
+import { NO_FLUID } from '../physics/fluidContact';
 import { Player } from '../player/Player';
 import { ChunkMirror } from '../world/ChunkMirror';
 import { DigSystem } from './DigSystem';
@@ -31,7 +32,7 @@ function setup() {
     sim,
     new EventBus<GameEvents>(),
   );
-  const player = new Player(tuning.player);
+  const player = new Player(tuning.player, tuning.vitals);
   player.placeAt(5.5, 10);
   const contact = {
     grounded: true,
@@ -39,6 +40,7 @@ function setup() {
     wallLeft: false,
     wallRight: false,
     canClimb: false,
+    fluid: NO_FLUID,
   };
   const run = (seconds: number, intent: { x: number; y: number }) => {
     for (let i = 0; i < Math.round(seconds * 60); i++) dig.update(player, intent, contact, 1 / 60);

@@ -68,5 +68,26 @@
   "light": {
     "lampLevel": 8,
     "fullBrightLevel": 7
+  },
+  "swim": {
+    "minSubmersion": 0.45,
+    "wadeSubmersion": 0.25,
+    "sinkGravity": 10,
+    "maxSinkSpeed": 2,
+    "swimSpeed": 4,
+    "swimAccel": 24,
+    "entryDrag": 60,
+    "exitJumpScale": 0.85,
+    "splashMinSpeed": 4
+  },
+  "vitals": {
+    "maxHealth": 100,
+    "minHealth": 1,
+    "regenDelay": 3,
+    "regenPerSecond": 10,
+    "breathSeconds": 10,
+    "breathRefillRate": 4,
+    "drownDamagePerSecond": 12,
+    "hurtEventInterval": 0.4
   }
 }

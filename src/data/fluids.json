@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "notes": "Fluids live in a tile's fluid layer (amount 0-8) on top of a non-solid material. ids are persisted in saves: never change or reuse them. 0 means no fluid. flowEvery: the fluid moves on one tick in N (lava is thick). light: emitted at full depth. damagePerSecond: to the player while touching it. swimSpeedScale and moveScale scale the player's swim and walk speeds inside it.",
+  "fluids": [
+    {
+      "id": 1,
+      "key": "water",
+      "name": "Water",
+      "flowEvery": 1,
+      "light": 0,
+      "damagePerSecond": 0,
+      "swimSpeedScale": 1,
+      "moveScale": 0.6,
+      "visual": { "color": "water", "surface": "sky", "opacity": 0.6 }
+    },
+    {
+      "id": 2,
+      "key": "lava",
+      "name": "Lava",
+      "flowEvery": 4,
+      "light": 12,
+      "damagePerSecond": 30,
+      "swimSpeedScale": 0.45,
+      "moveScale": 0.35,
+      "visual": { "color": "lava", "surface": "ember", "opacity": 0.95 }
+    }
+  ],
+  "reactions": [
+    {
+      "fluid": "lava",
+      "touching": "water",
+      "becomes": "obsidian",
+      "consumes": 4,
+      "event": "quench"
+    }
+  ]
+}

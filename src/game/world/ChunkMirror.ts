@@ -1,14 +1,26 @@
 import { ChunkStore } from '@/core/world/ChunkStore';
-import type { ChunkData } from '@/core/world/chunk';
-import { UNLOADED, type WorldDims } from '@/core/world/constants';
+import { tileIndex, type ChunkData } from '@/core/world/chunk';
+import {
+  CHUNK_MASK,
+  CHUNK_SHIFT,
+  CHUNK_SIZE,
+  UNLOADED,
+  type WorldDims,
+} from '@/core/world/constants';
 import type { MaterialRegistry } from '@/content/materials';
-import type { TileChange } from '@/protocol/messages';
+import type { FluidPatch, TileChange } from '@/protocol/messages';
 
 export interface MirrorListener {
   chunkLoaded(chunk: ChunkData): void;
   chunkUnloaded(cx: number, cy: number): void;
   tileChanged(x: number, y: number): void;
+  /** Fluid moved somewhere in this chunk. */
+  fluidsChanged?(cx: number, cy: number): void;
 }
+
+/** Packs a tile's fluid as `type << 4 | amount`, so 0 means none. */
+export const fluidType = (packed: number): number => packed >> 4;
+export const fluidAmount = (packed: number): number => packed & 15;
 
 /**
  * Main-thread copy of the chunks near the player, used for collision and
@@ -41,6 +53,15 @@ export class ChunkMirror {
   readonly isSolid = (x: number, y: number): boolean => {
     const m = this.store.materialAt(x, y);
     return m === UNLOADED || this.solidById[m] === 1;
+  };
+
+  /** The tile's fluid, packed (see `fluidType` / `fluidAmount`); 0 for none or unloaded. */
+  readonly fluidAt = (x: number, y: number): number => {
+    if (!this.store.inBounds(x, y)) return 0;
+    const chunk = this.store.get(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT);
+    if (!chunk) return 0;
+    const i = tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
+    return (chunk.fluidType[i]! << 4) | chunk.fluidAmount[i]!;
   };
 
   isLoaded(x: number, y: number): boolean {
@@ -78,6 +99,19 @@ export class ChunkMirror {
 
   applyChanges(changes: readonly TileChange[]): void {
     for (const c of changes) this.setMaterial(c.x, c.y, c.material);
+  }
+
+  applyFluids(patches: readonly FluidPatch[]): void {
+    for (const p of patches) {
+      const chunk = this.store.get(p.cx, p.cy);
+      if (!chunk) continue;
+      for (let row = 0; row < p.h; row++) {
+        const to = (p.y0 + row) * CHUNK_SIZE + p.x0;
+        chunk.fluidType.set(p.type.subarray(row * p.w, (row + 1) * p.w), to);
+        chunk.fluidAmount.set(p.amount.subarray(row * p.w, (row + 1) * p.w), to);
+      }
+      for (const l of this.listeners) l.fluidsChanged?.(p.cx, p.cy);
+    }
   }
 
   clear(): void {

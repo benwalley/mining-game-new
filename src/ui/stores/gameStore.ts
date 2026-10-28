@@ -19,6 +19,8 @@ export interface DebugInfo {
   inspected: string | null;
   lastSave: string;
   haptics: string;
+  sim: string;
+  health: string;
 }
 
 export const debugVisible = signal(false);
@@ -27,3 +29,17 @@ export const debugGrid = signal(false);
 export const debugLighting = signal(true);
 export const toolPower = signal(3);
 export const debugInfo = signal<DebugInfo | null>(null);
+
+/** Debug: what tapping the world pours. */
+export const debugPour = signal<'off' | 'water' | 'lava'>('off');
+
+export interface HudState {
+  health: number;
+  maxHealth: number;
+  /** Fraction of breath left, 0–1, in tenths. */
+  breath: number;
+}
+
+export const hud = signal<HudState>({ health: 100, maxHealth: 100, breath: 1 });
+/** Increments each time the player is hurt, to retrigger the damage flash. */
+export const hurtPulse = signal(0);

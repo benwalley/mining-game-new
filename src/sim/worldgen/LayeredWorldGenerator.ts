@@ -2,11 +2,12 @@ import { fbm2D, valueNoise2D } from '@/core/math/noise';
 import { createRng, hash2, seedFromString } from '@/core/random/rng';
 import { createChunk, tileIndex, type ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE, type WorldDims } from '@/core/world/constants';
+import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import type { WorldGenerator } from './WorldGenerator';
 
 /** Bump when the generation code changes in a way that alters output. */
-const CODE_VERSION = 1;
+const CODE_VERSION = 2;
 
 export interface LayeredWorldConfig {
   width: number;
@@ -39,6 +40,20 @@ export interface LayeredWorldConfig {
     maxDepth?: number;
   }[];
   caverns: { layer: string; count: number; rx: number[]; ry: number[] }[];
+  /** Rock around a pool's fluid that caves never cut, so pools start sealed and still. */
+  poolShell: number;
+  /**
+   * Elliptical pools of fluid. `fill` is the filled fraction of the height:
+   * 1 is a sealed aquifer, less is a lake whose air above can join caves.
+   */
+  pools: {
+    layer: string;
+    fluid: string;
+    count: number;
+    rx: number[];
+    ry: number[];
+    fill: number;
+  }[];
 }
 
 interface Layer {
@@ -65,6 +80,21 @@ interface Cavern {
   ry: number;
 }
 
+interface Pool extends Cavern {
+  fluid: number;
+  /** Rows at or below this are filled. */
+  level: number;
+}
+
+/** How a tile relates to the pools near it. */
+const enum PoolHit {
+  None,
+  /** Inside a pool: air, and fluid at or below its level. */
+  Inside,
+  /** The solid shell around a pool's filled part. */
+  Shell,
+}
+
 /**
  * The real world: six depth layers with wavy, dithered boundaries; ores and
  * deposits per layer; winding tunnels, pockets and big caverns. Every tile is
@@ -81,11 +111,15 @@ export class LayeredWorldGenerator implements WorldGenerator {
   private readonly air: number;
   private readonly layers: Layer[];
   private readonly caverns: Cavern[];
+  private readonly pools: Pool[];
+  /** The pool matched by the last `poolAt` call that returned Inside. */
+  private hitPool: Pool | null = null;
 
   constructor(
     private readonly config: LayeredWorldConfig,
     seed: string,
     materials: MaterialRegistry,
+    fluids: FluidRegistry,
   ) {
     this.id = `layered@${CODE_VERSION}:${seedFromString(JSON.stringify(config)).toString(36)}`;
     this.dims = {
@@ -118,6 +152,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
 
     const spawnX = Math.floor(config.width / 2);
     this.spawn = { x: spawnX, y: this.surfaceTop(spawnX) };
+    this.pools = this.rollPools(seed, fluids);
   }
 
   generateChunk(cx: number, cy: number): ChunkData {
@@ -132,13 +167,31 @@ export class LayeredWorldGenerator implements WorldGenerator {
         c.y + c.ry * 1.3 >= y0 &&
         c.y - c.ry * 1.3 < y0 + CHUNK_SIZE,
     );
+    const pools = this.pools.filter((p) => {
+      const s = this.config.poolShell + 1;
+      return (
+        p.x + p.rx + s >= x0 &&
+        p.x - p.rx - s < x0 + CHUNK_SIZE &&
+        p.y + p.ry + s >= y0 &&
+        p.y - p.ry - s < y0 + CHUNK_SIZE
+      );
+    });
     const bounds = new Float64Array(this.layers.length);
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const x = x0 + lx;
       const top = this.surfaceTop(x);
       this.layerBounds(x, bounds);
       for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-        chunk.material[tileIndex(lx, ly)] = this.tileAt(x, y0 + ly, top, bounds, caverns);
+        const y = y0 + ly;
+        const i = tileIndex(lx, ly);
+        chunk.material[i] = this.tileAt(x, y, top, bounds, caverns, pools);
+        if (pools.length > 0 && this.poolAt(x, y, pools) === PoolHit.Inside) {
+          const pool = this.hitPool!;
+          if (y >= pool.level) {
+            chunk.fluidType[i] = pool.fluid;
+            chunk.fluidAmount[i] = FLUID_MAX;
+          }
+        }
       }
     }
     return chunk;
@@ -148,7 +201,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
   materialAt(x: number, y: number): number {
     const bounds = new Float64Array(this.layers.length);
     this.layerBounds(x, bounds);
-    return this.tileAt(x, y, this.surfaceTop(x), bounds, this.caverns);
+    return this.tileAt(x, y, this.surfaceTop(x), bounds, this.caverns, this.pools);
   }
 
   /** Index into `config.layers` for a world tile (ignores caves). */
@@ -173,6 +226,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
     top: number,
     bounds: Float64Array,
     caverns: Cavern[],
+    pools: Pool[],
   ): number {
     const { width, wallThickness: wall } = this.config;
     const { height } = this.dims;
@@ -182,7 +236,9 @@ export class LayeredWorldGenerator implements WorldGenerator {
     const depth = y - this.config.surfaceY;
     const layer = this.layers[this.layerIndex(x, y, depth, bounds)]!;
 
-    if (this.isCave(x, y, depth, layer, caverns)) return this.air;
+    const pool = pools.length > 0 ? this.poolAt(x, y, pools) : PoolHit.None;
+    if (pool === PoolHit.Inside) return this.air;
+    if (pool === PoolHit.None && this.isCave(x, y, depth, layer, caverns)) return this.air;
 
     for (const d of layer.deposits) {
       if (depth < d.minDepth || depth > d.maxDepth) continue;
@@ -232,6 +288,67 @@ export class LayeredWorldGenerator implements WorldGenerator {
       if (Math.abs(n - 0.5) < tunnelWidth) return true;
     }
     return valueNoise2D(layer.seed ^ 0x90c, x, y, pocketScale) > pocketThreshold;
+  }
+
+  /**
+   * Inside wins over shell, so neighboring pools never wall each other off.
+   * The shell only wraps the filled rows: a lake's air can open into caves.
+   */
+  private poolAt(x: number, y: number, pools: Pool[]): PoolHit {
+    const shell = this.config.poolShell;
+    let hit = PoolHit.None;
+    for (const p of pools) {
+      const dx = x + 0.5 - p.x;
+      const dy = y + 0.5 - p.y;
+      if ((dx / p.rx) ** 2 + (dy / p.ry) ** 2 <= 1) {
+        this.hitPool = p;
+        return PoolHit.Inside;
+      }
+      if (y >= p.level - 1 && (dx / (p.rx + shell)) ** 2 + (dy / (p.ry + shell)) ** 2 <= 1) {
+        hit = PoolHit.Shell;
+      }
+    }
+    return hit;
+  }
+
+  private rollPools(seed: string, fluids: FluidRegistry): Pool[] {
+    const rng = createRng(`${seed}/pools`);
+    const { width, wallThickness, surfaceY, poolShell, spawn } = this.config;
+    const out: Pool[] = [];
+    for (const spec of this.config.pools) {
+      const li = this.config.layers.findIndex((l) => l.key === spec.layer);
+      if (li < 0) throw new Error(`Pool layer "${spec.layer}" not found`);
+      const fluid = fluids.require(spec.fluid).id;
+      const from = this.config.layers[li]!.fromDepth;
+      const to = this.config.layers[li + 1]?.fromDepth ?? this.config.depth;
+      for (let i = 0; i < spec.count; i++) {
+        // A few tries to avoid overlapping another pool or the spawn area.
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const rx = rng.range(spec.rx[0], spec.rx[1]);
+          const ry = rng.range(spec.ry[0], spec.ry[1]);
+          const margin = this.config.boundary.waveAmplitude + ry + poolShell;
+          const lo = Math.max(from + margin, 8 + ry + poolShell);
+          const x = rng.range(
+            wallThickness + rx + poolShell + 1,
+            width - wallThickness - rx - poolShell - 1,
+          );
+          const y = surfaceY + rng.range(lo, Math.max(lo + 1, to - margin));
+          const nearSpawn =
+            Math.abs(x - this.spawn.x) < spawn.safeRadius + rx + poolShell &&
+            y - ry - poolShell < surfaceY + spawn.safeDepth;
+          const overlaps = out.some(
+            (p) =>
+              Math.abs(p.x - x) < p.rx + rx + poolShell * 2 &&
+              Math.abs(p.y - y) < p.ry + ry + poolShell * 2,
+          );
+          if (nearSpawn || overlaps) continue;
+          const level = Math.floor(y + ry - 2 * ry * spec.fill);
+          out.push({ x, y, rx, ry, fluid, level });
+          break;
+        }
+      }
+    }
+    return out;
   }
 
   private rollCaverns(seed: string): Cavern[] {

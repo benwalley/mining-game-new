@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import worldgenConfig from '@/data/worldgen.json';
+import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
+import { ChunkStore } from '@/core/world/ChunkStore';
+import { CHUNK_SIZE } from '@/core/world/constants';
+import { FluidSim } from '../fluid/FluidSim';
 import { LayeredWorldGenerator, type LayeredWorldConfig } from './LayeredWorldGenerator';
 
 const materials = loadMaterials();
+const fluids = loadFluids(materials);
 const config = worldgenConfig as LayeredWorldConfig;
-const make = (seed = 'seed-a') => new LayeredWorldGenerator(config, seed, materials);
+const make = (seed = 'seed-a') => new LayeredWorldGenerator(config, seed, materials, fluids);
 const gen = make();
 
 describe('LayeredWorldGenerator', () => {
@@ -67,5 +72,39 @@ describe('LayeredWorldGenerator', () => {
     for (const layer of config.layers) {
       expect(counts.get(materials.require(layer.base).numId) ?? 0).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('LayeredWorldGenerator pools', () => {
+  // One generated band per fluid: stone (aquifers and lakes) and magma (lava lakes).
+  const bands = [
+    { fluid: 'water', from: config.layers[1]!.fromDepth, to: config.layers[2]!.fromDepth },
+    { fluid: 'lava', from: config.layers[4]!.fromDepth, to: config.layers[5]!.fromDepth },
+  ];
+
+  it.each(bands)('places $fluid that starts perfectly still', ({ fluid, from, to }) => {
+    const store = new ChunkStore(gen.dims, materials.bedrock.numId);
+    const cy0 = Math.floor((config.surfaceY + from) / CHUNK_SIZE);
+    const cy1 = Math.floor((config.surfaceY + to) / CHUNK_SIZE);
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = 0; cx < config.width / CHUNK_SIZE; cx++) store.set(gen.generateChunk(cx, cy));
+    }
+    let amount = 0;
+    const id = fluids.require(fluid).id;
+    for (const chunk of store.values()) {
+      chunk.fluidType.forEach((t, i) => {
+        if (t === id) amount += chunk.fluidAmount[i]!;
+      });
+    }
+    expect(amount).toBeGreaterThan(500);
+
+    const solid = new Uint8Array(materials.maxNumId + 1);
+    for (const m of materials.all) solid[m.numId] = m.solid ? 1 : 0;
+    const sim = new FluidSim(store, solid, fluids);
+    for (const chunk of store.values()) sim.wakeChunk(chunk.cx, chunk.cy);
+    // Long enough for thick fluids to get a turn to move.
+    for (let t = 0; t < fluids.require(fluid).flowEvery + 1; t++) sim.tick();
+    expect(sim.drain().changed.size).toBe(0);
+    expect(sim.sleeping).toBe(true);
   });
 });

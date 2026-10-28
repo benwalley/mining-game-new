@@ -2,11 +2,12 @@ import { valueNoise2D } from '@/core/math/noise';
 import { seedFromString } from '@/core/random/rng';
 import { createChunk, tileIndex, type ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE, type WorldDims } from '@/core/world/constants';
+import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import type { WorldGenerator } from './WorldGenerator';
 
 /** Bump when the generation code changes in a way that alters output. */
-const CODE_VERSION = 1;
+const CODE_VERSION = 2;
 
 export interface TestWorldConfig {
   width: number;
@@ -28,6 +29,8 @@ export interface TestWorldConfig {
 export type TestFeature =
   | { op: 'fill'; material: string; x: number; y: number; w: number; h: number; label?: string }
   | { op: 'carve'; x: number; y: number; w: number; h: number; label?: string }
+  /** Carves a rectangle and fills it with fluid. */
+  | { op: 'pool'; fluid: string; x: number; y: number; w: number; h: number; label?: string }
   | { op: 'ellipse'; x: number; y: number; rx: number; ry: number; label?: string }
   | {
       op: 'stairs';
@@ -71,11 +74,13 @@ export class TestWorldGenerator implements WorldGenerator {
     seed: number;
   }[];
   private readonly features: CompiledFeature[];
+  private readonly pools: { fluid: number; x0: number; y0: number; x1: number; y1: number }[];
 
   constructor(
     private readonly config: TestWorldConfig,
     seed: string,
     materials: MaterialRegistry,
+    fluids: FluidRegistry,
   ) {
     this.id = `test-flat@${CODE_VERSION}:${seedFromString(JSON.stringify(config)).toString(36)}`;
     this.dims = { width: config.width, height: config.height, surfaceY: config.surfaceY };
@@ -94,6 +99,19 @@ export class TestWorldGenerator implements WorldGenerator {
       seed: this.seedNum + (i + 1) * 7919,
     }));
     this.features = config.features.map((f) => this.compileFeature(f, id));
+    this.pools = config.features.flatMap((f) =>
+      f.op === 'pool'
+        ? [
+            {
+              fluid: fluids.require(f.fluid).id,
+              x0: f.x,
+              y0: f.y,
+              x1: f.x + f.w - 1,
+              y1: f.y + f.h - 1,
+            },
+          ]
+        : [],
+    );
   }
 
   generateChunk(cx: number, cy: number): ChunkData {
@@ -102,7 +120,13 @@ export class TestWorldGenerator implements WorldGenerator {
     const y0 = cy * CHUNK_SIZE;
     for (let ly = 0; ly < CHUNK_SIZE; ly++) {
       for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-        chunk.material[tileIndex(lx, ly)] = this.materialAt(x0 + lx, y0 + ly);
+        const i = tileIndex(lx, ly);
+        chunk.material[i] = this.materialAt(x0 + lx, y0 + ly);
+        const fluid = this.fluidAt(x0 + lx, y0 + ly);
+        if (fluid > 0) {
+          chunk.fluidType[i] = fluid;
+          chunk.fluidAmount[i] = FLUID_MAX;
+        }
       }
     }
     return chunk;
@@ -137,6 +161,15 @@ export class TestWorldGenerator implements WorldGenerator {
     return material;
   }
 
+  /** Fluid id at a world tile, 0 for none. The last pool covering it wins. */
+  fluidAt(x: number, y: number): number {
+    let fluid = 0;
+    for (const p of this.pools) {
+      if (x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1) fluid = p.fluid;
+    }
+    return fluid;
+  }
+
   private bandAt(depth: number): number {
     for (const band of this.bands) if (depth < band.toDepth) return band.material;
     return this.bands[this.bands.length - 1]?.material ?? this.bedrock;
@@ -146,7 +179,8 @@ export class TestWorldGenerator implements WorldGenerator {
     const air = this.air;
     switch (f.op) {
       case 'fill':
-      case 'carve': {
+      case 'carve':
+      case 'pool': {
         const m = f.op === 'fill' ? id(f.material) : air;
         return {
           minX: f.x,

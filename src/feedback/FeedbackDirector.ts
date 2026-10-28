@@ -1,4 +1,5 @@
 import type { EventBus } from '@/core/events/EventBus';
+import type { FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import { palette } from '@/content/palette';
 import type { FxTuning } from '@/content/tuning';
@@ -6,6 +7,9 @@ import type { Particles } from '@/fx/Particles';
 import type { GameEvents } from '@/game/events';
 import type { AudioService } from './AudioService';
 import type { Haptics } from './haptics';
+
+/** Quenching can happen dozens of times a tick; one hiss per window is plenty. */
+const HISS_MIN_MS = 90;
 
 const DIR_VECTORS = {
   left: [1, 0],
@@ -16,9 +20,12 @@ const DIR_VECTORS = {
 
 /** Turns gameplay events into sound, haptics and particles. Gameplay never calls these directly. */
 export class FeedbackDirector {
+  private lastHissAt = -Infinity;
+
   constructor(
     events: EventBus<GameEvents>,
     private readonly materials: MaterialRegistry,
+    private readonly fluids: FluidRegistry,
     private readonly audio: AudioService,
     private readonly haptics: Haptics,
     private readonly particles: Particles,
@@ -47,6 +54,27 @@ export class FeedbackDirector {
       });
     });
     events.on('landed', (e) => this.audio.land(e.speed));
+    events.on('splash', (e) => {
+      const f = this.fluids.get(e.fluid);
+      if (!f) return;
+      this.audio.splash(e.speed, f.flowEvery > 1);
+      const count = Math.min(14, Math.round(4 + e.speed));
+      this.particles.burst(e.x, e.y, count, [palette[f.visual.color], palette[f.visual.surface]], {
+        speed: 4 + e.speed * 0.3,
+        life: 0.45,
+        dirY: -1,
+      });
+    });
+    events.on('hurt', () => {
+      this.audio.hurt();
+      this.haptics.tick();
+    });
+    events.on('quench', () => {
+      const now = performance.now();
+      if (now - this.lastHissAt < HISS_MIN_MS) return;
+      this.lastHissAt = now;
+      this.audio.hiss();
+    });
   }
 
   private debris(

@@ -2,6 +2,7 @@ import { EventBus } from '@/core/events/EventBus';
 import { lerp } from '@/core/math/util';
 import { createRng } from '@/core/random/rng';
 import { CHUNK_SHIFT } from '@/core/world/constants';
+import type { FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import type { Tuning } from '@/content/tuning';
 import { AudioService } from '@/feedback/AudioService';
@@ -13,8 +14,9 @@ import { DigSystem } from '@/game/dig/DigSystem';
 import type { GameEvents } from '@/game/events';
 import { Player } from '@/game/player/Player';
 import { PlayerController, type MoveIntent } from '@/game/player/PlayerController';
+import { Vitals } from '@/game/player/Vitals';
 import { LightField } from '@/game/light/LightField';
-import { ChunkMirror } from '@/game/world/ChunkMirror';
+import { ChunkMirror, fluidAmount, fluidType } from '@/game/world/ChunkMirror';
 import { ChunkStreamer } from '@/game/world/ChunkStreamer';
 import { KeyboardInput } from '@/input/KeyboardInput';
 import { PointerGestureInput } from '@/input/PointerGestureInput';
@@ -27,7 +29,10 @@ import {
   debugGrid,
   debugInfo,
   debugLighting,
+  debugPour,
   debugVisible,
+  hud,
+  hurtPulse,
   toolPower,
 } from '@/ui/stores/gameStore';
 import { GameLoop } from './GameLoop';
@@ -35,11 +40,14 @@ import { GameLoop } from './GameLoop';
 const STEP = 1 / 60;
 const STREAM_EVERY_FRAMES = 10;
 const DEBUG_EVERY_MS = 200;
+/** Sim events further than this many tiles outside the view are not shown or heard. */
+const EVENT_MARGIN_TILES = 4;
 
 export interface GameDeps {
   canvas: HTMLCanvasElement;
   sim: SimClient;
   materials: MaterialRegistry;
+  fluids: FluidRegistry;
   tuning: Tuning;
   worldId: string;
   worldKind: WorldKind;
@@ -54,6 +62,7 @@ export class Game {
   private readonly streamer: ChunkStreamer;
   private readonly player: Player;
   private readonly controller: PlayerController;
+  private readonly vitals: Vitals;
   private readonly dig: DigSystem;
   private readonly camera: Camera;
   private readonly particles: Particles;
@@ -74,6 +83,7 @@ export class Game {
   private lastSyncedY = NaN;
   private lastSave = 'never';
   private inspected: string | null = null;
+  private simStats = '—';
 
   /** Connects to the sim, waits for the world, and starts playing. */
   static async start(deps: GameDeps): Promise<Game> {
@@ -98,17 +108,18 @@ export class Game {
     private readonly deps: GameDeps,
     readonly world: WorldInfo,
   ) {
-    const { canvas, sim, materials, tuning } = deps;
+    const { canvas, sim, materials, fluids, tuning } = deps;
     this.mirror = new ChunkMirror(world.dims, materials);
     this.renderer = new CanvasRenderer(
       canvas,
       this.mirror,
       materials,
+      fluids,
       tuning.camera,
       tuning.dig.crackStages,
       tuning.light,
     );
-    this.light = new LightField(this.mirror, materials);
+    this.light = new LightField(this.mirror, materials, fluids);
     this.mirror.addListener(this.light);
     this.streamer = new ChunkStreamer(
       this.mirror,
@@ -116,8 +127,13 @@ export class Game {
       tuning.streaming.loadMarginChunks,
       tuning.streaming.unloadMarginChunks,
     );
-    this.player = new Player(tuning.player);
-    this.controller = new PlayerController(tuning.player, tuning.input, this.events);
+    this.player = new Player(tuning.player, tuning.vitals);
+    this.controller = new PlayerController(tuning.player, tuning.input, this.events, {
+      swim: tuning.swim,
+      fluids,
+    });
+    this.vitals = new Vitals(tuning.vitals, fluids, this.events);
+    this.events.on('hurt', () => (hurtPulse.value += 1));
     this.dig = new DigSystem(tuning.dig, tuning.input, materials, this.mirror, sim, this.events);
     toolPower.value = this.dig.toolPower;
     this.camera = new Camera(tuning.camera, tuning.player, world.dims);
@@ -126,6 +142,7 @@ export class Game {
     new FeedbackDirector(
       this.events,
       materials,
+      fluids,
       this.audio,
       this.haptics,
       this.particles,
@@ -134,9 +151,7 @@ export class Game {
 
     this.pointer = new PointerGestureInput(canvas, tuning.input, {
       onGesture: () => this.audio.unlock(),
-      onTap: () => {
-        // Phase 0 has no context actions yet (talk, use, place).
-      },
+      onTap: (x, y) => this.onTap(x, y),
       onLongPress: (x, y) => this.inspectAt(x, y),
     });
     this.keyboard = new KeyboardInput(
@@ -162,6 +177,13 @@ export class Game {
         this.mirror.addChunk(chunk);
       }),
       sim.on('tilesChanged', ({ changes }) => this.mirror.applyChanges(changes)),
+      sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
+      sim.on('simEvents', ({ events }) => {
+        for (const e of events) if (this.nearView(e.x, e.y)) this.events.emit(e.kind, e);
+      }),
+      sim.on('simStats', ({ tickMs, awakeTiles }) => {
+        this.simStats = `${tickMs.toFixed(2)} ms/tick · ${awakeTiles} fluid tiles awake`;
+      }),
       sim.on('saved', ({ at }) => {
         this.lastSave = new Date(at).toLocaleTimeString();
       }),
@@ -240,12 +262,53 @@ export class Game {
     const solid = this.mirror.isSolid;
     if (this.worldReadyAroundPlayer()) {
       const intent = this.intent();
-      const contact = this.controller.sense(this.player, solid);
+      const contact = this.controller.sense(this.player, solid, this.mirror.fluidAt);
       this.dig.update(this.player, intent, contact, dt);
       this.controller.step(this.player, intent, contact, solid, dt, this.dig.isDigging);
+      this.vitals.update(this.player, contact.fluid, dt);
     }
     this.particles.update(dt, solid);
     this.syncPlayer(false);
+    this.updateHud();
+  }
+
+  /** Writes HUD signals only when a shown value changes, so Preact re-renders rarely. */
+  private updateHud(): void {
+    const p = this.player;
+    const t = this.deps.tuning.vitals;
+    const health = Math.ceil(p.health);
+    const breath = Math.ceil((p.breath / t.breathSeconds) * 10) / 10;
+    const cur = hud.value;
+    if (cur.health === health && cur.breath === breath) return;
+    hud.value = { health, maxHealth: t.maxHealth, breath };
+  }
+
+  private nearView(x: number, y: number): boolean {
+    const view = this.renderer.viewTiles;
+    const m = EVENT_MARGIN_TILES;
+    return (
+      Math.abs(x - this.camera.x) <= view.w / 2 + m && Math.abs(y - this.camera.y) <= view.h / 2 + m
+    );
+  }
+
+  private onTap(cssX: number, cssY: number): void {
+    // Phase 1 has no context actions yet (talk, use, place); debug can pour fluid.
+    const pour = debugPour.value;
+    if (pour === 'off') return;
+    const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
+    const fluid = this.deps.fluids.require(pour).id;
+    // A 3×3 block, enough to start a real flood.
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        this.deps.sim.send({
+          type: 'pourFluid',
+          x: Math.floor(t.x) + dx,
+          y: Math.floor(t.y) + dy,
+          fluid,
+          amount: 8,
+        });
+      }
+    }
   }
 
   private syncPlayer(force: boolean): void {
@@ -344,6 +407,8 @@ export class Game {
       inspected: this.inspected,
       lastSave: this.lastSave,
       haptics: this.haptics.kind,
+      sim: this.simStats,
+      health: `${Math.ceil(p.health)} hp · breath ${p.breath.toFixed(1)}s · in fluid ${p.submersion.toFixed(2)}`,
     };
   }
 
@@ -352,8 +417,10 @@ export class Game {
     const x = Math.floor(t.x);
     const y = Math.floor(t.y);
     const m = this.deps.materials.get(this.mirror.materialAt(x, y));
+    const f = this.mirror.fluidAt(x, y);
+    const fluid = f ? ` + ${this.deps.fluids.get(fluidType(f))?.name} ${fluidAmount(f)}/8` : '';
     this.inspected = m
-      ? `${m.name} @${x},${y}: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
+      ? `${m.name}${fluid} @${x},${y}: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
         ` heat ${m.heatLimit} span ${m.supportSpan} fuel ${m.fuel}${m.trait ? ` [${m.trait}]` : ''}`
       : `unloaded @${x},${y}`;
     this.haptics.tick();
@@ -366,5 +433,12 @@ export class Game {
     if (code === 'KeyL') debugLighting.value = !debugLighting.value;
     if (code === 'BracketRight') this.setToolPower(this.dig.toolPower + 1);
     if (code === 'BracketLeft') this.setToolPower(this.dig.toolPower - 1);
+    if (code === 'KeyP') this.cyclePour();
+  }
+
+  /** Debug: what a tap pours: nothing, water, or lava. */
+  cyclePour(): void {
+    const order = ['off', 'water', 'lava'] as const;
+    debugPour.value = order[(order.indexOf(debugPour.value) + 1) % order.length]!;
   }
 }

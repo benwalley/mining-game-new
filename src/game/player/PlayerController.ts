@@ -1,7 +1,9 @@
 import { approach } from '@/core/math/util';
 import type { EventBus } from '@/core/events/EventBus';
-import type { InputTuning, PlayerTuning } from '@/content/tuning';
+import type { FluidRegistry } from '@/content/fluids';
+import type { InputTuning, PlayerTuning, SwimTuning } from '@/content/tuning';
 import type { GameEvents } from '../events';
+import { NO_FLUID, senseFluid, type FluidContact, type FluidFn } from '../physics/fluidContact';
 import {
   EPS,
   canStepUp,
@@ -27,7 +29,15 @@ export interface Contact {
   wallLeft: boolean;
   wallRight: boolean;
   canClimb: boolean;
+  fluid: FluidContact;
 }
+
+export interface SwimOptions {
+  swim: SwimTuning;
+  fluids: FluidRegistry;
+}
+
+const noFluidAt: FluidFn = () => 0;
 
 /** Minimum push toward or away from a surface that counts as intended. */
 const PUSH = 0.15;
@@ -38,7 +48,8 @@ const PUSH = 0.15;
  * (or down) it, and a diagonal drag under a ceiling walks along it. Letting go
  * starts a short grip timer; the player only falls once it runs out. Clinging
  * follows corners going up: wall to ceiling, and around a ceiling's edge onto
- * the wall above it.
+ * the wall above it. In fluid the player swims: idle sinks slowly, a drag
+ * swims that way, and holding up at the surface jumps out.
  */
 export class PlayerController {
   private readonly jumpVelocity: number;
@@ -47,11 +58,12 @@ export class PlayerController {
     private readonly tuning: PlayerTuning,
     private readonly input: InputTuning,
     private readonly events: EventBus<GameEvents>,
+    private readonly fluids: SwimOptions,
   ) {
     this.jumpVelocity = Math.sqrt(2 * tuning.gravity * tuning.jumpHeight);
   }
 
-  sense(player: Player, solid: SolidFn): Contact {
+  sense(player: Player, solid: SolidFn, fluidAt: FluidFn = noFluidAt): Contact {
     const box = player.box;
     return {
       grounded: touching(box, 'down', solid),
@@ -59,6 +71,7 @@ export class PlayerController {
       wallLeft: touching(box, 'left', solid),
       wallRight: touching(box, 'right', solid),
       canClimb: inShaft(box, solid),
+      fluid: fluidAt === noFluidAt ? NO_FLUID : senseFluid(box, fluidAt),
     };
   }
 
@@ -97,6 +110,13 @@ export class PlayerController {
     const shape = shapeOf(intent, this.input.diagonalMinRatio);
     this.updateCling(player, intent, shape, contact, dt);
     const slipping = player.gripTimer > 0;
+    const { swim } = this.fluids;
+    const inFluid = this.fluids.fluids.get(contact.fluid.fluid);
+    const swimming =
+      inFluid !== undefined &&
+      contact.fluid.submersion >= swim.minSubmersion &&
+      !player.climbing &&
+      player.cling === 'none';
 
     if (player.climbing) {
       player.vy = verticalIntent && !digging ? intent.y * t.climbSpeed : 0;
@@ -115,12 +135,30 @@ export class PlayerController {
       // A small upward push keeps the body flush; collision stops it.
       player.vy = -1;
       player.jumping = false;
+    } else if (swimming) {
+      const speed = swim.swimSpeed * inFluid.swimSpeedScale;
+      const stroking = Math.abs(intent.y) > 0.2;
+      const target = stroking ? intent.y * speed : swim.maxSinkSpeed * inFluid.swimSpeedScale;
+      // Diving in fast is braked hard; otherwise ease toward the stroke or a slow sink.
+      const rate =
+        player.vy > Math.max(target, 0) + 0.01
+          ? swim.entryDrag
+          : stroking
+            ? swim.swimAccel
+            : swim.sinkGravity;
+      player.vy = approach(player.vy, target, rate * dt);
+      player.jumping = false;
+      // Head above the surface while stroking up: hop out onto the bank.
+      if (upHeld && contact.fluid.headFluid === 0 && !contact.ceiling && !digging) {
+        player.vy = -this.jumpVelocity * swim.exitJumpScale;
+        player.jumping = true;
+      }
     } else {
       player.vy = Math.min(player.vy + t.gravity * dt, t.maxFallSpeed);
     }
 
     const canJump = player.jumpBufferTimer > 0 && player.coyoteTimer > 0;
-    const free = !player.climbing && player.cling === 'none';
+    const free = !player.climbing && player.cling === 'none' && !swimming;
     if (free && !digging && canJump && !contact.ceiling) {
       player.vy = -this.jumpVelocity;
       player.jumpBufferTimer = 0;
@@ -151,12 +189,16 @@ export class PlayerController {
       const dx = approach(player.x, player.centerColumn + 0.5, t.centerSpeed * dt) - player.x;
       player.x = moveX(player.box, dx, solid).value;
     } else {
-      const target = intent.x * t.maxRunSpeed;
-      const accel = contact.grounded
-        ? intent.x !== 0
-          ? t.groundAccel
-          : t.groundDecel
-        : t.airAccel;
+      // Wading or swimming slows the run.
+      const wading = inFluid !== undefined && contact.fluid.submersion >= swim.wadeSubmersion;
+      const target = intent.x * t.maxRunSpeed * (wading ? inFluid.moveScale : 1);
+      const accel = swimming
+        ? swim.swimAccel
+        : contact.grounded
+          ? intent.x !== 0
+            ? t.groundAccel
+            : t.groundDecel
+          : t.airAccel;
       player.vx = approach(player.vx, target, accel * dt);
       this.moveHorizontal(player, solid, dt);
     }
@@ -175,7 +217,22 @@ export class PlayerController {
       player.jumping = false;
     }
 
+    this.splash(player, contact.fluid);
     this.animate(player, dt);
+  }
+
+  /** Hitting a fluid's surface fast makes a splash. */
+  private splash(player: Player, fluid: FluidContact): void {
+    const entered = player.submersion < 0.1 && fluid.submersion >= 0.1;
+    if (entered && player.vy >= this.fluids.swim.splashMinSpeed) {
+      this.events.emit('splash', {
+        x: player.x,
+        y: player.y - player.h * fluid.submersion,
+        fluid: fluid.fluid,
+        speed: player.vy,
+      });
+    }
+    player.submersion = fluid.submersion;
   }
 
   private updateCling(

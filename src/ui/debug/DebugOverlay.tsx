@@ -1,7 +1,8 @@
-import { debugGrid, debugInfo, debugLighting, toolPower } from '../stores/gameStore';
+import { debugGrid, debugInfo, debugLighting, debugPour, toolPower } from '../stores/gameStore';
 
 export interface DebugActions {
   setToolPower(power: number): void;
+  cyclePour(): void;
   resetWorld(): void;
 }
 
@@ -46,6 +47,8 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
           </div>
           <div>dig: {info.target ?? '—'}</div>
           <div>inspect: {info.inspected ?? 'long-press a tile'}</div>
+          <div>{info.health}</div>
+          <div>sim: {info.sim}</div>
           <div>saved: {info.lastSave}</div>
         </>
       )}
@@ -63,6 +66,9 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
         </button>
         <button style={button} onClick={() => (debugLighting.value = !debugLighting.value)}>
           {debugLighting.value ? 'dark' : 'lit'}
+        </button>
+        <button style={button} onClick={() => actions.cyclePour()}>
+          tap: {debugPour.value}
         </button>
         <button
           style={button}

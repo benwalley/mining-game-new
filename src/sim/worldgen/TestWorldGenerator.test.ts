@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import testWorldConfig from '@/data/test-world.json';
+import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { CHUNK_SIZE } from '@/core/world/constants';
 import { TestWorldGenerator, type TestWorldConfig } from './TestWorldGenerator';
 
 const materials = loadMaterials();
+const fluids = loadFluids(materials);
 const config = testWorldConfig as TestWorldConfig;
-const make = (seed = 'seed-a') => new TestWorldGenerator(config, seed, materials);
+const make = (seed = 'seed-a') => new TestWorldGenerator(config, seed, materials, fluids);
 
 describe('TestWorldGenerator', () => {
   it('is deterministic and independent of generation order', () => {
@@ -48,7 +50,12 @@ describe('TestWorldGenerator', () => {
   });
 
   it('changes id when the config changes', () => {
-    const changed = new TestWorldGenerator({ ...config, surfaceY: 30 }, 'seed-a', materials);
+    const changed = new TestWorldGenerator(
+      { ...config, surfaceY: 30 },
+      'seed-a',
+      materials,
+      fluids,
+    );
     expect(changed.id).not.toBe(make().id);
     expect(make().generateChunk(0, 0).material.length).toBe(CHUNK_SIZE * CHUNK_SIZE);
   });

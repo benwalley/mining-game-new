@@ -1,5 +1,6 @@
 import { render } from 'preact';
 import { Game } from '@/app/Game';
+import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
 import type { WorldKind } from '@/protocol/messages';
@@ -25,6 +26,7 @@ async function boot(): Promise<void> {
     <App
       debug={{
         setToolPower: (p) => game?.setToolPower(p),
+        cyclePour: () => game?.cyclePour(),
         resetWorld: () => game?.resetWorld(),
       }}
     />,
@@ -36,10 +38,12 @@ async function boot(): Promise<void> {
 
   const sim = SimClient.spawnWorker();
   sim.on('error', ({ message }) => console.error('[sim]', message));
+  const materials = loadMaterials();
   game = await Game.start({
     canvas,
     sim,
-    materials: loadMaterials(),
+    materials,
+    fluids: loadFluids(materials),
     tuning,
     worldId: WORLD_ID,
     worldKind: WORLD_KIND,

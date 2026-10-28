@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development.",
+  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development. Pools: fill 1 is a sealed aquifer; below 1 is a lake whose air can open into caves. poolShell is the rock kept around a pool's fluid so it starts still.",
   "width": 384,
   "depth": 3000,
   "surfaceY": 48,
@@ -216,6 +216,81 @@
       "count": 3,
       "rx": [24, 40],
       "ry": [14, 22]
+    }
+  ],
+  "poolShell": 2,
+  "pools": [
+    {
+      "layer": "topsoil",
+      "fluid": "water",
+      "count": 8,
+      "rx": [4, 8],
+      "ry": [2, 4],
+      "fill": 0.65
+    },
+    {
+      "layer": "stone",
+      "fluid": "water",
+      "count": 16,
+      "rx": [4, 10],
+      "ry": [3, 6],
+      "fill": 1
+    },
+    {
+      "layer": "stone",
+      "fluid": "water",
+      "count": 4,
+      "rx": [8, 14],
+      "ry": [4, 7],
+      "fill": 0.5
+    },
+    {
+      "layer": "crystal",
+      "fluid": "water",
+      "count": 6,
+      "rx": [12, 22],
+      "ry": [6, 10],
+      "fill": 0.5
+    },
+    {
+      "layer": "fungal",
+      "fluid": "water",
+      "count": 18,
+      "rx": [5, 12],
+      "ry": [3, 7],
+      "fill": 1
+    },
+    {
+      "layer": "fungal",
+      "fluid": "water",
+      "count": 6,
+      "rx": [10, 18],
+      "ry": [5, 8],
+      "fill": 0.6
+    },
+    {
+      "layer": "magma",
+      "fluid": "lava",
+      "count": 10,
+      "rx": [8, 18],
+      "ry": [5, 9],
+      "fill": 0.55
+    },
+    {
+      "layer": "magma",
+      "fluid": "lava",
+      "count": 10,
+      "rx": [3, 6],
+      "ry": [2, 4],
+      "fill": 1
+    },
+    {
+      "layer": "deep",
+      "fluid": "lava",
+      "count": 6,
+      "rx": [12, 24],
+      "ry": [6, 10],
+      "fill": 0.5
     }
   ]
 }

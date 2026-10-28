@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import testWorldConfig from '@/data/test-world.json';
+import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
 import { CHUNK_SIZE } from '@/core/world/constants';
@@ -12,6 +13,7 @@ import { SimHost } from './SimHost';
 import { TestWorldGenerator, type TestWorldConfig } from './worldgen/TestWorldGenerator';
 
 const materials = loadMaterials();
+const fluids = loadFluids(materials);
 const WORLD = 'w1';
 
 function createHost(store: SaveStore) {
@@ -20,9 +22,10 @@ function createHost(store: SaveStore) {
     port: { post: (m) => out.push(m), onMessage: () => {} },
     store,
     materials,
+    fluids,
     tuning,
     createGenerator: (seed) =>
-      new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials),
+      new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials, fluids),
     newSeed: () => 'fixed-seed',
     now: () => 1000,
   });
@@ -115,5 +118,31 @@ describe.each([
     await second.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
     await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
     expect(second.last('chunk')!.chunk.damage[idx]).toBe(0);
+  });
+
+  it('runs fluids, streams them to the main thread and saves them', async () => {
+    const store = await makeStore();
+    const worldId = `${WORLD}-e`;
+    const water = fluids.require('water').id;
+    const first = createHost(store);
+    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
+    await first.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    await first.send({ type: 'pourFluid', x: spawn.x, y: spawn.y - 4, fluid: water, amount: 8 });
+    for (let t = 0; t < 30; t++) first.host.tick();
+    const patches = first.out.flatMap((m) => (m.type === 'fluidsChanged' ? m.patches : []));
+    expect(patches.length).toBeGreaterThan(0);
+    await first.send({ type: 'flush' });
+
+    const second = createHost(store);
+    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
+    await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const chunk = second.last('chunk')!.chunk;
+    let total = 0;
+    chunk.fluidType.forEach((t, i) => {
+      if (t === water) total += chunk.fluidAmount[i]!;
+    });
+    // The poured water fell to the ground and was saved there.
+    expect(total).toBe(8);
+    expect(chunk.fluidAmount[(spawn.y - 4) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE)]).toBe(0);
   });
 });

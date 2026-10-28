@@ -1,5 +1,6 @@
 import testWorldConfig from '@/data/test-world.json';
 import worldgenConfig from '@/data/worldgen.json';
+import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
 import type { FromSim, MessagePort, ToSim } from '@/protocol/messages';
@@ -38,16 +39,18 @@ const queue = (e: MessageEvent<ToSim>): void => void pending.push(e.data);
 self.addEventListener('message', queue);
 
 const materials = loadMaterials();
+const fluids = loadFluids(materials);
 const store = await openStore();
 const host = new SimHost({
   port,
   store,
   materials,
+  fluids,
   tuning,
   createGenerator: (seed, kind) =>
     kind === 'test'
-      ? new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials)
-      : new LayeredWorldGenerator(worldgenConfig as LayeredWorldConfig, seed, materials),
+      ? new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials, fluids)
+      : new LayeredWorldGenerator(worldgenConfig as LayeredWorldConfig, seed, materials, fluids),
   newSeed,
 });
 self.removeEventListener('message', queue);

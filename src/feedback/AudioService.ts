@@ -68,6 +68,23 @@ export class AudioService {
     this.sweep(110, 45, 0.1, Math.min(0.5, speed / 40));
   }
 
+  /** Hitting a fluid's surface. Thick fluids sound duller. */
+  splash(speed: number, thick: boolean): void {
+    const gain = Math.min(0.6, 0.15 + speed / 40);
+    this.noiseBurst(thick ? 380 : 900, 0.8, 0.28, gain);
+    this.noiseBurst(thick ? 900 : 2600, 1.2, 0.12, gain * 0.6);
+  }
+
+  /** Lava quenched by water. */
+  hiss(): void {
+    this.noiseBurst(this.rng.range(4500, 6000), 0.7, 0.35, 0.3);
+  }
+
+  hurt(): void {
+    this.sweep(260, 110, 0.18, 0.35);
+    this.noiseBurst(420, 1, 0.08, 0.3);
+  }
+
   private profile(m: MaterialDef): SoundProfile {
     let p = this.profiles.get(m.numId);
     if (!p) {

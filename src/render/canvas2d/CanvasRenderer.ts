@@ -1,9 +1,10 @@
 import { CHUNK_SIZE, TILE_PX, chunkCountX, chunkCountY } from '@/core/world/constants';
+import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import { palette } from '@/content/palette';
 import type { CameraTuning, LightTuning } from '@/content/tuning';
 import type { LightView } from '@/game/light/LightField';
-import type { ChunkMirror } from '@/game/world/ChunkMirror';
+import { fluidAmount, fluidType, type ChunkMirror } from '@/game/world/ChunkMirror';
 import type { RenderFrame, Renderer } from '../Renderer';
 import { ChunkCache } from './ChunkCache';
 import { createSurface, type Ctx2D, type Surface } from './surface';
@@ -11,6 +12,17 @@ import { drawPlayer } from './playerSprite';
 import { TileAtlas } from './TileAtlas';
 
 const CHUNK_PX = CHUNK_SIZE * TILE_PX;
+/** Source-pixel box the player sprite is drawn into when fluid must tint it. */
+const SPRITE_PX = 64;
+const SPRITE_FEET = 48;
+/** How strongly fluid shows over a submerged player, relative to its normal opacity. */
+const OVER_PLAYER_ALPHA = 0.55;
+
+interface FluidStyle {
+  color: string;
+  surface: string;
+  opacity: number;
+}
 
 /** Canvas 2D renderer with crisp whole-number pixel scaling. */
 export class CanvasRenderer implements Renderer {
@@ -24,15 +36,27 @@ export class CanvasRenderer implements Renderer {
   private darkness: { canvas: Surface; ctx: Ctx2D; image: ImageData } | null = null;
   /** Darkness alpha (0–255) for each light level. */
   private readonly darknessByLevel = new Uint8ClampedArray(16);
+  /** Indexed by fluid id. */
+  private readonly fluidStyles: (FluidStyle | undefined)[] = [];
+  private readonly fluidPaths: { body: Path2D; surface: Path2D; any: boolean }[] = [];
+  private sprite: { canvas: Surface; ctx: Ctx2D; scale: number } | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly mirror: ChunkMirror,
     materials: MaterialRegistry,
+    fluids: FluidRegistry,
     private readonly tuning: CameraTuning,
     crackStages: number,
     light: LightTuning,
   ) {
+    for (const f of fluids.all) {
+      this.fluidStyles[f.id] = {
+        color: palette[f.visual.color],
+        surface: palette[f.visual.surface],
+        opacity: f.visual.opacity,
+      };
+    }
     for (let level = 0; level < 16; level++) {
       const brightness = Math.min(1, level / light.fullBrightLevel);
       this.darknessByLevel[level] = Math.round((1 - brightness) * 255);
@@ -107,19 +131,139 @@ export class CanvasRenderer implements Renderer {
       }
     }
 
+    this.drawFluids(
+      ctx,
+      Math.floor(-ox / tile),
+      Math.floor(-oy / tile),
+      Math.floor((canvas.width - ox) / tile),
+      Math.floor((canvas.height - oy) / tile),
+      ox,
+      oy,
+      1,
+    );
     this.drawParticles(frame, ox, oy, tile);
     // Darkness goes over the world but under the player, who carries the lamp.
     if (frame.light) this.drawDarkness(frame.light, ox, oy, tile);
 
     // Player, with feet snapped to the source-pixel grid.
     const p = frame.player;
+    const px = Math.round(ox + p.x * tile);
+    const py = Math.round((oy + p.y * tile) / scale) * scale;
+    if (this.fluidNear(p.x, p.y)) {
+      this.drawPlayerInFluid(p, px, py, ox, oy);
+    } else {
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(scale, scale);
+      drawPlayer(ctx, p);
+      ctx.restore();
+    }
+
+    if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+  }
+
+  /**
+   * Fluid in a tile range: a body filled to its amount (or the whole tile
+   * under more of the same fluid) and a lighter surface line on top.
+   */
+  private drawFluids(
+    ctx: Ctx2D,
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    ox: number,
+    oy: number,
+    alphaScale: number,
+  ): void {
+    const tile = TILE_PX * this.scale;
+    const unit = tile / FLUID_MAX;
+    const paths = this.fluidPaths;
+    for (let id = 0; id < this.fluidStyles.length; id++) {
+      paths[id] = { body: new Path2D(), surface: new Path2D(), any: false };
+    }
+    const fluidAt = this.mirror.fluidAt;
+    for (let y = ty0; y <= ty1; y++) {
+      for (let x = tx0; x <= tx1; x++) {
+        const f = fluidAt(x, y);
+        if (f === 0) continue;
+        const type = fluidType(f);
+        const path = paths[type];
+        if (!path) continue;
+        path.any = true;
+        const sx = ox + x * tile;
+        const bottom = oy + (y + 1) * tile;
+        if (fluidType(fluidAt(x, y - 1)) === type) {
+          path.body.rect(sx, bottom - tile, tile, tile);
+        } else {
+          const h = Math.max(this.scale, Math.round(fluidAmount(f) * unit));
+          path.body.rect(sx, bottom - h, tile, h);
+          path.surface.rect(sx, bottom - h, tile, this.scale);
+        }
+      }
+    }
+    for (let id = 0; id < paths.length; id++) {
+      const path = paths[id]!;
+      const style = this.fluidStyles[id];
+      if (!path.any || !style) continue;
+      ctx.globalAlpha = style.opacity * alphaScale;
+      ctx.fillStyle = style.color;
+      ctx.fill(path.body);
+      ctx.fillStyle = style.surface;
+      ctx.fill(path.surface);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private fluidNear(x: number, y: number): boolean {
+    const fluidAt = this.mirror.fluidAt;
+    for (let ty = Math.floor(y) - 2; ty <= Math.floor(y); ty++) {
+      for (let tx = Math.floor(x) - 1; tx <= Math.floor(x) + 1; tx++) {
+        if (fluidAt(tx, ty) !== 0) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Draws the player into a small surface, tints the parts under fluid
+   * (source-atop keeps the tint inside the sprite), then copies it over.
+   */
+  private drawPlayerInFluid(
+    p: RenderFrame['player'],
+    px: number,
+    py: number,
+    ox: number,
+    oy: number,
+  ): void {
+    const { scale } = this;
+    const size = SPRITE_PX * scale;
+    if (!this.sprite || this.sprite.scale !== scale) {
+      this.sprite = { ...createSurface(size, size), scale };
+    }
+    const { canvas, ctx } = this.sprite;
+    const left = px - (size >> 1);
+    const top = py - SPRITE_FEET * scale;
+    ctx.clearRect(0, 0, size, size);
     ctx.save();
-    ctx.translate(Math.round(ox + p.x * tile), Math.round((oy + p.y * tile) / scale) * scale);
+    ctx.translate(size >> 1, SPRITE_FEET * scale);
     ctx.scale(scale, scale);
     drawPlayer(ctx, p);
     ctx.restore();
 
-    if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+    ctx.globalCompositeOperation = 'source-atop';
+    this.drawFluids(
+      ctx,
+      Math.floor(p.x) - 2,
+      Math.floor(p.y) - 3,
+      Math.floor(p.x) + 2,
+      Math.floor(p.y) + 1,
+      ox - left,
+      oy - top,
+      OVER_PLAYER_ALPHA,
+    );
+    ctx.globalCompositeOperation = 'source-over';
+    this.ctx.drawImage(canvas, left, top);
   }
 
   /** Screen position of world tile (0, 0), rounded to whole pixels so tiles never shimmer. */

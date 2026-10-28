@@ -1,5 +1,6 @@
 import type { ChunkData } from '@/core/world/chunk';
 import type { WorldDims } from '@/core/world/constants';
+import type { SimEventKind } from '@/content/fluids';
 
 /**
  * Messages between the main thread (input, rendering, player) and the
@@ -7,7 +8,7 @@ import type { WorldDims } from '@/core/world/constants';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -41,6 +42,25 @@ export interface DamageChange {
   damage: number;
 }
 
+/** A rectangle of one chunk's fluid layer, in local tile coords; arrays are row-major w×h. */
+export interface FluidPatch {
+  cx: number;
+  cy: number;
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  type: Uint8Array;
+  amount: Uint8Array;
+}
+
+/** Something that happened in the world that the main thread may want to show or play. */
+export interface SimEvent {
+  kind: SimEventKind;
+  x: number;
+  y: number;
+}
+
 export type ToSim =
   | { type: 'init'; protocol: number; worldId: string; kind: WorldKind }
   | { type: 'requestChunks'; chunks: ChunkCoord[] }
@@ -52,13 +72,20 @@ export type ToSim =
   | { type: 'setPaused'; paused: boolean }
   /** Save everything dirty right now (page is hiding or closing). */
   | { type: 'flush' }
-  | { type: 'resetWorld' };
+  | { type: 'resetWorld' }
+  /** Debug: fill a tile with fluid. */
+  | { type: 'pourFluid'; x: number; y: number; fluid: number; amount: number };
 
 export type FromSim =
   | { type: 'ready'; world: WorldInfo; player: PlayerSnapshot | null; playTimeMs: number }
   | { type: 'chunk'; chunk: ChunkData }
   /** Authoritative tile values; the main thread overwrites its mirror with these. */
   | { type: 'tilesChanged'; changes: TileChange[] }
+  /** Fluid that moved this tick, for chunks the main thread holds. */
+  | { type: 'fluidsChanged'; patches: FluidPatch[] }
+  | { type: 'simEvents'; events: SimEvent[] }
+  /** About once a second: how much work the simulation is doing. */
+  | { type: 'simStats'; tickMs: number; awakeTiles: number }
   | { type: 'saved'; at: number; chunks: number }
   | { type: 'worldReset' }
   | { type: 'error'; message: string };

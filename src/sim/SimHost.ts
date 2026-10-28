@@ -1,12 +1,21 @@
 import { ChunkStore } from '@/core/world/ChunkStore';
 import { chunkTransferables, cloneChunk, type ChunkData } from '@/core/world/chunk';
-import { CHUNK_SHIFT, UNLOADED, chunkKey, chunkKeyX, chunkKeyY } from '@/core/world/constants';
+import {
+  CHUNK_SHIFT,
+  CHUNK_SIZE,
+  UNLOADED,
+  chunkKey,
+  chunkKeyX,
+  chunkKeyY,
+} from '@/core/world/constants';
+import type { FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import type { Tuning } from '@/content/tuning';
 import {
   PROTOCOL_VERSION,
   type ChunkCoord,
   type DamageChange,
+  type FluidPatch,
   type FromSim,
   type MessagePort,
   type PlayerSnapshot,
@@ -14,26 +23,24 @@ import {
   type WorldKind,
   type WorldInfo,
 } from '@/protocol/messages';
+import { FluidSim } from './fluid/FluidSim';
 import type { SaveStore } from './persistence/SaveStore';
 import { SAVE_VERSION, type WorldMeta } from './persistence/saveFormat';
 import type { WorldGenerator } from './worldgen/WorldGenerator';
 
 const PLAYER_ENTITY_ID = 'player';
+const STATS_EVERY_MS = 1000;
 
 export interface SimHostDeps {
   port: MessagePort<ToSim, FromSim>;
   store: SaveStore;
   materials: MaterialRegistry;
+  fluids: FluidRegistry;
   tuning: Tuning;
   createGenerator(seed: string, kind: WorldKind): WorldGenerator;
   /** Entropy for new world seeds. */
   newSeed(): string;
   now?(): number;
-}
-
-/** A per-tick world system. Phase 1 adds fluids, heat, gas, support, light. */
-export interface SimSystem {
-  tick(dt: number): void;
 }
 
 /**
@@ -48,6 +55,7 @@ export class SimHost {
     meta: WorldMeta;
     generator: WorldGenerator;
     chunks: ChunkStore;
+    fluids: FluidSim;
   };
   private player: PlayerSnapshot | null = null;
   private playerDirty = false;
@@ -55,16 +63,21 @@ export class SimHost {
   /** Chunks the main thread currently holds. Others may be evicted from memory. */
   private readonly wanted = new Set<number>();
   private readonly loading = new Map<number, Promise<void>>();
-  private readonly systems: SimSystem[] = [];
+  private readonly solidById: Uint8Array;
   private paused = false;
   private saving: Promise<void> | null = null;
   private saveQueued = false;
   private tickTimer?: ReturnType<typeof setInterval>;
   private saveTimer?: ReturnType<typeof setInterval>;
   private lastTickAt = 0;
+  private statsSince = 0;
+  private statsTicks = 0;
+  private statsTickMs = 0;
 
   constructor(private readonly deps: SimHostDeps) {
     this.now = deps.now ?? (() => Date.now());
+    this.solidById = new Uint8Array(deps.materials.maxNumId + 1);
+    for (const m of deps.materials.all) this.solidById[m.numId] = m.solid ? 1 : 0;
     deps.port.onMessage((msg) => {
       this.handle(msg).catch((err: unknown) => this.post({ type: 'error', message: String(err) }));
     });
@@ -102,6 +115,9 @@ export class SimHost {
         return;
       case 'resetWorld':
         await this.resetWorld();
+        return;
+      case 'pourFluid':
+        this.requireWorld().fluids.setFluid(msg.x, msg.y, msg.fluid, msg.amount);
         return;
     }
   }
@@ -151,10 +167,12 @@ export class SimHost {
     }
 
     const generator = this.deps.createGenerator(meta.seed, kind);
+    const chunks = new ChunkStore(generator.dims, this.deps.materials.bedrock.numId);
     this.world = {
       meta,
       generator,
-      chunks: new ChunkStore(generator.dims, this.deps.materials.bedrock.numId),
+      chunks,
+      fluids: new FluidSim(chunks, this.solidById, this.deps.fluids),
       info: {
         worldId,
         seed: meta.seed,
@@ -213,6 +231,7 @@ export class SimHost {
       ];
       for (const chunk of chunks) {
         world.chunks.set(chunk);
+        world.fluids.wakeChunk(chunk.cx, chunk.cy);
         if (this.wanted.has(chunkKey(chunk.cx, chunk.cy))) this.sendChunk(chunk);
       }
     } finally {
@@ -231,12 +250,12 @@ export class SimHost {
   }
 
   private releaseChunks(coords: readonly ChunkCoord[]): void {
-    const world = this.requireWorld();
+    this.requireWorld();
     for (const [cx, cy] of coords) {
       const key = chunkKey(cx, cy);
       this.wanted.delete(key);
       // Dirty chunks stay in memory until the next save writes them.
-      if (!this.dirtyChunks.has(key)) world.chunks.delete(cx, cy);
+      if (!this.dirtyChunks.has(key)) this.evict(cx, cy);
     }
   }
 
@@ -254,6 +273,8 @@ export class SimHost {
     if (canDig) {
       world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
       this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+      // An opening can let neighboring fluid in.
+      world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
     }
     // Always answer with the authoritative value so a rejected dig is corrected.
     this.post({
@@ -274,13 +295,56 @@ export class SimHost {
     }
   }
 
-  private tick(): void {
+  /** One simulation step. Public so tests can drive it without timers. */
+  tick(): void {
     const t = this.now();
     const dt = (t - this.lastTickAt) / 1000;
     this.lastTickAt = t;
-    if (this.paused || !this.world) return;
-    this.world.meta.playTimeMs += dt * 1000;
-    for (const system of this.systems) system.tick(dt);
+    const world = this.world;
+    if (this.paused || !world) return;
+    world.meta.playTimeMs += dt * 1000;
+
+    const started = performance.now();
+    world.fluids.tick();
+    this.publish(world.fluids);
+    this.statsTickMs += performance.now() - started;
+    this.statsTicks++;
+    if (t - this.statsSince >= STATS_EVERY_MS) {
+      this.post({
+        type: 'simStats',
+        tickMs: this.statsTickMs / Math.max(1, this.statsTicks),
+        awakeTiles: world.fluids.awakeTiles,
+      });
+      this.statsSince = t;
+      this.statsTicks = 0;
+      this.statsTickMs = 0;
+    }
+  }
+
+  /** Marks what the fluids changed for saving and sends it to the main thread. */
+  private publish(fluids: FluidSim): void {
+    const out = fluids.drain();
+    if (out.materials.length > 0) this.post({ type: 'tilesChanged', changes: out.materials });
+    if (out.changed.size > 0) {
+      const patches: FluidPatch[] = [];
+      const transfer: ArrayBuffer[] = [];
+      for (const [key, rect] of out.changed) {
+        this.dirtyChunks.add(key);
+        if (!this.wanted.has(key)) continue;
+        const chunk = this.world?.chunks.get(chunkKeyX(key), chunkKeyY(key));
+        if (!chunk) continue;
+        const patch = fluidPatch(chunk, rect.minX, rect.minY, rect.maxX, rect.maxY);
+        patches.push(patch);
+        transfer.push(patch.type.buffer as ArrayBuffer, patch.amount.buffer as ArrayBuffer);
+      }
+      if (patches.length > 0) this.post({ type: 'fluidsChanged', patches }, transfer);
+    }
+    if (out.events.length > 0) this.post({ type: 'simEvents', events: out.events });
+  }
+
+  private evict(cx: number, cy: number): void {
+    this.world?.chunks.delete(cx, cy);
+    this.world?.fluids.forgetChunk(cx, cy);
   }
 
   /** Writes dirty chunks, the player and world meta. Serialized: never two saves at once. */
@@ -325,9 +389,7 @@ export class SimHost {
     }
     // Evict chunks that were only kept in memory because they were dirty.
     for (const k of keys) {
-      if (!this.wanted.has(k) && !this.dirtyChunks.has(k)) {
-        world.chunks.delete(chunkKeyX(k), chunkKeyY(k));
-      }
+      if (!this.wanted.has(k) && !this.dirtyChunks.has(k)) this.evict(chunkKeyX(k), chunkKeyY(k));
     }
     this.post({ type: 'saved', at: world.meta.lastSavedAt, chunks: chunks.length });
   }
@@ -343,4 +405,17 @@ export class SimHost {
     this.world = undefined;
     this.post({ type: 'worldReset' });
   }
+}
+
+function fluidPatch(chunk: ChunkData, x0: number, y0: number, x1: number, y1: number): FluidPatch {
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const type = new Uint8Array(w * h);
+  const amount = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const from = (y0 + y) * CHUNK_SIZE + x0;
+    type.set(chunk.fluidType.subarray(from, from + w), y * w);
+    amount.set(chunk.fluidAmount.subarray(from, from + w), y * w);
+  }
+  return { cx: chunk.cx, cy: chunk.cy, x0, y0, w, h, type, amount };
 }

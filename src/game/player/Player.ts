@@ -32,6 +32,14 @@ export class Player {
   /** True from takeoff until the jump is cut or peaks. */
   jumping = false;
   upHeldPrev = false;
+  /** Fraction of the body under fluid as of the last step. */
+  submersion = 0;
+
+  health: number;
+  /** Seconds of air left while the head is under fluid. */
+  breath: number;
+  /** Seconds since the player last took damage. */
+  sinceHurt = Infinity;
 
   /** Set by DigSystem: the direction being dug this step, or null. */
   digDir: DigDirection | null = null;
@@ -46,9 +54,11 @@ export class Player {
   squashTimer = 0;
   walkPhase = 0;
 
-  constructor(tuning: PlayerTuning) {
+  constructor(tuning: PlayerTuning, vitals: { maxHealth: number; breathSeconds: number }) {
     this.w = tuning.width;
     this.h = tuning.height;
+    this.health = vitals.maxHealth;
+    this.breath = vitals.breathSeconds;
   }
 
   get box(): Box {

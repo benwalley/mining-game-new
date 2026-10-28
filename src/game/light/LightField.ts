@@ -1,7 +1,13 @@
 import { MAX_LIGHT, computeLight, type LightRegion, type LightSources } from '@/core/light/light';
 import type { ChunkData } from '@/core/world/chunk';
+import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
-import type { ChunkMirror, MirrorListener } from '../world/ChunkMirror';
+import {
+  fluidAmount,
+  fluidType,
+  type ChunkMirror,
+  type MirrorListener,
+} from '../world/ChunkMirror';
 import type { TileRect } from '../world/ChunkStreamer';
 
 /** Read-only light for the renderer: one level (0–15) per tile of `region`. */
@@ -21,18 +27,27 @@ export class LightField implements MirrorListener {
   private dirty = true;
   private key = '';
   private readonly emission: Uint8Array;
+  private readonly fluidEmission: Uint8Array;
   private readonly lamps = [{ x: 0, y: 0, level: 0 }];
   private readonly sources: LightSources;
 
-  constructor(mirror: ChunkMirror, materials: MaterialRegistry) {
+  constructor(mirror: ChunkMirror, materials: MaterialRegistry, fluids: FluidRegistry) {
     this.emission = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.emission[m.numId] = m.light;
+    this.fluidEmission = new Uint8Array(fluids.maxId + 1);
+    for (const f of fluids.all) this.fluidEmission[f.id] = f.light;
     const surfaceY = mirror.dims.surfaceY;
     this.sources = {
       isOpaque: mirror.isSolid,
       emission: (x, y) => {
         const m = mirror.materialAt(x, y);
-        return m < 0 ? 0 : this.emission[m]!;
+        if (m < 0) return 0;
+        const fluid = mirror.fluidAt(x, y);
+        if (fluid === 0) return this.emission[m]!;
+        // A thin film of a glowing fluid glows less than a full tile.
+        const full = this.fluidEmission[fluidType(fluid)]!;
+        const glow = Math.round(full * (0.5 + fluidAmount(fluid) / (2 * FLUID_MAX)));
+        return Math.max(this.emission[m]!, glow);
       },
       isSky: (_x, y) => y < surfaceY,
       lamps: this.lamps,
@@ -71,6 +86,11 @@ export class LightField implements MirrorListener {
   }
 
   tileChanged(): void {
+    this.dirty = true;
+  }
+
+  fluidsChanged(): void {
+    // Only glowing fluids change the light, but checking costs more than recomputing.
     this.dirty = true;
   }
 }

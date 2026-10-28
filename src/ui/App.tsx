@@ -1,9 +1,11 @@
 import { bootError, bootState, debugVisible } from './stores/gameStore';
 import { DebugOverlay, type DebugActions } from './debug/DebugOverlay';
+import { Hud } from './hud/Hud';
 
 export function App({ debug }: { debug: DebugActions }) {
   return (
     <>
+      {bootState.value === 'ready' && <Hud />}
       {bootState.value !== 'ready' && <BootScreen />}
       {debugVisible.value && <DebugOverlay actions={debug} />}
     </>

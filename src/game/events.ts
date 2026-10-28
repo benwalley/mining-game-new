@@ -8,4 +8,8 @@ export interface GameEvents {
   jumped: Record<string, never>;
   landed: { speed: number };
   inspect: { x: number; y: number };
+  splash: { x: number; y: number; fluid: number; speed: number };
+  hurt: { cause: 'drowning' | 'fluid'; fluid: number };
+  /** Lava met water and hardened; from the sim. */
+  quench: { x: number; y: number };
 }

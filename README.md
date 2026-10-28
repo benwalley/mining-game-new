@@ -37,9 +37,15 @@ flat test world instead (each keeps its own save).
   ceiling's edge carries you around it onto the wall above. Lift your finger and the mole
   starts losing grip (it trembles and slides); it only falls after about a second, so you can
   re-grab. Half-dug tiles keep their cracks, so you can come back and finish them.
+- **Water and lava:** in fluid the mole swims. Let go and it sinks slowly, drag to swim
+  that way, and holding up at the surface hops you out onto the bank. Breath bubbles appear
+  while your head is under; when they run out you start drowning. Lava burns on contact.
+  Health shows top right when hurt, with a red vignette, and regenerates after a few seconds
+  out of danger. Until rescue arrives in phase 3, nothing can take you below 1 HP.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
-  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, and `[` and `]`
-  change pick power.
+  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `[` and `]`
+  change pick power, and `P` cycles what a tap pours (nothing, water, lava). The overlay's
+  "tap" button does the same on phones; each tap pours a 3×3 block.
 
 ## Architecture
 
@@ -54,7 +60,7 @@ src/
   data/              ALL tunable numbers and content: materials, palette, tuning, test world
   protocol/          Typed main <-> sim messages and the SimClient
   sim/               Runs in a Web Worker: SimHost (authoritative world), world generation,
-                     persistence (IndexedDB, versioned save format with migrations)
+                     the fluid simulation, persistence (IndexedDB, versioned save format)
   game/              Main-thread gameplay: player movement, digging, camera, chunk mirror
                      and streaming
   input/             Pointer (swipe) and keyboard input
@@ -113,8 +119,18 @@ per-layer deposits and ores, winding tunnels, pockets and big caverns, generated
 deterministically from the seed (`src/data/worldgen.json`). Light spreads tile by tile from the
 sky, glowing materials and the helmet lamp; underground is dark beyond the lamp.
 
-**Phase 1, still to come:** water and lava; falling sand and cave-ins; heat and gas (hazards
-hurt but can't kill until rescue exists in phase 3); simulation zones and full saving.
+**Phase 1, slice 2 (done):** water and lava (`src/data/fluids.json`). The fluid layer (0–8
+per tile) is a cellular automaton in the worker at 20 ticks/s. Fluid falls, then levels out
+sideways (no pressure). Lava moves on one tick in four, and lava touching water hardens into
+obsidian with a hiss. Only awake tiles are simulated, so a settled lake costs nothing. The
+worker sends changed rectangles to the main thread, which draws fluids each frame and lets
+lava glow. World gen adds sealed aquifers, lakes and lava lakes (`pools` in `worldgen.json`),
+each wrapped in a rock shell so it starts still. The test world has a surface pond, a sealed
+aquifer, and an aquifer above a lava basin for a waterfall test. The player swims, has breath
+and health, and gets hurt by lava and drowning (never below 1 HP).
+
+**Phase 1, still to come:** falling sand and cave-ins; heat and gas; simulation zones (fluids
+run in every loaded chunk for now) and full saving.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

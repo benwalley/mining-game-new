@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '@/core/events/EventBus';
+import { loadFluids } from '@/content/fluids';
+import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
 import type { GameEvents } from '../events';
+import type { FluidFn } from '../physics/fluidContact';
 import type { SolidFn } from '../physics/tileCollision';
 import { Player } from './Player';
 import { PlayerController, type MoveIntent } from './PlayerController';
+
+const fluids = loadFluids(loadMaterials());
 
 function grid(rows: string[]): SolidFn {
   return (x, y) => y >= rows.length || rows[y]?.[x] === '#';
@@ -14,8 +19,11 @@ function simulate(solid: SolidFn, x: number, y: number) {
   const events = new EventBus<GameEvents>();
   const jumps: unknown[] = [];
   events.on('jumped', (e) => jumps.push(e));
-  const controller = new PlayerController(tuning.player, tuning.input, events);
-  const player = new Player(tuning.player);
+  const controller = new PlayerController(tuning.player, tuning.input, events, {
+    swim: tuning.swim,
+    fluids,
+  });
+  const player = new Player(tuning.player, tuning.vitals);
   player.placeAt(x, y);
   const run = (seconds: number, intent: MoveIntent) => {
     for (let i = 0; i < seconds * 60; i++) {
@@ -171,5 +179,50 @@ describe('PlayerController', () => {
     run(1, { x: 1, y: 0 });
     expect(player.y).toBe(3);
     expect(player.x).toBeGreaterThan(5);
+  });
+});
+
+describe('PlayerController in water', () => {
+  // A pool four tiles deep with a dry bank on the left at the water's top row.
+  const pool = ['#.......', '#.......', '##......', '##......', '##......', '##......', '########'];
+  const solid = grid(pool);
+  const wet: FluidFn = (x, y) => (x >= 2 && y >= 2 && y <= 5 ? (1 << 4) | 8 : 0);
+
+  function swim(x: number, y: number) {
+    const events = new EventBus<GameEvents>();
+    const splashes: unknown[] = [];
+    events.on('splash', (e) => splashes.push(e));
+    const controller = new PlayerController(tuning.player, tuning.input, events, {
+      swim: tuning.swim,
+      fluids,
+    });
+    const player = new Player(tuning.player, tuning.vitals);
+    player.placeAt(x, y);
+    const run = (seconds: number, intent: MoveIntent) => {
+      for (let i = 0; i < seconds * 60; i++) {
+        const contact = controller.sense(player, solid, wet);
+        controller.step(player, intent, contact, solid, 1 / 60, false);
+      }
+    };
+    return { player, run, splashes };
+  }
+
+  it('splashes in and sinks slowly when idle', () => {
+    const { player, run, splashes } = swim(4.5, 1);
+    run(0.6, { x: 0, y: 0 });
+    expect(splashes).toHaveLength(1);
+    expect(player.vy).toBeLessThanOrEqual(tuning.swim.maxSinkSpeed + 0.01);
+    run(3, { x: 0, y: 0 });
+    expect(player.y).toBe(6);
+  });
+
+  it('swims up and hops out onto the bank', () => {
+    const { player, run } = swim(4.5, 6);
+    // Hold up and toward the bank until standing on dry ground.
+    for (let i = 0; i < 180 && !(player.grounded && player.submersion === 0); i++) {
+      run(1 / 60, { x: -0.5, y: -1 });
+    }
+    expect(player.y).toBe(2);
+    expect(player.x).toBeLessThan(2);
   });
 });
