@@ -103,7 +103,7 @@ export class PlayerController {
           : t.groundDecel
         : t.airAccel;
       player.vx = approach(player.vx, target, accel * dt);
-      this.moveHorizontal(player, solid, dt, contact.grounded);
+      this.moveHorizontal(player, solid, dt);
     }
 
     const resY = moveY(player.box, player.vy * dt, solid);
@@ -123,7 +123,7 @@ export class PlayerController {
     this.animate(player, dt);
   }
 
-  private moveHorizontal(player: Player, solid: SolidFn, dt: number, grounded: boolean): void {
+  private moveHorizontal(player: Player, solid: SolidFn, dt: number): void {
     const dx = player.vx * dt;
     const startX = player.x;
     const res = moveX(player.box, dx, solid);
@@ -132,9 +132,11 @@ export class PlayerController {
       return;
     }
     const dir: 1 | -1 = dx > 0 ? 1 : -1;
-    if (grounded && canStepUp({ ...player.box, x: res.value }, dir, solid)) {
-      // Auto-climb a 1-tile ledge. prevY moves too so interpolation doesn't
-      // smear the snap; the visual offset eases it instead.
+    if (canStepUp({ ...player.box, x: res.value }, dir, solid)) {
+      // Auto-climb a 1-tile ledge. In the air this is a mantle: a jump that
+      // gets the feet past a ledge's top row pulls the player onto it. prevY
+      // moves too so interpolation doesn't smear the snap; the visual offset
+      // eases it instead.
       player.x = res.value;
       player.y -= 1;
       player.prevY -= 1;

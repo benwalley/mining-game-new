@@ -277,6 +277,8 @@ export class Game {
         swing: Math.min(1, p.swingTime / this.deps.tuning.dig.swingInterval),
         squash: p.squashTimer / this.deps.tuning.player.landSquashTime,
         walkPhase: p.walkPhase,
+        time: performance.now() / 1000,
+        appearance: p.appearance,
       },
       dig,
       particles: this.particles,

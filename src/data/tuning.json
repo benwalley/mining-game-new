@@ -9,22 +9,22 @@
     "jumpMinUpRatio": 0.5
   },
   "player": {
-    "width": 0.75,
-    "height": 1.8,
+    "width": 0.8,
+    "height": 0.8,
     "maxRunSpeed": 6,
     "groundAccel": 60,
     "groundDecel": 90,
     "airAccel": 35,
     "gravity": 50,
     "maxFallSpeed": 22,
-    "jumpHeight": 2.3,
+    "jumpHeight": 1.6,
     "jumpCutMultiplier": 0.45,
     "coyoteTime": 0.1,
     "jumpBufferTime": 0.12,
     "climbSpeed": 4.5,
     "centerSpeed": 6,
     "stepUpSmoothTime": 0.08,
-    "landSquashMinSpeed": 8,
+    "landSquashMinSpeed": 6,
     "landSquashTime": 0.12
   },
   "dig": {

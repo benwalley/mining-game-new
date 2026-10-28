@@ -52,10 +52,12 @@ export function chooseDigTarget(ctx: DigContext): DigTarget | null {
   const col = Math.floor(box.x);
   if (intentY < 0) {
     if (!supported) return null;
+    // The tile right above the head's row. A body shorter than a tile always
+    // has a gap above its head while standing, so that much gap still counts.
     const top = box.y - box.h;
-    const boundary = Math.round(top);
-    if (Math.abs(top - boundary) > tol) return null;
-    const row = boundary - 1;
+    const headRow = Math.floor(top + EPS);
+    if (top - headRow > Math.max(0, 1 - box.h) + tol) return null;
+    const row = headRow - 1;
     return solid(col, row) ? { x: col, y: row, dir: 'up' } : null;
   }
 

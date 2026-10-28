@@ -2,6 +2,7 @@ import type { PlayerSnapshot } from '@/protocol/messages';
 import type { PlayerTuning } from '@/content/tuning';
 import type { Box } from '../physics/tileCollision';
 import type { DigDirection } from '../dig/digTarget';
+import { DEFAULT_APPEARANCE, type Appearance } from './appearance';
 
 /** All mutable player state. Logic lives in PlayerController and DigSystem. */
 export class Player {
@@ -14,6 +15,7 @@ export class Player {
   readonly w: number;
   readonly h: number;
   facing: 1 | -1 = 1;
+  appearance: Appearance = { ...DEFAULT_APPEARANCE };
 
   grounded = false;
   climbing = false;

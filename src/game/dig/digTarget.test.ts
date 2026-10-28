@@ -55,6 +55,13 @@ describe('chooseDigTarget', () => {
     expect(chooseDigTarget({ ...base(ceiling, 1.5, 3), intentY: -1 })).toBeNull();
   });
 
+  it('lets a one-tile body dig the tile above its own row', () => {
+    const ceiling = grid(['#####', '.....', '#####']);
+    const small = { ...base(ceiling, 1.5, 2), intentY: -1 };
+    small.box = { ...small.box, h: 0.8 };
+    expect(chooseDigTarget(small)).toEqual({ x: 1, y: 0, dir: 'up' });
+  });
+
   it('does not dig sideways in mid-air', () => {
     const ctx = { ...base(wall, 3.625, 2.5), intentX: 1, grounded: false };
     expect(chooseDigTarget(ctx)).toBeNull();

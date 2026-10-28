@@ -64,6 +64,15 @@ describe('PlayerController', () => {
     expect(player.y).toBe(held);
   });
 
+  it('mantles onto a 2-tile ledge with a jump', () => {
+    const wall = grid(['..........', '..........', '.....#####', '.....#####', '##########']);
+    const { player, run } = simulate(wall, 3.5, 4);
+    run(0.1, { x: 0.6, y: -0.8 });
+    run(0.6, { x: 1, y: 0 });
+    expect(player.y).toBe(2);
+    expect(player.x).toBeGreaterThan(5);
+  });
+
   it('auto-climbs a 1-tile ledge', () => {
     const ledge = grid(['..........', '..........', '..........', '.....#####', '##########']);
     const { player, run } = simulate(ledge, 2.5, 4);

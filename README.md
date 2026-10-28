@@ -26,8 +26,9 @@ a production build.
 
 - **Touch:** drag anywhere and hold. The direction from where your finger landed sets the
   move direction, and the distance sets the speed (12 px dead zone, full speed at 60 px).
-  Push into a solid tile to dig it. Drag up to jump, or to climb inside a 1-wide shaft. Lift
-  to stop. Long-press a tile to inspect it in the debug overlay.
+  Push into a solid tile to dig it. Drag up to jump, or to climb inside a 1-wide shaft. 1-tile
+  ledges are climbed automatically, and a jump that reaches the top row of a 2-tile ledge pulls
+  you onto it. Lift to stop. Long-press a tile to inspect it in the debug overlay.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `[` and `]` change pick power.
 
@@ -88,9 +89,11 @@ How the pieces fit:
 
 ## Phase 0 status
 
-Built: swipe movement (8-directional, with a dead zone and speed from drag distance), 4-way
-digging with auto-assist, coyote time, jump buffering and a variable jump height, shaft
-climbing, auto-climbing 1-tile ledges, 3 crack stages, debris particles, synthesized
+Built: the player, a one-tile mole in a miner's helmet, drawn in layers with gear slots (head,
+body, back) so armor and packs can be added in `playerSprite.ts` without redrawing the body.
+Swipe movement (8-directional, with a dead zone and speed from drag distance), 4-way digging
+with auto-assist, coyote time, jump buffering and a variable jump height, shaft climbing,
+auto-climbing 1-tile ledges and mantling 2-tile ones, 3 crack stages, debris particles, synthesized
 per-material dig sounds, haptics (Android vibration; the iOS 18 switch trick, untested on a
 device), camera follow with look-ahead, a flat test world (material bands, pockets, steps, a
 gap, caves, a shaft), and instant resume.
