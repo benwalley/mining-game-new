@@ -7,7 +7,10 @@ import type { WorldDims } from '@/core/world/constants';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
+
+/** Which generator builds a world: the real layered world or the flat test world. */
+export type WorldKind = 'layered' | 'test';
 
 export interface PlayerSnapshot {
   x: number;
@@ -39,7 +42,7 @@ export interface DamageChange {
 }
 
 export type ToSim =
-  | { type: 'init'; protocol: number; worldId: string }
+  | { type: 'init'; protocol: number; worldId: string; kind: WorldKind }
   | { type: 'requestChunks'; chunks: ChunkCoord[] }
   | { type: 'releaseChunks'; chunks: ChunkCoord[] }
   | { type: 'digTile'; x: number; y: number; toolPower: number }

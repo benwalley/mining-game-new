@@ -41,7 +41,7 @@ describe.each([
 ])('SimHost with %s store', (_name, makeStore) => {
   it('creates a world and serves chunks', async () => {
     const { send, last } = createHost(await makeStore());
-    await send({ type: 'init', protocol: PROTOCOL_VERSION, worldId: `${WORLD}-a` });
+    await send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId: `${WORLD}-a` });
     expect(last('ready')?.player).toBeNull();
 
     await send({ type: 'requestChunks', chunks: [spawnChunk] });
@@ -53,7 +53,7 @@ describe.each([
     const store = await makeStore();
     const worldId = `${WORLD}-b`;
     const first = createHost(store);
-    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await first.send({ type: 'requestChunks', chunks: [spawnChunk, [0, spawnChunk[1]]] });
 
     await first.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
@@ -67,7 +67,7 @@ describe.each([
     expect(first.last('saved')?.chunks).toBe(1);
 
     const second = createHost(store);
-    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     expect(second.last('ready')?.player).toEqual({ x: 12.5, y: 30, facing: -1 });
     await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
     const chunk = second.last('chunk')!.chunk;
@@ -79,7 +79,7 @@ describe.each([
     const store = await makeStore();
     const worldId = `${WORLD}-c`;
     const host = createHost(store);
-    await host.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await host.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await host.send({ type: 'playerState', player: { x: 1, y: 2, facing: 1 } });
     await host.send({ type: 'flush' });
     await host.send({ type: 'resetWorld' });
@@ -92,7 +92,7 @@ describe.each([
     const worldId = `${WORLD}-d`;
     const idx = (spawn.y % CHUNK_SIZE) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE);
     const first = createHost(store);
-    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await first.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await first.send({ type: 'requestChunks', chunks: [spawnChunk, [0, spawnChunk[1]]] });
     await first.send({
       type: 'damageTiles',
@@ -104,7 +104,7 @@ describe.each([
     await first.send({ type: 'flush' });
 
     const second = createHost(store);
-    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId });
+    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
     await second.send({ type: 'requestChunks', chunks: [spawnChunk, [0, spawnChunk[1]]] });
     const chunks = second.out.flatMap((m) => (m.type === 'chunk' ? [m.chunk] : []));
     const home = chunks.find((c) => c.cx === spawnChunk[0])!;

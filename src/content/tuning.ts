@@ -7,5 +7,6 @@ export type PlayerTuning = Tuning['player'];
 export type DigTuning = Tuning['dig'];
 export type CameraTuning = Tuning['camera'];
 export type FxTuning = Tuning['fx'];
+export type LightTuning = Tuning['light'];
 
 export const tuning: Tuning = tuningData;

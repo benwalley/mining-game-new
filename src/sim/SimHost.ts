@@ -11,6 +11,7 @@ import {
   type MessagePort,
   type PlayerSnapshot,
   type ToSim,
+  type WorldKind,
   type WorldInfo,
 } from '@/protocol/messages';
 import type { SaveStore } from './persistence/SaveStore';
@@ -24,7 +25,7 @@ export interface SimHostDeps {
   store: SaveStore;
   materials: MaterialRegistry;
   tuning: Tuning;
-  createGenerator(seed: string): WorldGenerator;
+  createGenerator(seed: string, kind: WorldKind): WorldGenerator;
   /** Entropy for new world seeds. */
   newSeed(): string;
   now?(): number;
@@ -75,7 +76,7 @@ export class SimHost {
         if (msg.protocol !== PROTOCOL_VERSION) {
           throw new Error(`Protocol mismatch: main ${msg.protocol}, sim ${PROTOCOL_VERSION}`);
         }
-        await this.init(msg.worldId);
+        await this.init(msg.worldId, msg.kind);
         return;
       case 'requestChunks':
         await this.requestChunks(msg.chunks);
@@ -124,10 +125,10 @@ export class SimHost {
     this.deps.port.post(msg, transfer);
   }
 
-  private async init(worldId: string): Promise<void> {
+  private async init(worldId: string, kind: WorldKind): Promise<void> {
     const { store } = this.deps;
     let meta = await store.loadMeta(worldId);
-    const probe = this.deps.createGenerator('probe');
+    const probe = this.deps.createGenerator('probe', kind);
 
     if (meta && meta.generatorId !== probe.id) {
       // The test world's code or config changed; old chunks no longer match.
@@ -149,7 +150,7 @@ export class SimHost {
       await store.commit(worldId, { meta });
     }
 
-    const generator = this.deps.createGenerator(meta.seed);
+    const generator = this.deps.createGenerator(meta.seed, kind);
     this.world = {
       meta,
       generator,

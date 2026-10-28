@@ -1,10 +1,12 @@
 import { CHUNK_SIZE, TILE_PX, chunkCountX, chunkCountY } from '@/core/world/constants';
 import type { MaterialRegistry } from '@/content/materials';
 import { palette } from '@/content/palette';
-import type { CameraTuning } from '@/content/tuning';
+import type { CameraTuning, LightTuning } from '@/content/tuning';
+import type { LightView } from '@/game/light/LightField';
 import type { ChunkMirror } from '@/game/world/ChunkMirror';
 import type { RenderFrame, Renderer } from '../Renderer';
 import { ChunkCache } from './ChunkCache';
+import { createSurface, type Ctx2D, type Surface } from './surface';
 import { drawPlayer } from './playerSprite';
 import { TileAtlas } from './TileAtlas';
 
@@ -18,6 +20,10 @@ export class CanvasRenderer implements Renderer {
   /** Screen pixels per source pixel. Always a whole number. */
   private scale = 1;
   private dpr = 1;
+  /** One pixel per tile of darkness, drawn smoothed so light falls off softly. */
+  private darkness: { canvas: Surface; ctx: Ctx2D; image: ImageData } | null = null;
+  /** Darkness alpha (0–255) for each light level. */
+  private readonly darknessByLevel = new Uint8ClampedArray(16);
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -25,7 +31,12 @@ export class CanvasRenderer implements Renderer {
     materials: MaterialRegistry,
     private readonly tuning: CameraTuning,
     crackStages: number,
+    light: LightTuning,
   ) {
+    for (let level = 0; level < 16; level++) {
+      const brightness = Math.min(1, level / light.fullBrightLevel);
+      this.darknessByLevel[level] = Math.round((1 - brightness) * 255);
+    }
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('2D canvas not supported');
     this.ctx = ctx;
@@ -97,6 +108,8 @@ export class CanvasRenderer implements Renderer {
     }
 
     this.drawParticles(frame, ox, oy, tile);
+    // Darkness goes over the world but under the player, who carries the lamp.
+    if (frame.light) this.drawDarkness(frame.light, ox, oy, tile);
 
     // Player, with feet snapped to the source-pixel grid.
     const p = frame.player;
@@ -116,6 +129,32 @@ export class CanvasRenderer implements Renderer {
       ox: Math.round(this.canvas.width / 2 - cameraX * tile),
       oy: Math.round(this.canvas.height / 2 - cameraY * tile),
     };
+  }
+
+  private drawDarkness(light: LightView, ox: number, oy: number, tile: number): void {
+    const { x0, y0, w, h } = light.region;
+    if (w === 0 || h === 0) return;
+    let d = this.darkness;
+    if (!d || d.image.width !== w || d.image.height !== h) {
+      const surface = createSurface(w, h);
+      d = { ...surface, image: surface.ctx.createImageData(w, h) };
+      this.darkness = d;
+    }
+    const data = d.image.data;
+    const levels = light.levels;
+    for (let i = 0; i < w * h; i++) {
+      // Ink-colored pixels; only alpha varies.
+      const o = i * 4;
+      data[o] = 13;
+      data[o + 1] = 11;
+      data[o + 2] = 16;
+      data[o + 3] = this.darknessByLevel[levels[i]!]!;
+    }
+    d.ctx.putImageData(d.image, 0, 0);
+    // Each darkness pixel's center lands on its tile's center.
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.drawImage(d.canvas, ox + x0 * tile, oy + y0 * tile, w * tile, h * tile);
+    this.ctx.imageSmoothingEnabled = false;
   }
 
   private drawParticles(frame: RenderFrame, ox: number, oy: number, tile: number): void {

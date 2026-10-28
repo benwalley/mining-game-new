@@ -64,5 +64,9 @@
   },
   "sim": {
     "ticksPerSecond": 20
+  },
+  "light": {
+    "lampLevel": 8,
+    "fullBrightLevel": 7
   }
 }

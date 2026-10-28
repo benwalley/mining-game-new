@@ -2,12 +2,18 @@ import { render } from 'preact';
 import { Game } from '@/app/Game';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
+import type { WorldKind } from '@/protocol/messages';
 import { SimClient } from '@/protocol/SimClient';
 import { App } from '@/ui/App';
 import { bootError, bootState, debugVisible } from '@/ui/stores/gameStore';
 
-/** Phase 0 has a single test world; the world list arrives with multiple saves. */
-const WORLD_ID = 'test-world';
+/**
+ * One real world for now (the world list comes in a later phase). Add
+ * ?world=test to play the flat test world instead; each has its own save.
+ */
+const WORLD_KIND: WorldKind =
+  new URLSearchParams(location.search).get('world') === 'test' ? 'test' : 'layered';
+const WORLD_ID = WORLD_KIND === 'test' ? 'test-world' : 'world-1';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -30,7 +36,14 @@ async function boot(): Promise<void> {
 
   const sim = SimClient.spawnWorker();
   sim.on('error', ({ message }) => console.error('[sim]', message));
-  game = await Game.start({ canvas, sim, materials: loadMaterials(), tuning, worldId: WORLD_ID });
+  game = await Game.start({
+    canvas,
+    sim,
+    materials: loadMaterials(),
+    tuning,
+    worldId: WORLD_ID,
+    worldKind: WORLD_KIND,
+  });
   bootState.value = 'ready';
   if (import.meta.env.DEV) Object.assign(window, { deepkind: game });
 }

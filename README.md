@@ -1,7 +1,7 @@
 # Deepkind
 
 A side-view mining sandbox for mobile browsers. The design is in the Deepkind Game Design
-Document; this repo is at **phase 0 ("Feel")** of its roadmap, plus basic resume.
+Document. Phase 0 ("Feel") is done; **phase 1 ("Living rock")** is being built in slices.
 
 ## Run it
 
@@ -12,7 +12,8 @@ npm run dev
 
 `npm run dev` serves on your LAN too (it prints a `Network:` URL). Open that on a phone on
 the same Wi-Fi to playtest. The debug overlay is on in dev builds; add `?debug` to show it in
-a production build.
+a production build. The game opens the real generated world; add `?world=test` to play the
+flat test world instead (each keeps its own save).
 
 | Script           | Does                                       |
 | ---------------- | ------------------------------------------ |
@@ -37,7 +38,8 @@ a production build.
   starts losing grip (it trembles and slides); it only falls after about a second, so you can
   re-grab. Half-dug tiles keep their cracks, so you can come back and finish them.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
-  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `[` and `]` change pick power.
+  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, and `[` and `]`
+  change pick power.
 
 ## Architecture
 
@@ -94,17 +96,25 @@ How the pieces fit:
   a migration. Changing `src/data/test-world.json` automatically discards saved test worlds,
   because the generator id includes a hash of the config.
 
-## Phase 0 status
+## Status
 
-Built: the player, a one-tile mole in a miner's helmet, drawn in layers with gear slots (head,
-body, back) so armor and packs can be added in `playerSprite.ts` without redrawing the body.
-Swipe movement (8-directional, with a dead zone and speed from drag distance), 4-way digging
-with auto-assist, coyote time, jump buffering and a variable jump height, shaft climbing,
-auto-climbing 1-tile ledges and mantling 2-tile ones, walking on walls and ceilings, persistent 3-stage cracks, debris particles, synthesized
-per-material dig sounds, haptics (Android vibration; the iOS 18 switch trick, untested on a
-device), camera follow with look-ahead, a flat test world (material bands, pockets, steps, a
-gap, caves, a shaft), and instant resume.
+**Phase 0 (done):** the player, a one-tile mole in a miner's helmet, drawn in layers with gear
+slots (head, body, back) so armor and packs can be added in `playerSprite.ts` without redrawing
+the body. Swipe movement (8-directional, with a dead zone and speed from drag distance), 4-way
+digging with auto-assist, coyote time, jump buffering and a variable jump height, shaft
+climbing, auto-climbing 1-tile ledges and mantling 2-tile ones, walking on walls and ceilings,
+persistent 3-stage cracks, debris particles, synthesized per-material dig sounds, haptics
+(Android vibration; the iOS 18 switch trick, untested on a device), camera follow with
+look-ahead, a flat test world, and instant resume.
 
-Deliberately not built yet (later phases): darkness and light, falling sand, fluids, heat,
-gas, cave-ins, the real world generator, inventory, crafting, creatures, the service
-worker/PWA, and cavern camera zoom.
+**Phase 1, slice 1 (done):** the real world, 384 × 3,000 tiles: six depth layers (topsoil,
+stone, crystal caverns, fungal deep, magma belt, the Deep) with wavy, dithered boundaries,
+per-layer deposits and ores, winding tunnels, pockets and big caverns, generated
+deterministically from the seed (`src/data/worldgen.json`). Light spreads tile by tile from the
+sky, glowing materials and the helmet lamp; underground is dark beyond the lamp.
+
+**Phase 1, still to come:** water and lava; falling sand and cave-ins; heat and gas (hazards
+hurt but can't kill until rescue exists in phase 3); simulation zones and full saving.
+
+Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
+the service worker/PWA, and cavern camera zoom.

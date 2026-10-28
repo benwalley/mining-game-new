@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "notes": "Layered world generator. Depths are tiles below the surface line. Values are starting targets for tuning; changing this file discards saved worlds while in development.",
+  "width": 384,
+  "depth": 3000,
+  "surfaceY": 48,
+  "wallThickness": 2,
+  "surface": {
+    "hillHeight": 6,
+    "hillScale": 36
+  },
+  "boundary": {
+    "waveAmplitude": 18,
+    "waveScale": 90,
+    "blendTiles": 30
+  },
+  "spawn": {
+    "safeRadius": 14,
+    "safeDepth": 16
+  },
+  "layers": [
+    {
+      "key": "topsoil",
+      "name": "Topsoil",
+      "fromDepth": 0,
+      "base": "dirt",
+      "caves": {
+        "tunnelWidth": 0.022,
+        "tunnelScale": 44,
+        "pocketScale": 10,
+        "pocketThreshold": 0.86
+      }
+    },
+    {
+      "key": "stone",
+      "name": "Stone",
+      "fromDepth": 150,
+      "base": "stone",
+      "caves": {
+        "tunnelWidth": 0.03,
+        "tunnelScale": 52,
+        "pocketScale": 14,
+        "pocketThreshold": 0.8
+      }
+    },
+    {
+      "key": "crystal",
+      "name": "Crystal caverns",
+      "fromDepth": 600,
+      "base": "slate",
+      "caves": {
+        "tunnelWidth": 0.04,
+        "tunnelScale": 64,
+        "pocketScale": 20,
+        "pocketThreshold": 0.76
+      }
+    },
+    {
+      "key": "fungal",
+      "name": "Fungal deep",
+      "fromDepth": 1200,
+      "base": "mudstone",
+      "caves": {
+        "tunnelWidth": 0.035,
+        "tunnelScale": 48,
+        "pocketScale": 16,
+        "pocketThreshold": 0.77
+      }
+    },
+    {
+      "key": "magma",
+      "name": "Magma belt",
+      "fromDepth": 1900,
+      "base": "basalt",
+      "caves": {
+        "tunnelWidth": 0.03,
+        "tunnelScale": 56,
+        "pocketScale": 16,
+        "pocketThreshold": 0.79
+      }
+    },
+    {
+      "key": "deep",
+      "name": "The Deep",
+      "fromDepth": 2600,
+      "base": "elderstone",
+      "caves": {
+        "tunnelWidth": 0.025,
+        "tunnelScale": 70,
+        "pocketScale": 24,
+        "pocketThreshold": 0.8
+      }
+    }
+  ],
+  "deposits": [
+    {
+      "material": "rootwood",
+      "layers": ["topsoil"],
+      "scale": 4,
+      "threshold": 0.83,
+      "maxDepth": 70
+    },
+    {
+      "material": "clay",
+      "layers": ["topsoil"],
+      "scale": 14,
+      "threshold": 0.77
+    },
+    {
+      "material": "sand",
+      "layers": ["topsoil"],
+      "scale": 12,
+      "threshold": 0.8
+    },
+    {
+      "material": "coal",
+      "layers": ["topsoil", "stone"],
+      "scale": 5,
+      "threshold": 0.85,
+      "minDepth": 20
+    },
+    {
+      "material": "copper",
+      "layers": ["stone"],
+      "scale": 4,
+      "threshold": 0.86
+    },
+    {
+      "material": "tin",
+      "layers": ["stone"],
+      "scale": 4,
+      "threshold": 0.88
+    },
+    {
+      "material": "quartz",
+      "layers": ["stone"],
+      "scale": 3,
+      "threshold": 0.92
+    },
+    {
+      "material": "quartz",
+      "layers": ["crystal"],
+      "scale": 5,
+      "threshold": 0.83
+    },
+    {
+      "material": "iron",
+      "layers": ["crystal", "fungal"],
+      "scale": 4,
+      "threshold": 0.86
+    },
+    {
+      "material": "glowcap",
+      "layers": ["fungal"],
+      "scale": 4,
+      "threshold": 0.84
+    },
+    {
+      "material": "spore-silk",
+      "layers": ["fungal"],
+      "scale": 5,
+      "threshold": 0.86
+    },
+    {
+      "material": "obsidian",
+      "layers": ["magma"],
+      "scale": 10,
+      "threshold": 0.78
+    },
+    {
+      "material": "ember-crystal",
+      "layers": ["magma"],
+      "scale": 4,
+      "threshold": 0.87
+    },
+    {
+      "material": "gold",
+      "layers": ["magma"],
+      "scale": 4,
+      "threshold": 0.88
+    },
+    {
+      "material": "starsilver",
+      "layers": ["deep"],
+      "scale": 4,
+      "threshold": 0.92
+    }
+  ],
+  "caverns": [
+    {
+      "layer": "stone",
+      "count": 6,
+      "rx": [10, 20],
+      "ry": [6, 11]
+    },
+    {
+      "layer": "crystal",
+      "count": 10,
+      "rx": [22, 46],
+      "ry": [12, 26]
+    },
+    {
+      "layer": "fungal",
+      "count": 7,
+      "rx": [16, 30],
+      "ry": [8, 16]
+    },
+    {
+      "layer": "magma",
+      "count": 5,
+      "rx": [14, 26],
+      "ry": [8, 14]
+    },
+    {
+      "layer": "deep",
+      "count": 3,
+      "rx": [24, 40],
+      "ry": [14, 22]
+    }
+  ]
+}

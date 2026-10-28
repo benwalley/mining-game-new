@@ -13,16 +13,23 @@ import { DigSystem } from '@/game/dig/DigSystem';
 import type { GameEvents } from '@/game/events';
 import { Player } from '@/game/player/Player';
 import { PlayerController, type MoveIntent } from '@/game/player/PlayerController';
+import { LightField } from '@/game/light/LightField';
 import { ChunkMirror } from '@/game/world/ChunkMirror';
 import { ChunkStreamer } from '@/game/world/ChunkStreamer';
 import { KeyboardInput } from '@/input/KeyboardInput';
 import { PointerGestureInput } from '@/input/PointerGestureInput';
-import { PROTOCOL_VERSION, type WorldInfo } from '@/protocol/messages';
+import { PROTOCOL_VERSION, type WorldInfo, type WorldKind } from '@/protocol/messages';
 import type { SimClient } from '@/protocol/SimClient';
 import { CanvasRenderer } from '@/render/canvas2d/CanvasRenderer';
 import { orientationFor } from '@/render/canvas2d/playerSprite';
 import type { Renderer } from '@/render/Renderer';
-import { debugGrid, debugInfo, debugVisible, toolPower } from '@/ui/stores/gameStore';
+import {
+  debugGrid,
+  debugInfo,
+  debugLighting,
+  debugVisible,
+  toolPower,
+} from '@/ui/stores/gameStore';
 import { GameLoop } from './GameLoop';
 
 const STEP = 1 / 60;
@@ -35,6 +42,7 @@ export interface GameDeps {
   materials: MaterialRegistry;
   tuning: Tuning;
   worldId: string;
+  worldKind: WorldKind;
 }
 
 /** Composition root for one running world: builds every system and runs the loop. */
@@ -42,6 +50,7 @@ export class Game {
   private readonly events = new EventBus<GameEvents>();
   private readonly mirror: ChunkMirror;
   private readonly renderer: Renderer;
+  private readonly light: LightField;
   private readonly streamer: ChunkStreamer;
   private readonly player: Player;
   private readonly controller: PlayerController;
@@ -69,7 +78,12 @@ export class Game {
   /** Connects to the sim, waits for the world, and starts playing. */
   static async start(deps: GameDeps): Promise<Game> {
     const ready = deps.sim.once('ready');
-    deps.sim.send({ type: 'init', protocol: PROTOCOL_VERSION, worldId: deps.worldId });
+    deps.sim.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      worldId: deps.worldId,
+      kind: deps.worldKind,
+    });
     const { world, player } = await ready;
     const game = new Game(deps, world);
     if (player) game.player.restore(player);
@@ -92,7 +106,10 @@ export class Game {
       materials,
       tuning.camera,
       tuning.dig.crackStages,
+      tuning.light,
     );
+    this.light = new LightField(this.mirror, materials);
+    this.mirror.addListener(this.light);
     this.streamer = new ChunkStreamer(
       this.mirror,
       sim,
@@ -264,6 +281,17 @@ export class Game {
       view.h,
     );
     if (++this.frameCount % STREAM_EVERY_FRAMES === 0) this.streamTick();
+    if (debugLighting.value) {
+      this.light.update(
+        {
+          x: this.camera.x - view.w / 2,
+          y: this.camera.y - view.h / 2,
+          w: view.w,
+          h: view.h,
+        },
+        { x: p.x, y: p.y - p.h / 2, level: this.deps.tuning.light.lampLevel },
+      );
+    }
 
     this.renderer.render({
       cameraX: this.camera.x,
@@ -283,6 +311,7 @@ export class Game {
         appearance: p.appearance,
       },
       particles: this.particles,
+      light: debugLighting.value ? this.light.view : null,
       debug: { grid: debugGrid.value },
     });
     this.updateDebug();
@@ -334,6 +363,7 @@ export class Game {
   private onKey(code: string): void {
     if (code === 'Backquote') debugVisible.value = !debugVisible.value;
     if (code === 'KeyG') debugGrid.value = !debugGrid.value;
+    if (code === 'KeyL') debugLighting.value = !debugLighting.value;
     if (code === 'BracketRight') this.setToolPower(this.dig.toolPower + 1);
     if (code === 'BracketLeft') this.setToolPower(this.dig.toolPower - 1);
   }

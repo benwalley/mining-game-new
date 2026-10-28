@@ -23,5 +23,7 @@ export interface DebugInfo {
 
 export const debugVisible = signal(false);
 export const debugGrid = signal(false);
+/** Debug: turn darkness off to see the whole world. */
+export const debugLighting = signal(true);
 export const toolPower = signal(3);
 export const debugInfo = signal<DebugInfo | null>(null);

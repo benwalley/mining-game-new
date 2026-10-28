@@ -33,6 +33,14 @@
     "blood": "#8c2330",
     "glow": "#b8f070",
     "violet": "#7a4fa0",
-    "rose": "#e89aa0"
+    "rose": "#e89aa0",
+    "blueStone": "#56607a",
+    "blueStoneDark": "#373d52",
+    "mud": "#5b5440",
+    "mudDark": "#3c3828",
+    "basalt": "#3d3438",
+    "basaltLight": "#5a4c50",
+    "elder": "#2c3a46",
+    "elderLight": "#4a6070"
   }
 }

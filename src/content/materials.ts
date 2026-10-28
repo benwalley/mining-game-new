@@ -28,6 +28,8 @@ export interface MaterialDef {
   supportSpan: number;
   fuel: number;
   trait: string | null;
+  /** Light emitted by the tile itself, 0–15. */
+  light: number;
   visual: MaterialVisual | null;
 }
 
@@ -126,6 +128,7 @@ export function loadMaterials(): MaterialRegistry {
     supportSpan: raw.supportSpan,
     fuel: raw.fuel,
     trait: raw.trait,
+    light: 'light' in raw ? Number(raw.light) : 0,
     visual: parseVisual(raw),
   }));
   return new MaterialRegistry(defs);

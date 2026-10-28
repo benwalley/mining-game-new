@@ -7,13 +7,23 @@ export interface Haptics {
 
 class VibrationHaptics implements Haptics {
   readonly kind = 'vibration';
-  // Browsers reject vibration until the page has been tapped (keyboard play on
-  // desktop never taps), and log an error for each attempt, so wait for it.
-  tick(): void {
-    if (navigator.userActivation?.hasBeenActive ?? true) navigator.vibrate(8);
+  /**
+   * Chrome rejects vibration (and logs an error per call) until the page has
+   * been tapped; a key press doesn't count. Keyboard play on desktop never
+   * taps, so stay quiet until a pointer goes down.
+   */
+  private tapped = false;
+
+  constructor() {
+    window.addEventListener('pointerdown', () => (this.tapped = true), { once: true });
   }
+
+  tick(): void {
+    if (this.tapped) navigator.vibrate(8);
+  }
+
   pulse(): void {
-    if (navigator.userActivation?.hasBeenActive ?? true) navigator.vibrate([18, 40, 28]);
+    if (this.tapped) navigator.vibrate([18, 40, 28]);
   }
 }
 

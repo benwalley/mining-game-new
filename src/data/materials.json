@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "numId is persisted in saves and must never change or be reused. conductivity is null where the design doc gives no value yet.",
+  "notes": "numId is persisted in saves and must never change or be reused. conductivity is null where the design doc gives no value yet. light (0-15) is how much a tile glows; omitted means 0. slate, mudstone, basalt and elderstone are proposed base rocks for the deeper layers (not in the design doc).",
   "materials": [
     {
       "numId": 0,
@@ -31,7 +31,12 @@
       "supportSpan": 99,
       "fuel": 0,
       "trait": null,
-      "visual": { "base": "deep", "dark": "ink", "light": "slate", "pattern": "bedrock" }
+      "visual": {
+        "base": "deep",
+        "dark": "ink",
+        "light": "slate",
+        "pattern": "bedrock"
+      }
     },
     {
       "numId": 2,
@@ -46,7 +51,12 @@
       "supportSpan": 2,
       "fuel": 0,
       "trait": null,
-      "visual": { "base": "soil", "dark": "soilDark", "light": "soilLight", "pattern": "soil" }
+      "visual": {
+        "base": "soil",
+        "dark": "soilDark",
+        "light": "soilLight",
+        "pattern": "soil"
+      }
     },
     {
       "numId": 3,
@@ -61,7 +71,12 @@
       "supportSpan": 0,
       "fuel": 0,
       "trait": "falls",
-      "visual": { "base": "sand", "dark": "soilLight", "light": "sandLight", "pattern": "grain" }
+      "visual": {
+        "base": "sand",
+        "dark": "soilLight",
+        "light": "sandLight",
+        "pattern": "grain"
+      }
     },
     {
       "numId": 4,
@@ -76,7 +91,12 @@
       "supportSpan": 3,
       "fuel": 0,
       "trait": null,
-      "visual": { "base": "clay", "dark": "soil", "light": "clayLight", "pattern": "smooth" }
+      "visual": {
+        "base": "clay",
+        "dark": "soil",
+        "light": "clayLight",
+        "pattern": "smooth"
+      }
     },
     {
       "numId": 5,
@@ -91,7 +111,12 @@
       "supportSpan": 4,
       "fuel": 5,
       "trait": "flexible",
-      "visual": { "base": "root", "dark": "rootDark", "light": "soilLight", "pattern": "fiber" }
+      "visual": {
+        "base": "root",
+        "dark": "rootDark",
+        "light": "soilLight",
+        "pattern": "fiber"
+      }
     },
     {
       "numId": 6,
@@ -106,7 +131,12 @@
       "supportSpan": 5,
       "fuel": 0,
       "trait": null,
-      "visual": { "base": "stone", "dark": "slate", "light": "pebble", "pattern": "block" }
+      "visual": {
+        "base": "stone",
+        "dark": "slate",
+        "light": "pebble",
+        "pattern": "block"
+      }
     },
     {
       "numId": 7,
@@ -236,7 +266,8 @@
         "light": "moss",
         "accent": "glow",
         "pattern": "spots"
-      }
+      },
+      "light": 10
     },
     {
       "numId": 13,
@@ -251,7 +282,12 @@
       "supportSpan": 0,
       "fuel": 2,
       "trait": "flexible",
-      "visual": { "base": "fog", "dark": "pebble", "light": "bone", "pattern": "fiber" }
+      "visual": {
+        "base": "fog",
+        "dark": "pebble",
+        "light": "bone",
+        "pattern": "fiber"
+      }
     },
     {
       "numId": 14,
@@ -293,7 +329,8 @@
         "light": "ember",
         "accent": "ember",
         "pattern": "crystal"
-      }
+      },
+      "light": 7
     },
     {
       "numId": 16,
@@ -335,6 +372,87 @@
         "dark": "ink",
         "light": "quartz",
         "accent": "sky",
+        "pattern": "crystal"
+      }
+    },
+    {
+      "numId": 18,
+      "key": "slate",
+      "name": "Slate",
+      "solid": true,
+      "hardness": 5,
+      "toughness": 5,
+      "weight": 6,
+      "heatLimit": 8,
+      "conductivity": null,
+      "supportSpan": 7,
+      "fuel": 0,
+      "trait": null,
+      "visual": {
+        "base": "blueStone",
+        "dark": "blueStoneDark",
+        "light": "stone",
+        "pattern": "smooth"
+      }
+    },
+    {
+      "numId": 19,
+      "key": "mudstone",
+      "name": "Mudstone",
+      "solid": true,
+      "hardness": 3,
+      "toughness": 3,
+      "weight": 5,
+      "heatLimit": 7,
+      "conductivity": null,
+      "supportSpan": 3,
+      "fuel": 0,
+      "trait": null,
+      "visual": {
+        "base": "mud",
+        "dark": "mudDark",
+        "light": "moss",
+        "pattern": "soil"
+      }
+    },
+    {
+      "numId": 20,
+      "key": "basalt",
+      "name": "Basalt",
+      "solid": true,
+      "hardness": 7,
+      "toughness": 7,
+      "weight": 8,
+      "heatLimit": 9,
+      "conductivity": null,
+      "supportSpan": 8,
+      "fuel": 0,
+      "trait": null,
+      "visual": {
+        "base": "basalt",
+        "dark": "ink",
+        "light": "basaltLight",
+        "pattern": "block"
+      }
+    },
+    {
+      "numId": 21,
+      "key": "elderstone",
+      "name": "Elderstone",
+      "solid": true,
+      "hardness": 9,
+      "toughness": 8,
+      "weight": 7,
+      "heatLimit": 10,
+      "conductivity": null,
+      "supportSpan": 9,
+      "fuel": 0,
+      "trait": null,
+      "visual": {
+        "base": "elder",
+        "dark": "ink",
+        "light": "elderLight",
+        "accent": "violet",
         "pattern": "crystal"
       }
     }

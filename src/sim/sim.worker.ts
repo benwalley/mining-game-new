@@ -1,4 +1,5 @@
 import testWorldConfig from '@/data/test-world.json';
+import worldgenConfig from '@/data/worldgen.json';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
 import type { FromSim, MessagePort, ToSim } from '@/protocol/messages';
@@ -6,6 +7,7 @@ import { IdbSaveStore } from './persistence/IdbSaveStore';
 import { MemorySaveStore } from './persistence/MemorySaveStore';
 import type { SaveStore } from './persistence/SaveStore';
 import { SimHost } from './SimHost';
+import { LayeredWorldGenerator, type LayeredWorldConfig } from './worldgen/LayeredWorldGenerator';
 import { TestWorldGenerator, type TestWorldConfig } from './worldgen/TestWorldGenerator';
 
 const port: MessagePort<ToSim, FromSim> = {
@@ -42,8 +44,10 @@ const host = new SimHost({
   store,
   materials,
   tuning,
-  createGenerator: (seed) =>
-    new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials),
+  createGenerator: (seed, kind) =>
+    kind === 'test'
+      ? new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials)
+      : new LayeredWorldGenerator(worldgenConfig as LayeredWorldConfig, seed, materials),
   newSeed,
 });
 self.removeEventListener('message', queue);

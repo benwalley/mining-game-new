@@ -1,4 +1,4 @@
-import { debugGrid, debugInfo, toolPower } from '../stores/gameStore';
+import { debugGrid, debugInfo, debugLighting, toolPower } from '../stores/gameStore';
 
 export interface DebugActions {
   setToolPower(power: number): void;
@@ -61,10 +61,13 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
         <button style={button} onClick={() => (debugGrid.value = !debugGrid.value)}>
           grid
         </button>
+        <button style={button} onClick={() => (debugLighting.value = !debugLighting.value)}>
+          {debugLighting.value ? 'dark' : 'lit'}
+        </button>
         <button
           style={button}
           onClick={() => {
-            if (confirm('Delete this test world and start over?')) actions.resetWorld();
+            if (confirm('Delete this world and start over?')) actions.resetWorld();
           }}
         >
           reset

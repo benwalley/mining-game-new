@@ -1,4 +1,5 @@
 import type { Particles } from '@/fx/Particles';
+import type { LightView } from '@/game/light/LightField';
 import type { PlayerPose } from './canvas2d/playerSprite';
 
 export interface RenderFrame {
@@ -7,6 +8,8 @@ export interface RenderFrame {
   cameraY: number;
   player: PlayerPose & { x: number; y: number };
   particles: Particles;
+  /** Null draws everything fully lit (debug). */
+  light: LightView | null;
   debug: { grid: boolean };
 }
 
