@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
 
 export default defineConfig({
+  // GitHub Pages serves project sites from /<repo>/; the deploy workflow sets BASE_PATH.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [preact()],
   resolve: {
     alias: {
