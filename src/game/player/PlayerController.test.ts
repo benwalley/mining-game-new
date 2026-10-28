@@ -96,13 +96,52 @@ describe('PlayerController', () => {
       expect(player.x).toBeGreaterThan(5);
     });
 
-    it('falls off when the finger lifts', () => {
+    it('slips for a moment after the finger lifts, then falls', () => {
+      const { player, run } = simulate(tower, 4.5, 6);
+      run(0.3, { x: 1, y: 0 });
+      run(0.4, { x: 0.7, y: -0.7 });
+      const held = player.y;
+      run(0.5, { x: 0, y: 0 });
+      expect(player.cling).toBe('wall');
+      expect(player.gripTimer).toBeGreaterThan(0);
+      expect(player.y).toBeGreaterThan(held); // Sliding down a little.
+      run(1, { x: 0, y: 0 });
+      expect(player.cling).toBe('none');
+      expect(player.y).toBe(6);
+    });
+
+    it('regains its grip if the finger comes back in time', () => {
       const { player, run } = simulate(tower, 4.5, 6);
       run(0.3, { x: 1, y: 0 });
       run(0.4, { x: 0.7, y: -0.7 });
       run(0.6, { x: 0, y: 0 });
-      expect(player.cling).toBe('none');
-      expect(player.y).toBe(6);
+      run(0.1, { x: 0.7, y: -0.7 });
+      expect(player.cling).toBe('wall');
+      expect(player.gripTimer).toBe(0);
+    });
+
+    it('goes around corners going up: wall, ceiling, over the edge, onto the top', () => {
+      const overhang = grid([
+        '..........',
+        '..#######.',
+        '.....#####',
+        '.....#####',
+        '.....#####',
+        '##########',
+      ]);
+      const { player, run } = simulate(overhang, 4.5, 5);
+      run(0.3, { x: 1, y: 0 });
+      run(1.2, { x: 0.7, y: -0.7 });
+      expect(player.cling).toBe('wall');
+      expect(player.y - player.h).toBeCloseTo(2); // Head against the overhang.
+      run(0.6, { x: -0.7, y: -0.7 });
+      expect(player.cling).toBe('ceiling');
+      // Keep holding up-left until the mole is standing again.
+      for (let i = 0; i < 90 && !(player.grounded && player.cling === 'none'); i++) {
+        run(1 / 60, { x: -0.7, y: -0.7 });
+      }
+      expect(player.y).toBe(1); // Standing on top of the overhang.
+      expect(player.x).toBeGreaterThan(1.5);
     });
 
     it('does not climb when pushing straight into a wall from the ground', () => {
@@ -121,7 +160,7 @@ describe('PlayerController', () => {
       run(0.4, { x: 0.8, y: -0.6 });
       expect(player.y - player.h).toBeCloseTo(1);
       expect(player.x).toBeGreaterThan(startX + 1);
-      run(0.6, { x: 0, y: 0 });
+      run(1.6, { x: 0, y: 0 });
       expect(player.y).toBe(3);
     });
   });

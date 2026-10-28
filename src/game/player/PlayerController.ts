@@ -2,7 +2,16 @@ import { approach } from '@/core/math/util';
 import type { EventBus } from '@/core/events/EventBus';
 import type { InputTuning, PlayerTuning } from '@/content/tuning';
 import type { GameEvents } from '../events';
-import { canStepUp, inShaft, moveX, moveY, touching, type SolidFn } from '../physics/tileCollision';
+import {
+  EPS,
+  canStepUp,
+  inShaft,
+  moveX,
+  moveY,
+  overlapsSolid,
+  touching,
+  type SolidFn,
+} from '../physics/tileCollision';
 import { shapeOf, type IntentShape } from './intentShape';
 import type { Player } from './Player';
 
@@ -26,8 +35,10 @@ const PUSH = 0.15;
 /**
  * Platformer movement: run, jump (with coyote time and buffering), shaft
  * climbing, ledge step-up, and clinging: a diagonal drag into a wall walks up
- * (or down) it, and a diagonal drag under a ceiling walks along it. Clinging
- * lasts while the player keeps holding toward the surface.
+ * (or down) it, and a diagonal drag under a ceiling walks along it. Letting go
+ * starts a short grip timer; the player only falls once it runs out. Clinging
+ * follows corners going up: wall to ceiling, and around a ceiling's edge onto
+ * the wall above it.
  */
 export class PlayerController {
   private readonly jumpVelocity: number;
@@ -84,14 +95,20 @@ export class PlayerController {
     if (!contact.canClimb || (contact.grounded && !upHeld)) player.climbing = false;
     else if (upHeld && !contact.ceiling) player.climbing = true;
     const shape = shapeOf(intent, this.input.diagonalMinRatio);
-    this.updateCling(player, intent, shape, contact);
+    this.updateCling(player, intent, shape, contact, dt);
+    const slipping = player.gripTimer > 0;
 
     if (player.climbing) {
       player.vy = verticalIntent && !digging ? intent.y * t.climbSpeed : 0;
       player.jumping = false;
     } else if (player.cling === 'wall') {
       // Straight into the wall holds still (and digs); otherwise walk along it.
-      player.vy = digging || shape.straightHorizontal ? 0 : intent.y * t.climbSpeed;
+      // Losing grip slides the player slowly down.
+      player.vy = slipping
+        ? t.gripSlideSpeed * (player.gripTimer / t.gripTime)
+        : digging || shape.straightHorizontal
+          ? 0
+          : intent.y * t.climbSpeed;
       if (Math.abs(player.vy) > 0.5) player.climbDir = player.vy < 0 ? -1 : 1;
       player.jumping = false;
     } else if (player.cling === 'ceiling') {
@@ -124,8 +141,11 @@ export class PlayerController {
       player.vx = player.clingSide * t.climbSpeed;
       this.moveHorizontal(player, solid, dt);
     } else if (player.cling === 'ceiling') {
-      player.vx = intent.x * t.climbSpeed;
+      player.vx = slipping ? 0 : intent.x * t.climbSpeed;
       this.moveHorizontal(player, solid, dt);
+      if (player.vx !== 0 && !touching(player.box, 'up', solid)) {
+        this.wrapOverCeilingEdge(player, solid, player.vx > 0 ? 1 : -1);
+      }
     } else if (player.centerColumn !== null) {
       player.vx = 0;
       const dx = approach(player.x, player.centerColumn + 0.5, t.centerSpeed * dt) - player.x;
@@ -163,22 +183,41 @@ export class PlayerController {
     intent: MoveIntent,
     shape: IntentShape,
     contact: Contact,
+    dt: number,
   ): void {
-    // Keep clinging only while still holding toward the surface.
     if (player.cling === 'wall') {
       const side = player.clingSide;
       const onWall = side > 0 ? contact.wallRight : contact.wallLeft;
-      const holding = shape.active && intent.x * side >= -PUSH;
-      const standing = contact.grounded && intent.y >= 0;
-      if (!onWall || !holding || standing) player.cling = 'none';
+      // Inner corner: turning up and away from the wall under a ceiling moves onto it.
+      if (onWall && contact.ceiling && intent.y < 0 && intent.x * side < -PUSH) {
+        this.grab(player, 'ceiling', side);
+        return;
+      }
+      if (!onWall || (contact.grounded && intent.y >= 0)) {
+        this.letGo(player);
+      } else {
+        // Any push toward the wall or upward keeps the grip, so turning a
+        // corner (whose drag points up and away) doesn't count as letting go.
+        const holding = shape.active && (intent.x * side >= -PUSH || intent.y < -PUSH);
+        this.grip(player, holding, dt);
+      }
     } else if (player.cling === 'ceiling') {
-      if (!contact.ceiling || intent.y >= 0) player.cling = 'none';
+      // Inner corner: pushing into a wall from the ceiling moves onto the wall.
+      for (const side of [1, -1] as const) {
+        const onWall = side > 0 ? contact.wallRight : contact.wallLeft;
+        if (onWall && intent.x * side > PUSH) {
+          this.grab(player, 'wall', side);
+          return;
+        }
+      }
+      if (!contact.ceiling) this.letGo(player);
+      else this.grip(player, intent.y < 0, dt);
     }
     if (player.cling !== 'none' || player.climbing) return;
 
-    // Grab a ceiling with an up-diagonal (for example sliding off a wall's top corner).
+    // Grab a ceiling with an up-diagonal (for example jumping into one).
     if (contact.ceiling && !contact.grounded && intent.y < 0 && shape.diagonal) {
-      player.cling = 'ceiling';
+      this.grab(player, 'ceiling', player.clingSide);
       return;
     }
     // Grab a wall with an up-diagonal into it, or by pushing into it mid-air.
@@ -187,11 +226,61 @@ export class PlayerController {
       if (!onWall || intent.x * side <= PUSH) continue;
       const upDiagonal = intent.y < 0 && shape.diagonal;
       if (upDiagonal || (!contact.grounded && shape.straightHorizontal)) {
-        player.cling = 'wall';
-        player.clingSide = side;
+        this.grab(player, 'wall', side);
         return;
       }
     }
+  }
+
+  private grab(player: Player, cling: 'wall' | 'ceiling', side: 1 | -1): void {
+    player.cling = cling;
+    player.clingSide = side;
+    player.gripTimer = 0;
+  }
+
+  private letGo(player: Player): void {
+    player.cling = 'none';
+    player.gripTimer = 0;
+  }
+
+  /** Holding resets the grip; otherwise it wears out over `gripTime` and the player falls. */
+  private grip(player: Player, holding: boolean, dt: number): void {
+    if (holding) {
+      player.gripTimer = 0;
+      return;
+    }
+    player.gripTimer += dt;
+    if (player.gripTimer >= this.tuning.gripTime) this.letGo(player);
+  }
+
+  /**
+   * Outer corner: walking off the edge of a ceiling into an opening carries the
+   * player around the edge and onto the wall above it, still going up.
+   */
+  private wrapOverCeilingEdge(player: Player, solid: SolidFn, dir: 1 | -1): void {
+    const top = player.y - player.h;
+    if (Math.abs(top - Math.round(top)) > 0.05) return;
+    const ceilingRow = Math.round(top) - 1;
+    // The last ceiling tile, just behind the body.
+    const back = player.x - (dir * player.w) / 2;
+    const col = dir > 0 ? Math.floor(back + EPS) - 1 : Math.floor(back - EPS) + 1;
+    if (!solid(col, ceilingRow)) return;
+    const face = dir > 0 ? col + 1 : col;
+    const box = { x: face + (dir * player.w) / 2, y: ceilingRow + 1, w: player.w, h: player.h };
+    if (overlapsSolid(box, solid)) return;
+
+    const dx = box.x - player.x;
+    const dy = box.y - player.y;
+    player.x = box.x;
+    player.y = box.y;
+    player.prevX += dx;
+    player.prevY += dy;
+    // Ease the jump around the corner visually.
+    player.stepOffsetX -= dx;
+    player.stepOffsetY -= dy;
+    player.vy = 0;
+    player.climbDir = -1;
+    this.grab(player, 'wall', dir > 0 ? -1 : 1);
   }
 
   private moveHorizontal(player: Player, solid: SolidFn, dt: number): void {
@@ -223,6 +312,7 @@ export class PlayerController {
     const t = this.tuning;
     player.squashTimer = Math.max(0, player.squashTimer - dt);
     player.stepOffsetY = approach(player.stepOffsetY, 0, dt / t.stepUpSmoothTime);
+    player.stepOffsetX = approach(player.stepOffsetX, 0, dt / t.stepUpSmoothTime);
     // Walking on a wall moves along y; everywhere else along x.
     const along = player.cling === 'wall' ? player.vy : player.vx;
     const onSurface = player.grounded || player.cling !== 'none';

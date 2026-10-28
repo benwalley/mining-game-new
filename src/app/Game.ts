@@ -269,7 +269,7 @@ export class Game {
       cameraX: this.camera.x,
       cameraY: this.camera.y,
       player: {
-        x,
+        x: x + p.stepOffsetX,
         y: y + p.stepOffsetY,
         ...orientationFor(p.cling, p.clingSide, p.facing, p.climbDir),
         speed: p.cling === 'wall' ? p.vy : p.vx,
@@ -278,6 +278,7 @@ export class Game {
         swing: Math.min(1, p.swingTime / this.deps.tuning.dig.swingInterval),
         squash: p.squashTimer / this.deps.tuning.player.landSquashTime,
         walkPhase: p.walkPhase,
+        gripLoss: p.cling === 'none' ? 0 : p.gripTimer / this.deps.tuning.player.gripTime,
         time: performance.now() / 1000,
         appearance: p.appearance,
       },

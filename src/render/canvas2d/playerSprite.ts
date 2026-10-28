@@ -18,6 +18,8 @@ export interface PlayerPose {
   /** 0–1 landing squash strength. */
   squash: number;
   walkPhase: number;
+  /** 0–1 while slipping off a wall or ceiling after letting go. */
+  gripLoss: number;
   /** Seconds since start, for idle animation (blinks, nose wiggles). */
   time: number;
   appearance: Appearance;
@@ -120,6 +122,11 @@ export function drawPlayer(ctx: Ctx2D, pose: PlayerPose): void {
   const squashX = 1 + 0.2 * pose.squash;
 
   ctx.save();
+  // Losing grip: a tremble that gets faster as the grip runs out.
+  if (pose.gripLoss > 0.15) {
+    const rate = 8 + pose.gripLoss * 16;
+    ctx.translate(Math.floor(pose.time * rate) % 2 === 0 ? -1 : 1, 0);
+  }
   if (pose.rotation !== 0) {
     ctx.translate(0, PIVOT_Y);
     ctx.rotate(pose.rotation);

@@ -26,7 +26,9 @@
     "centerSpeed": 6,
     "stepUpSmoothTime": 0.08,
     "landSquashMinSpeed": 6,
-    "landSquashTime": 0.12
+    "landSquashTime": 0.12,
+    "gripTime": 1.0,
+    "gripSlideSpeed": 0.8
   },
   "dig": {
     "secondsPerHardness": 1.0,

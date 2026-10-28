@@ -31,9 +31,11 @@ a production build.
   you onto it. Lift to stop. Long-press a tile to inspect it in the debug overlay.
 - **Walls and ceilings:** drag diagonally up into a wall (up-right against a wall on your
   right) to walk up it. Straight up or down walks along it, and straight into it digs. Under a
-  ceiling, an up-diagonal walks along it and straight up digs. You cling only while holding
-  toward the surface; lift your finger to drop. Half-dug tiles keep their cracks, so you can
-  come back and finish them.
+  ceiling, an up-diagonal walks along it and straight up digs. Corners work going up: at a
+  wall's top inner corner, turn up-and-away to step onto the ceiling, and walking off a
+  ceiling's edge carries you around it onto the wall above. Lift your finger and the mole
+  starts losing grip (it trembles and slides); it only falls after about a second, so you can
+  re-grab. Half-dug tiles keep their cracks, so you can come back and finish them.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `[` and `]` change pick power.
 

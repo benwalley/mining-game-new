@@ -23,6 +23,8 @@ export class Player {
   cling: 'none' | 'wall' | 'ceiling' = 'none';
   /** Which side the wall is on while clinging to one. */
   clingSide: 1 | -1 = 1;
+  /** Seconds since the player stopped holding toward the surface they cling to. */
+  gripTimer = 0;
   /** Last direction moved along a wall: -1 up, 1 down. */
   climbDir: 1 | -1 = -1;
   coyoteTimer = 0;
@@ -40,6 +42,7 @@ export class Player {
 
   /** Visual-only: offsets that smooth out instant snaps such as stepping up a ledge. */
   stepOffsetY = 0;
+  stepOffsetX = 0;
   squashTimer = 0;
   walkPhase = 0;
 
