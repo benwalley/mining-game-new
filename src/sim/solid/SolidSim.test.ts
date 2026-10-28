@@ -17,7 +17,8 @@ const KEYS: Record<string, string> = {
   '.': 'air',
   w: 'air',
 };
-const t = tuning.support;
+// Ceiling collapse is off in the game for now; these tests keep it working for later.
+const t = { ...tuning.support, ceilingsCollapse: true };
 const DT = 1 / tuning.sim.ticksPerSecond;
 
 /** One chunk drawn from rows ('w' is air holding full water); outside is bedrock. */
@@ -114,6 +115,16 @@ describe('SolidSim', () => {
     w.run(1);
     expect(w.at(4, 2)).toBe('rubble');
     expect(w.store.originAt(4, 2)).toBe(id('dirt'));
+  });
+
+  it('never fails ceilings while collapse is switched off', () => {
+    const w = world(['ddddddddd', 'dd.....dd', 'ddddddddd']);
+    const off = new SolidSim(w.store, materials, tuning.support);
+    w.store.setMaterial(2, 0, materials.air.numId);
+    off.removed(2, 0);
+    for (let i = 0; i < (t.failSeconds + 1) / DT; i++) off.tick(DT);
+    expect(w.at(4, 0)).toBe('dirt');
+    expect(off.active).toBe(0);
   });
 
   it('leaves a ceiling within its span alone', () => {

@@ -82,9 +82,9 @@ export interface LayeredWorldConfig {
   /**
    * Natural ceilings must obey the support rule. Over-long ones are rebuilt in
    * the first `reinforce` material strong enough; where even the last can't
-   * span it, columns of `column` are added.
+   * span it, columns of `column` are added. Off while ceilings can't collapse.
    */
-  support: { reinforce: string[]; column: string };
+  support: { enabled: boolean; reinforce: string[]; column: string };
   /** Rock around a pool's fluid that caves never cut, so pools start sealed and still. */
   poolShell: number;
   /**
@@ -224,15 +224,18 @@ export class LayeredWorldGenerator implements WorldGenerator {
     const chunk = createChunk(cx, cy);
     const x0 = cx * CHUNK_SIZE;
     const y0 = cy * CHUNK_SIZE;
-    // The support pass reads beyond the chunk, so generate raw terrain with a margin.
-    const g = this.region(x0 - PAD_X, y0 - PAD_Y, CHUNK_SIZE + 2 * PAD_X, CHUNK_SIZE + 2 * PAD_Y);
+    // The support pass reads beyond the chunk, so it needs raw terrain with a margin.
+    const support = this.config.support.enabled;
+    const px = support ? PAD_X : 0;
+    const py = support ? PAD_Y : 0;
+    const g = this.region(x0 - px, y0 - py, CHUNK_SIZE + 2 * px, CHUNK_SIZE + 2 * py);
     for (let ly = 0; ly < CHUNK_SIZE; ly++) {
       for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-        const u = lx + PAD_X;
-        const v = ly + PAD_Y;
+        const u = lx + px;
+        const v = ly + py;
         const j = v * g.w + u;
         const i = tileIndex(lx, ly);
-        chunk.material[i] = this.supported(g, u, v);
+        chunk.material[i] = support ? this.supported(g, u, v) : g.material[j]!;
         if (g.fluid[j]) {
           chunk.fluidType[i] = g.fluid[j]!;
           chunk.fluidAmount[i] = FLUID_MAX;

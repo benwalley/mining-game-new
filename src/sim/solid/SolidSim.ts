@@ -27,8 +27,8 @@ interface Failing {
 const MAX_CRACK = 230;
 
 /**
- * Gravity for solids: loose tiles (sand, rubble) fall, and ceilings that lose
- * support fail. Nothing is scanned every tick: a change (a dig, a fall) queues
+ * Gravity for solids: loose tiles (sand, rubble) fall, and (when
+ * `ceilingsCollapse` is on; it's off for now) ceilings that lose support fail. Nothing is scanned every tick: a change (a dig, a fall) queues
  * checks for the tiles it could affect, and only tiles found unstable are
  * tracked. Failure is telegraphed: a ceiling creaks, sheds dust and cracks for
  * `failSeconds` before it collapses into rubble that remembers what it was.
@@ -193,6 +193,7 @@ export class SolidSim {
       }
       return;
     }
+    if (!this.tuning.ceilingsCollapse) return;
     if (this.failing.has(key) || !isUnsupported(this.view, x, y)) return;
     const total = quick ? this.tuning.chainFailSeconds : this.tuning.failSeconds;
     this.failing.set(key, { left: total, total, dust: 0, material: m });

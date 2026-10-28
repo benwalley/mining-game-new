@@ -110,7 +110,14 @@ describe('LayeredWorldGenerator pools', () => {
   });
 });
 
-describe('LayeredWorldGenerator support', () => {
+describe('LayeredWorldGenerator support pass (off for now)', () => {
+  const gen = new LayeredWorldGenerator(
+    { ...config, support: { ...config.support, enabled: true } },
+    'seed-a',
+    materials,
+    fluids,
+  );
+
   it.each(config.layers.map((l, i) => ({ layer: l.key, i })))(
     'leaves $layer caves standing under the support rule',
     ({ i }) => {

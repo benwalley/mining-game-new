@@ -146,22 +146,21 @@ describe.each([
     expect(chunk.fluidAmount[(spawn.y - 4) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE)]).toBe(0);
   });
 
-  it('collapses an undermined ceiling into rubble and saves it', async () => {
+  it('leaves an undermined ceiling standing but lets sand fall', async () => {
     const store = await makeStore();
     const worldId = `${WORLD}-f`;
     const host = createHost(store);
     await host.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
-    // The test world's wide flat room in dirt (x 100–113, y 34–36).
+    // The test world's wide flat room in dirt (x 100–113, y 34–36), and its sand band below.
     await host.send({ type: 'requestChunks', chunks: [[3, 1]] });
     await host.send({ type: 'digTile', x: 101, y: 33, toolPower: 3 });
+    // Dirt at the top of the band under the sand (sand runs to y 61).
+    await host.send({ type: 'digTile', x: 104, y: 62, toolPower: 3 });
     const seconds = tuning.support.failSeconds + 2;
     for (let t = 0; t < seconds * tuning.sim.ticksPerSecond; t++) host.host.tick();
-    const changes = host.out.flatMap((m) => (m.type === 'tilesChanged' ? m.changes : []));
-    const rubble = changes.filter((c) => c.material === materials.rubble.numId);
-    expect(rubble.length).toBeGreaterThan(0);
-    expect(rubble[0]!.origin).toBe(materials.require('dirt').numId);
     const events = host.out.flatMap((m) => (m.type === 'simEvents' ? m.events : []));
-    expect(events.map((e) => e.kind)).toEqual(expect.arrayContaining(['creak', 'collapse']));
+    expect(events.map((e) => e.kind)).not.toContain('collapse');
+    expect(events.map((e) => e.kind)).toEqual(expect.arrayContaining(['loose', 'land']));
     await host.send({ type: 'flush' });
     expect(host.last('saved')?.chunks).toBeGreaterThan(0);
   });

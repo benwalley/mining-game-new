@@ -91,6 +91,7 @@
     "hurtEventInterval": 0.4
   },
   "support": {
+    "ceilingsCollapse": false,
     "failSeconds": 2.5,
     "chainFailSeconds": 0.6,
     "looseSeconds": 0.4,
