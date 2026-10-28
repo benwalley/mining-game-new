@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "notes": "Phase 0 flat test world. Coordinates are world tiles (y grows downward). Changing this file resets saved test worlds.",
+  "width": 192,
+  "height": 320,
+  "surfaceY": 24,
+  "spawn": { "x": 96, "y": 24 },
+  "wallThickness": 2,
+  "bands": [
+    { "material": "dirt", "toDepth": 18 },
+    { "material": "clay", "toDepth": 30 },
+    { "material": "sand", "toDepth": 38 },
+    { "material": "dirt", "toDepth": 46 },
+    { "material": "stone", "toDepth": 999 }
+  ],
+  "pockets": [
+    { "material": "rootwood", "within": ["dirt"], "scale": 4, "threshold": 0.8 },
+    { "material": "coal", "within": ["stone", "clay"], "scale": 5, "threshold": 0.78 },
+    { "material": "copper", "within": ["stone"], "scale": 4, "threshold": 0.82, "minDepth": 60 },
+    { "material": "tin", "within": ["stone"], "scale": 4, "threshold": 0.84, "minDepth": 90 },
+    { "material": "air", "within": ["stone"], "scale": 9, "threshold": 0.83, "minDepth": 70 }
+  ],
+  "features": [
+    { "op": "fill", "material": "dirt", "x": 104, "y": 23, "w": 3, "h": 1, "label": "1-tile step" },
+    { "op": "fill", "material": "dirt", "x": 107, "y": 22, "w": 3, "h": 2, "label": "2-tile step" },
+    { "op": "carve", "x": 113, "y": 24, "w": 3, "h": 3, "label": "jump gap" },
+    {
+      "op": "fill",
+      "material": "stone",
+      "x": 84,
+      "y": 21,
+      "w": 2,
+      "h": 3,
+      "label": "stone pillar"
+    },
+    { "op": "ellipse", "x": 78, "y": 62, "rx": 10, "ry": 4, "label": "first cave" },
+    {
+      "op": "stairs",
+      "x": 102,
+      "y": 92,
+      "steps": 6,
+      "dir": 1,
+      "stepW": 2,
+      "clearH": 4,
+      "label": "ledge stairs"
+    },
+    { "op": "carve", "x": 60, "y": 120, "w": 1, "h": 14, "label": "climb shaft" },
+    { "op": "ellipse", "x": 120, "y": 160, "rx": 16, "ry": 7, "label": "big chamber" },
+    {
+      "op": "fill",
+      "material": "stone",
+      "x": 118,
+      "y": 162,
+      "w": 4,
+      "h": 5,
+      "label": "chamber pillar"
+    }
+  ]
+}

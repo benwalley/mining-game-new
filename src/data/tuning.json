@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "input": {
+    "deadZonePx": 12,
+    "fullSpeedPx": 60,
+    "tapMaxMs": 200,
+    "tapMaxMovePx": 10,
+    "longPressMs": 450,
+    "jumpMinUpRatio": 0.5
+  },
+  "player": {
+    "width": 0.75,
+    "height": 1.8,
+    "maxRunSpeed": 6,
+    "groundAccel": 60,
+    "groundDecel": 90,
+    "airAccel": 35,
+    "gravity": 50,
+    "maxFallSpeed": 22,
+    "jumpHeight": 2.3,
+    "jumpCutMultiplier": 0.45,
+    "coyoteTime": 0.1,
+    "jumpBufferTime": 0.12,
+    "climbSpeed": 4.5,
+    "centerSpeed": 6,
+    "stepUpSmoothTime": 0.08,
+    "landSquashMinSpeed": 8,
+    "landSquashTime": 0.12
+  },
+  "dig": {
+    "secondsPerHardness": 1.0,
+    "minDigTime": 0.15,
+    "crackStages": 3,
+    "gateOffset": 1,
+    "defaultToolPower": 3,
+    "swingInterval": 0.22,
+    "flushTolerance": 0.05
+  },
+  "camera": {
+    "targetTilesAcross": 14,
+    "minPixelScale": 2,
+    "followRate": 8,
+    "lookAheadX": 2.5,
+    "lookAheadUp": 1.5,
+    "lookAheadDown": 3.5,
+    "lookAheadRate": 3
+  },
+  "fx": {
+    "breakParticles": 12,
+    "hitParticles": 3,
+    "particleGravity": 30,
+    "particleLife": 0.6
+  },
+  "streaming": {
+    "loadMarginChunks": 1,
+    "unloadMarginChunks": 3
+  },
+  "save": {
+    "autosaveIntervalMs": 3000,
+    "playerSyncIntervalMs": 1000
+  },
+  "sim": {
+    "ticksPerSecond": 20
+  }
+}

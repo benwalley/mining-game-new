@@ -1,0 +1,48 @@
+:root {
+  --ink: #0d0b10;
+  --bone: #ece6dc;
+  --fog: #c4bfc4;
+  --panel: rgba(13, 11, 16, 0.78);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* No scroll, bounce, zoom, text selection or long-press callouts during play. */
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#world {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: block;
+  touch-action: none;
+  image-rendering: pixelated;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#ui .interactive {
+  pointer-events: auto;
+}

@@ -1,0 +1,134 @@
+import { createRng } from '@/core/random/rng';
+import type { MaterialDef } from '@/content/materials';
+import { soundProfile, type SoundProfile } from './materialSound';
+
+/**
+ * Synthesized sound effects (Web Audio). No audio files: every sound is built
+ * from filtered noise and short tones. Real samples can replace these later
+ * behind the same methods.
+ */
+export class AudioService {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private noise: AudioBuffer | null = null;
+  private readonly profiles = new Map<number, SoundProfile>();
+  private readonly rng = createRng('audio');
+
+  /** Must be called from a user gesture; browsers block audio until then. */
+  unlock(): void {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      return;
+    }
+    const Ctor = window.AudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    this.ctx = ctx;
+    const comp = ctx.createDynamicsCompressor();
+    comp.connect(ctx.destination);
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(comp);
+
+    const len = Math.floor(ctx.sampleRate * 0.5);
+    this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = this.noise.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = this.rng.range(-1, 1);
+  }
+
+  suspend(): void {
+    void this.ctx?.suspend();
+  }
+
+  resume(): void {
+    void this.ctx?.resume();
+  }
+
+  digHit(m: MaterialDef): void {
+    const p = this.profile(m);
+    this.noiseBurst(p.noiseHz * this.rng.range(0.92, 1.08), p.q, p.decay, 0.5);
+    if (p.toneHz > 0)
+      this.tone(p.toneHz * this.rng.range(0.95, 1.05), p.decay * 1.2, p.toneGain, 'sine');
+    if (p.ring > 0) this.tone(p.noiseHz * 0.75, p.ring, 0.12, 'triangle');
+  }
+
+  tileBreak(m: MaterialDef): void {
+    const p = this.profile(m);
+    this.noiseBurst(p.noiseHz * 0.7, 0.6, 0.2, 0.7);
+    this.sweep(150 - 60 * (m.hardness / 10), 50, 0.14, 0.5);
+    if (p.ring > 0) this.tone(p.noiseHz * 0.9, p.ring * 1.5, 0.15, 'triangle');
+  }
+
+  blocked(): void {
+    this.tone(1900, 0.08, 0.18, 'triangle');
+    this.tone(2600, 0.05, 0.1, 'square');
+  }
+
+  land(speed: number): void {
+    this.sweep(110, 45, 0.1, Math.min(0.5, speed / 40));
+  }
+
+  private profile(m: MaterialDef): SoundProfile {
+    let p = this.profiles.get(m.numId);
+    if (!p) {
+      p = soundProfile(m);
+      this.profiles.set(m.numId, p);
+    }
+    return p;
+  }
+
+  private ready(): { ctx: AudioContext; out: GainNode } | null {
+    if (!this.ctx || !this.master || this.ctx.state !== 'running') return null;
+    return { ctx: this.ctx, out: this.master };
+  }
+
+  private envelope(ctx: AudioContext, peak: number, decay: number): GainNode {
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    return g;
+  }
+
+  private noiseBurst(hz: number, q: number, decay: number, gain: number): void {
+    const r = this.ready();
+    if (!r || !this.noise) return;
+    const src = r.ctx.createBufferSource();
+    src.buffer = this.noise;
+    const filter = r.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = hz;
+    filter.Q.value = q;
+    const env = this.envelope(r.ctx, gain, decay);
+    src.connect(filter).connect(env).connect(r.out);
+    const offset = this.rng.range(0, 0.3);
+    src.start(r.ctx.currentTime, offset, decay + 0.02);
+  }
+
+  private tone(hz: number, decay: number, gain: number, type: OscillatorType): void {
+    const r = this.ready();
+    if (!r) return;
+    const osc = r.ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = hz;
+    const env = this.envelope(r.ctx, gain, decay);
+    osc.connect(env).connect(r.out);
+    osc.start();
+    osc.stop(r.ctx.currentTime + decay + 0.02);
+  }
+
+  private sweep(fromHz: number, toHz: number, decay: number, gain: number): void {
+    const r = this.ready();
+    if (!r) return;
+    const osc = r.ctx.createOscillator();
+    osc.type = 'sine';
+    const t = r.ctx.currentTime;
+    osc.frequency.setValueAtTime(fromHz, t);
+    osc.frequency.exponentialRampToValueAtTime(toHz, t + decay);
+    const env = this.envelope(r.ctx, gain, decay);
+    osc.connect(env).connect(r.out);
+    osc.start();
+    osc.stop(t + decay + 0.02);
+  }
+}
