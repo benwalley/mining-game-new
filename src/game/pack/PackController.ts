@@ -58,6 +58,8 @@ export class PackController {
   readonly gesture: PackGesture;
   private mode: Mode = DEFAULT_MODE;
   private preview: Mode | null = null;
+  /** While scrubbing, how far the strip of modes has slid, in modes. */
+  private progress = 0;
   private button: Point = { x: 0, y: 0 };
   private sheet = false;
   private paused = false;
@@ -75,7 +77,12 @@ export class PackController {
     this.gesture = new PackGesture(d.tuning, {
       nextMode: () => this.setMode(MODES[(MODES.indexOf(this.mode) + 1) % MODES.length]!),
       scrub: (i) => this.setPreview(MODES[i] ?? null),
+      scrubMove: (p) => {
+        this.progress = p;
+        this.publishMode();
+      },
       scrubEnd: (i) => {
+        this.progress = 0;
         this.setPreview(null);
         if (i !== null) this.setMode(MODES[i]!);
       },
@@ -226,7 +233,7 @@ export class PackController {
 
   private setPreview(mode: Mode | null): void {
     this.preview = mode;
-    this.publish();
+    this.publishMode();
   }
 
   /** Puts the ghost two tiles above the finger, or below it near the top of the screen. */
@@ -318,6 +325,18 @@ export class PackController {
     if (undoView.value) undoView.value = null;
   }
 
+  /** Just the mode signal, so a drag across the button doesn't rebuild the whole pack view. */
+  private publishMode(): void {
+    modeView.value = {
+      mode: this.mode,
+      preview: this.preview,
+      modes: MODES,
+      pulse: this.pulse,
+      progress: this.progress,
+      scrubbing: this.preview !== null,
+    };
+  }
+
   private publish(): void {
     const { pack, materials } = this.d;
     this.shownRevision = pack.revision;
@@ -354,7 +373,7 @@ export class PackController {
     const g = this.gesture;
     fanView.value = { open: g.fanOpen, slots: g.slots, hover: g.hover };
     sheetOpen.value = this.sheet;
-    modeView.value = { mode: this.mode, preview: this.preview, modes: MODES, pulse: this.pulse };
+    this.publishMode();
 
     const paused = freezesWorld(this.mode) || g.fanOpen || this.sheet;
     if (paused !== this.paused) {

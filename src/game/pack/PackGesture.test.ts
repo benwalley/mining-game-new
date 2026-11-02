@@ -13,9 +13,11 @@ const SLOT = [
 
 function setup(entries = 4, modes = 3) {
   const calls: string[] = [];
+  const moves: number[] = [];
   const g = new PackGesture(tuningData.placing, {
     nextMode: () => calls.push('nextMode'),
     scrub: (i) => calls.push(`scrub ${i}`),
+    scrubMove: (p) => moves.push(Math.round(p * 100) / 100),
     scrubEnd: (i) => calls.push(`scrubEnd ${i}`),
     openFan: () => calls.push('openFan'),
     closeFan: () => calls.push('closeFan'),
@@ -35,7 +37,7 @@ function setup(entries = 4, modes = 3) {
     g.move({ x: BUTTON.x - 20, y: BUTTON.y });
     g.move(to);
   };
-  return { g, calls, tap, swipeOut };
+  return { g, calls, moves, tap, swipeOut };
 }
 
 describe('PackGesture', () => {
@@ -73,10 +75,19 @@ describe('PackGesture', () => {
     expect(down.calls).toEqual(['scrub 0', 'scrub 2', 'scrubEnd 2']);
   });
 
+  it('reports how far the contents have slid, fractionally, so they can follow the finger', () => {
+    const { g, moves } = setup();
+    g.down(BUTTON, 0);
+    g.move({ x: BUTTON.x, y: BUTTON.y - 25 });
+    g.move({ x: BUTTON.x, y: BUTTON.y - 75 });
+    g.move({ x: BUTTON.x, y: BUTTON.y + 25 });
+    expect(moves).toEqual([0.5, 1.5, -0.5]);
+  });
+
   it('wraps a long scrub past the end', () => {
     const { g, calls } = setup(4, 2);
     g.down(BUTTON, 0);
-    g.move({ x: BUTTON.x, y: BUTTON.y - 150 }); // Four steps on two modes is back where it began.
+    g.move({ x: BUTTON.x, y: BUTTON.y - 200 }); // Four steps on two modes is back where it began.
     g.up();
     expect(calls.at(-1)).toBe('scrubEnd 0');
   });

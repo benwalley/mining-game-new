@@ -20,19 +20,20 @@ Movement is 8-directional. Digging is 4-directional (left, right, up, down) to k
 > **Decided since (owner, 2026-11-02, reworked the same day):** there's no hotbar, and the
 > game has **modes**. Today there are two: **dig** (the world runs; swipe to move and dig) and
 > **build** (the world is frozen and the whole screen takes touches). The list of modes is
-> data, so more can be added. The pack button in the bottom-right corner shows the held block
-> and the current mode.
+> data, so more can be added. The pack button in the bottom-right corner is a round **window**
+> onto an endless vertical strip of modes, and shows the current one: the pick in dig mode, the
+> held block in build mode.
 >
-> | Gesture on the pack button                      | Result                                                                                                                                                                     |
-> | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-> | Tap                                             | Switch to the next mode, wrapping around.                                                                                                                                  |
-> | Swipe up or down                                | Scrub through modes, about 36 px per step, passing several if the finger goes far. A rail of mode icons shows above the button. Release to pick; up goes to the next mode. |
-> | Swipe left                                      | Open the block picker fan. The game pauses while it's open.                                                                                                                |
-> | Swipe left again with the fan open              | Open the full pack, still paused.                                                                                                                                          |
-> | Hold still for 0.4 s                            | Open the full pack.                                                                                                                                                        |
-> | With the fan open: tap the button or outside it | Close the fan.                                                                                                                                                             |
-> | In the fan: tap an entry                        | Hold that block and close the fan. The last entry opens the full pack.                                                                                                     |
-> | In the fan: drag along the arc                  | Scroll.                                                                                                                                                                    |
+> | Gesture on the pack button                      | Result                                                                                                                                                                                                   |
+> | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Tap                                             | Slide to the next mode, wrapping around.                                                                                                                                                                 |
+> | Swipe up or down                                | The strip of modes slides behind the button, following the finger one for one (about 50 px per mode), so several can go by. Release to settle on the nearest. Up goes forward, and the strip is endless. |
+> | Swipe left                                      | Open the block picker fan. The game pauses while it's open.                                                                                                                                              |
+> | Swipe left again with the fan open              | Open the full pack, still paused.                                                                                                                                                                        |
+> | Hold still for 0.4 s                            | Open the full pack.                                                                                                                                                                                      |
+> | With the fan open: tap the button or outside it | Close the fan.                                                                                                                                                                                           |
+> | In the fan: tap an entry                        | Hold that block and close the fan. The last entry opens the full pack.                                                                                                                                   |
+> | In the fan: drag along the arc                  | Scroll.                                                                                                                                                                                                  |
 >
 > A swipe is told apart from a hold by movement (more than about 10 px), and an up or down
 > swipe from a left one by which way it mostly goes. A swipe to the right does nothing. While

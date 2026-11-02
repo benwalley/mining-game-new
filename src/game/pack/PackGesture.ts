@@ -19,6 +19,8 @@ export interface PackGestureHooks {
   nextMode(): void;
   /** While scrubbing: the mode a release would pick. */
   scrub(index: number): void;
+  /** While scrubbing: how far the contents have slid, in modes. Up is positive, and it's fractional. */
+  scrubMove(progress: number): void;
   /** The scrub ended on `index`, or was cancelled (null). */
   scrubEnd(index: number | null): void;
   openFan(): void;
@@ -38,7 +40,8 @@ const MIN_SCROLL_RADIUS_PX = 40;
  * knows nothing about the DOM or the game, only points, times and hooks.
  *
  * - Tap the button: next mode. With the fan open, close the fan.
- * - Swipe up or down: scrub through modes, a step every `modeStepPx`; up is forward.
+ * - Swipe up or down: the button is a window onto an endless strip of modes, and
+ *   the strip follows the finger, `modeStepPx` per mode; up is forward.
  * - Swipe left: the fan opens and follows the finger; letting go over an entry
  *   picks it, letting go elsewhere leaves the fan open. With the fan already
  *   open, swiping left opens the full pack.
@@ -215,6 +218,7 @@ export class PackGesture {
 
   /** Up is forward; stepping past either end wraps around. */
   private scrubTo(dy: number): void {
+    this.hooks.scrubMove(-dy / this.t.modeStepPx);
     const steps = Math.round(-dy / this.t.modeStepPx);
     const n = this.modeCount;
     const index = (((this.modeIndex + steps) % n) + n) % n;

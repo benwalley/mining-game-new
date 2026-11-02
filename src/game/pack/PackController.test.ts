@@ -87,8 +87,12 @@ describe('PackController modes', () => {
     g.down(BUTTON, 0);
     g.move({ x: BUTTON.x, y: BUTTON.y - 40 });
     expect(modeView.value.preview).toBe(MODES[1]);
+    expect(modeView.value.scrubbing).toBe(true);
+    expect(modeView.value.progress).toBeCloseTo(0.8);
     g.up();
     expect(modeView.value.preview).toBeNull();
+    expect(modeView.value.scrubbing).toBe(false);
+    expect(modeView.value.progress).toBe(0);
     expect(modeView.value.mode).toBe('build');
   });
 

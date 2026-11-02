@@ -43,8 +43,9 @@ Design sections to read: [02](design/02-core-loop.md) (pack weight sets the trip
   dig; the pack bulges and you slow down.
 - **No hotbar, and two modes.** The game has **dig** (the world runs) and **build** (the world
   is frozen; tap a tile to place, hold to aim a ghost above the finger; undo lasts one second
-  and covers only the last block). The pack button cycles modes on a tap and scrubs through
-  them on an up or down swipe; swipe left for the block picker fan. A block can go on any
+  and covers only the last block). The pack button is a window onto an endless strip of modes
+  (the pick for dig, the held block for build): a tap slides to the next, and an up or down
+  swipe drags the strip behind it; swipe left for the block picker fan. A block can go on any
   on-screen tile the player could reach through open tiles without breaking anything, and may
   push fluid out. The gestures are in [design 03](design/03-controls.md) and the HUD in
   [design 04](design/04-look-sound-ui.md), both under "Decided since". The mode list is
@@ -74,8 +75,9 @@ messages (`PROTOCOL_VERSION` 9), and the sim accepts them while paused. The mode
   arc, ghost offset, undo time).
 - **The full pack reorders with up and down buttons,** not by dragging. Inspect shows only the
   count and weight; properties come with discovery.
-- **The fan scrolls by dragging along the arc,** with no flick momentum. Scrubbing down has
-  little room at the bottom of the screen, which is fine with two modes since up wraps.
+- **The fan scrolls by dragging along the arc,** with no flick momentum. Swiping down from the
+  button has little room at the bottom of the screen, which is fine with two modes since up
+  wraps.
 - **Build mode doesn't pan,** so building further means leaving it and walking.
 - **Left-handed mirroring** (a Could) isn't built.
 

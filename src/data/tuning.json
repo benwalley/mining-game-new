@@ -50,7 +50,7 @@
     "packHoldMs": 400,
     "swipeMovePx": 10,
     "ghostOffsetTiles": 2,
-    "modeStepPx": 36,
+    "modeStepPx": 50,
     "undoMs": 1000,
     "fanRadiusPx": 132,
     "fanSlotPx": 44,

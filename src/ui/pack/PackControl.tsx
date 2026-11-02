@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { tuning } from '@/content/tuning';
+import { stripPositions } from '@/game/pack/carousel';
 import type { Mode } from '@/game/pack/modes';
-import { fanView, modeView, packView, undoView } from '../stores/gameStore';
+import { fanView, modeView, packView, undoView, type PackView } from '../stores/gameStore';
 import type { PackActions } from './packActions';
 
 const RING = 2 * Math.PI * 24;
@@ -10,31 +11,30 @@ const point = (e: PointerEvent) => ({ x: e.clientX, y: e.clientY });
 
 const MODE_LABEL: Record<Mode, string> = { dig: 'Dig', build: 'Build' };
 
-/** A small picture for each mode, drawn with plain shapes. */
-function ModeGlyph({ mode }: { mode: Mode }) {
+/** What each mode shows in the button's window: the pick for digging, the held block for building. */
+function ModeFace({ mode, held }: { mode: Mode; held: PackView['held'] }) {
+  if (mode === 'dig') {
+    return (
+      <svg viewBox="0 0 24 24" width="26" height="26" class="mode-glyph" aria-hidden="true">
+        <path d="M5 19 L15 9" />
+        <path d="M11 5 Q19 5 19 13 L15 9 Z" />
+      </svg>
+    );
+  }
+  if (!held) return <span class="pack-glyph" />;
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" class="mode-glyph" aria-hidden="true">
-      {mode === 'dig' ? (
-        <>
-          <path d="M5 19 L15 9" />
-          <path d="M11 5 Q19 5 19 13 L15 9 Z" />
-        </>
-      ) : (
-        <>
-          <rect x="5" y="9" width="14" height="10" rx="1" />
-          <rect x="9" y="3" width="6" height="6" rx="1" />
-        </>
-      )}
-    </svg>
+    <span class="swatch" style={{ background: held.color, opacity: held.count === 0 ? 0.3 : 1 }} />
   );
 }
 
 /**
- * The pack button in the bottom-right corner, its fan, the mode rail and the
- * undo chip. The button shows the held block, with a ring that fills with pack
- * weight (it swells and turns red when overloaded) and a border that shows the
- * mode. No numbers: those live in the full pack. The gesture logic is all in
- * `PackGesture`; this only reports pointer events.
+ * The pack button in the bottom-right corner, its fan and the undo chip. The
+ * button is a round window onto an endless vertical strip of modes: a swipe up
+ * or down slides the strip behind it, following the finger, and a tap slides to
+ * the next one. A ring around the window fills with pack weight (it swells and
+ * turns red when overloaded) and the border shows the mode. No numbers: those
+ * live in the full pack. The gesture logic is all in `PackGesture`; this only
+ * reports pointer events.
  */
 export function PackControl({ actions }: { actions: PackActions }) {
   const button = useRef<HTMLDivElement>(null);
@@ -80,11 +80,12 @@ export function PackControl({ actions }: { actions: PackActions }) {
 
   const { held, load } = packView.value;
   const fan = fanView.value;
-  const { mode, preview, modes, pulse } = modeView.value;
+  const { mode, preview, modes, pulse, progress, scrubbing } = modeView.value;
   const shown = preview ?? mode;
   const over = Math.max(0, Math.min(1, (load - 1) / (tuning.pack.hardLimit - 1)));
-  const gone = held !== null && held.count === 0;
   const undo = undoView.value;
+  const step = tuning.placing.modeStepPx;
+  const positions = stripPositions(modes.indexOf(mode), modes.length, progress);
 
   return (
     <>
@@ -119,19 +120,7 @@ export function PackControl({ actions }: { actions: PackActions }) {
           </div>
         </div>
       )}
-      {preview !== null && (
-        <div class="mode-rail" aria-hidden="true">
-          {/* Starting from the current mode, so swiping up always moves up the rail. */}
-          {modes
-            .map((_, i) => modes[(modes.indexOf(mode) + i) % modes.length]!)
-            .map((m) => (
-              <div key={m} class={`mode-chip${m === preview ? ' picked' : ''}`}>
-                <span class="mode-label">{MODE_LABEL[m]}</span>
-                <ModeGlyph mode={m} />
-              </div>
-            ))}
-        </div>
-      )}
+      {scrubbing && <div class="mode-bubble">{MODE_LABEL[shown]}</div>}
       {undo && (
         <button
           key={undo.id}
@@ -164,6 +153,19 @@ export function PackControl({ actions }: { actions: PackActions }) {
         aria-label={`${MODE_LABEL[shown]} mode${held ? `, holding ${held.name}` : ''}`}
         {...handlers}
       >
+        <div class="pack-window" aria-hidden="true">
+          {modes.map((m, i) =>
+            Math.abs(positions[i]!) < 1.2 ? (
+              <div
+                key={m}
+                class={`pack-face${scrubbing ? ' drag' : ''}`}
+                style={{ transform: `translateY(${positions[i]! * step}px)` }}
+              >
+                <ModeFace mode={m} held={held} />
+              </div>
+            ) : null,
+          )}
+        </div>
         <svg viewBox="0 0 56 56" class="pack-ring" aria-hidden="true">
           <circle cx="28" cy="28" r="24" class="ring-track" />
           <circle
@@ -174,15 +176,6 @@ export function PackControl({ actions }: { actions: PackActions }) {
             stroke-dasharray={`${RING * Math.min(1, load)} ${RING}`}
           />
         </svg>
-        {held ? (
-          <span
-            class="swatch"
-            style={{ background: held.color, opacity: gone ? 0.3 : 1 }}
-            aria-hidden="true"
-          />
-        ) : (
-          <span class="pack-glyph" />
-        )}
         {pulse > 0 && <span key={pulse} class="pulse-ring" />}
       </div>
     </>

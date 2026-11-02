@@ -102,9 +102,19 @@ export interface ModeView {
   modes: readonly Mode[];
   /** Counts up each time a tap finds nothing to place, to pulse the button. */
   pulse: number;
+  /** While a finger drags across the button: how far the strip of modes behind it has slid. */
+  progress: number;
+  scrubbing: boolean;
 }
 
-export const modeView = signal<ModeView>({ mode: 'dig', preview: null, modes: MODES, pulse: 0 });
+export const modeView = signal<ModeView>({
+  mode: 'dig',
+  preview: null,
+  modes: MODES,
+  pulse: 0,
+  progress: 0,
+  scrubbing: false,
+});
 
 /** Set for the undo window after a block is placed; `id` changes each time, to restart the ring. */
 export const undoView = signal<{ id: number; ms: number } | null>(null);

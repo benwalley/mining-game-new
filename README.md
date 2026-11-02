@@ -193,8 +193,9 @@ with fire, torches and furnaces.
 Every dug tile goes into the pack, which is limited by weight only (`tuning.json` `pack`:
 capacity 200). Past capacity you slow down and jump lower, down to 45% at 1.5×, where digging
 is blocked. There's no hotbar. The pack button in the bottom-right corner shows the held block
-and the mode, with a ring that fills with weight. Tap it to go to the next mode, or swipe up
-or down to scrub through them (`src/game/pack/modes.ts`: dig, build). Swipe left for the block
+and the mode, with a ring that fills with weight. It is a round window onto an endless strip of
+modes (`src/game/pack/modes.ts`: dig shows the pick, build shows the held block): tap it to slide
+to the next, or swipe up or down to drag the strip behind it, one for one with your finger. Swipe left for the block
 picker fan, swipe left again or hold for the full pack: reorder, hold, discard. In **build
 mode** the world is frozen and the whole screen takes touches: tap a tile to place the held
 block, or hold to aim a ghost two tiles above your finger and release to place it. Blocks go

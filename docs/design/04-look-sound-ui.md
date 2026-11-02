@@ -34,9 +34,11 @@ The HUD shows almost nothing. State is communicated through the world and screen
 No numbers appear in the HUD. Numbers are fine inside the crafting sheet and journal, where players compare items.
 
 > **Decided since (owner, 2026-11-02):** the hotbar is replaced by a single pack button in
-> the bottom-right corner (gestures in section 3). The button shows the held block, with a
-> ring around it that fills with pack weight, with no numbers; it swells and changes colour
-> when overloaded. Its border shows the mode: white for dig, blue for build. A small tag at
+> the bottom-right corner (gestures in section 3). The button is a round window onto an
+> endless vertical strip of modes: it shows the pick in dig mode and the held block in build
+> mode, and swiping up or down slides the strip behind it, following the finger. A ring around
+> it fills with pack weight, with no numbers; it swells and changes colour when overloaded. Its
+> border shows the mode: white for dig, blue for build. A small tag at
 > the bottom left says "Build" while building, and a faint blue tint marks the tiles a block
 > can go on. After a placement, an undo chip with a 1-second ring appears beside the button.
 > The picker fan and the full pack pause the game, and so does build mode. The full pack is a

@@ -340,52 +340,12 @@ body {
   pointer-events: none;
 }
 
-.mode-rail {
-  position: absolute;
-  right: calc(env(safe-area-inset-right) + 20px);
-  bottom: calc(env(safe-area-inset-bottom) + 82px);
-  z-index: 3;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.mode-chip {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 2px solid #4a4550;
-  border-radius: 50%;
-  background: var(--panel);
-  transition: transform 0.1s;
-}
-
-.mode-chip.picked {
-  border-color: #8fc8e8;
-  transform: scale(1.14);
-}
-
 .mode-glyph {
   fill: none;
   stroke: var(--bone);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
-}
-
-.mode-label {
-  position: absolute;
-  right: 54px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--panel);
-  font-size: 13px;
-  white-space: nowrap;
 }
 
 /* The chip is 86 px wide and centered 81 px left of the pack button (see UNDO_CHIP_DX_PX). */
@@ -450,4 +410,42 @@ body {
     transform: scale(1.5);
     opacity: 0;
   }
+}
+
+/* The pack button is a window onto an endless strip of modes */
+
+.pack-window {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.pack-face {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  transition: transform 0.14s ease-out;
+}
+
+/* While a finger drags the strip, it follows it exactly. */
+.pack-face.drag {
+  transition: none;
+}
+
+.mode-bubble {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 80px);
+  bottom: calc(env(safe-area-inset-bottom) + 28px);
+  z-index: 3;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 13px;
+  pointer-events: none;
 }
