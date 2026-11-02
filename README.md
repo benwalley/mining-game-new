@@ -40,16 +40,15 @@ flat test world instead (each keeps its own save).
 - **Water and lava:** in fluid the mole swims. Let go and it sinks slowly, drag to swim
   that way, and holding up at the surface hops you out onto the bank. Breath bubbles appear
   while your head is under; when they run out you start drowning. Lava burns on contact.
-  Health shows top right when hurt, with a red vignette, and regenerates after a few seconds
-  out of danger. Until rescue arrives in phase 3, nothing can take you below 1 HP.
+  A health bar sits top right, a red vignette deepens as health drops, and health
+  regenerates after a few seconds out of danger. Until rescue arrives in phase 3, nothing
+  can take you below 1 HP.
 - **Gas:** gases rise and pool under ceilings as a haze, and digging into a pocket hisses.
   Green spore gas (Fungal deep) makes the mole cough and hurts while breathed. Pale
   firedamp (Magma belt) is safe to breathe, but if it touches lava a flash fire runs
   through the whole cloud and burns anyone inside. Blocks are never broken. Water pushes
   gas out of its way, thin gas fades, and gas reaching open sky blows away.
-- **Falling sand:** dig under sand and it slips for a moment, then the whole column falls.
-  Anything landing on the mole hurts and pops it out on top. Ceilings don't collapse for
-  now (see Status).
+- **Nothing falls:** sand, rock and ceilings stay put however much you dig under them.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `H` the heat
   map (every tile colored by temperature; the overlay's "heat" button on phones), `[` and `]`
@@ -70,7 +69,7 @@ src/
   data/              ALL tunable numbers and content: materials, palette, tuning, test world
   protocol/          Typed main <-> sim messages and the SimClient
   sim/               Runs in a Web Worker: SimHost (authoritative world), world generation,
-                     fluids, falling solids and cave-ins, persistence (IndexedDB,
+                     fluids, heat, persistence (IndexedDB,
                      versioned save format with migrations)
   game/              Main-thread gameplay: player movement, digging, camera, chunk mirror
                      and streaming
@@ -140,16 +139,9 @@ each wrapped in a rock shell so it starts still. The test world has a surface po
 aquifer, and an aquifer above a lava basin for a waterfall test. The player swims, has breath
 and health, and gets hurt by lava and drowning (never below 1 HP).
 
-**Phase 1, slice 3 (done, cave-ins switched off):** falling sand (`src/sim/solid/`). Nothing
-is scanned every tick: a dig or a fall queues checks for the tiles it could affect. Ceiling
-collapse is built but off (`support.ceilingsCollapse` in `tuning.json`), because one dig
-through a cavern wall could bring the whole cavern down. When it's on: a ceiling tile holds
-if it is within its material's span of a resting tile along its row (`support.ts`). Failing
-ceilings creak, shed dust and crack for 2.5 s, then fall as rubble that remembers its origin
-material (a per-tile `origin` field, save format v2). The matching world-gen support pass,
-with flowstone ceilings and natural columns, is off too (`support.enabled` in
-`worldgen.json`). The test world has a wide flat dirt room (x 100–113, y 34–36) for trying
-it.
+**Phase 1, slice 3 (dropped):** falling sand and cave-ins were built, then removed at the
+owner's call: nothing in the world falls. Material ids 22 (rubble) and 23 (flowstone) are
+retired, and save format v3 drops the per-tile `origin` field they used.
 
 **Phase 1, slice 4 (done):** gas. Gases share the fluid layer (`fluids.json`, `kind: "gas"`):
 they rise, spread under ceilings, swap places with liquids, fade when thin, and vanish in
@@ -164,7 +156,6 @@ tiles down):
 - **Firedamp room with lava behind its east wall**, x 98–103: dig down at spawn to the floor
   (y 30) and tunnel right, so the gas can't escape up your shaft. Then dig the east wall
   from the floor to set it off.
-- **Sand slab over a pit**, x 117–121 (just past the jump gap): dig any of it and it drops.
 - **Water pocket over lava**, x 124–126: dig down at x 125, then dig the floor under the
   water.
 
@@ -196,7 +187,7 @@ where the heat comes from. Long-press shows a tile's temperature; the overlay sh
 temperature where you stand and what the mole feels. The test world squeezes the same ramp
 into its 300 rows (warm below about 190, hot below about 230), and its lava pocket at x
 105–106 warms the rock around it. Heat damage, suits, melting and igniting come in phase 2
-with fire, torches and furnaces; cave-ins come back there with support beams.
+with fire, torches and furnaces.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

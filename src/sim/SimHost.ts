@@ -27,7 +27,6 @@ import {
 } from '@/protocol/messages';
 import { FluidSim } from './fluid/FluidSim';
 import { HeatSim } from './heat/HeatSim';
-import { SolidSim } from './solid/SolidSim';
 import { Zone, Zones } from './zones';
 import type { SaveStore } from './persistence/SaveStore';
 import { SAVE_VERSION, type WorldMeta } from './persistence/saveFormat';
@@ -63,7 +62,6 @@ export class SimHost {
     generator: WorldGenerator;
     chunks: ChunkStore;
     fluids: FluidSim;
-    solids: SolidSim;
     heat: HeatSim;
   };
   private player: PlayerSnapshot | null = null;
@@ -187,7 +185,6 @@ export class SimHost {
       generator,
       chunks,
       fluids: new FluidSim(chunks, this.solidById, this.deps.fluids),
-      solids: new SolidSim(chunks, this.deps.materials, this.deps.tuning.support),
       heat: new HeatSim(
         this.deps.materials,
         this.deps.fluids,
@@ -331,9 +328,8 @@ export class SimHost {
     if (canDig) {
       world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
       this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
-      // An opening can let neighboring fluid in, loosen sand, or undermine a ceiling.
+      // An opening can let neighboring fluid in.
       world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
-      world.solids.removed(x, y);
       world.heat.tileChanged(x, y);
       if (this.gasNextTo(world.chunks, x, y)) {
         this.post({ type: 'simEvents', events: [{ kind: 'vent', x, y }] });
@@ -385,15 +381,6 @@ export class SimHost {
 
     const started = performance.now();
     this.zones.advance();
-    world.solids.tick(1 / this.deps.tuning.sim.ticksPerSecond, this.zones);
-    const solids = world.solids.drain();
-    for (let i = 0; i < solids.touched.length; i += 2) {
-      world.fluids.touch(solids.touched[i]!, solids.touched[i + 1]!);
-    }
-    for (const key of solids.chunks) this.dirtyChunks.add(key);
-    for (const c of solids.tiles) world.heat.tileChanged(c.x, c.y);
-    if (solids.tiles.length > 0) this.post({ type: 'tilesChanged', changes: solids.tiles });
-    if (solids.events.length > 0) this.post({ type: 'simEvents', events: solids.events });
     world.fluids.tick(this.zones);
     this.publish(world.fluids, world.heat);
     world.heat.tick(this.zones);
@@ -413,7 +400,6 @@ export class SimHost {
         tickMs: this.statsTickMs / Math.max(1, this.statsTicks),
         tickMsMax: this.statsTickMsMax,
         awakeTiles: world.fluids.awakeTiles,
-        solidsActive: world.solids.active,
         heatChunks: world.heat.awakeChunks,
         chunks: world.chunks.size,
       });
@@ -468,7 +454,6 @@ export class SimHost {
   private evict(cx: number, cy: number): void {
     this.world?.chunks.delete(cx, cy);
     this.world?.fluids.forgetChunk(cx, cy);
-    this.world?.solids.forgetChunk(cx, cy);
     this.world?.heat.forgetChunk(cx, cy);
   }
 

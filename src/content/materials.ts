@@ -2,16 +2,7 @@ import materialsData from '@/data/materials.json';
 import { isColorName, palette, type ColorName } from './palette';
 
 export type TilePattern =
-  | 'bedrock'
-  | 'soil'
-  | 'grain'
-  | 'smooth'
-  | 'fiber'
-  | 'block'
-  | 'vein'
-  | 'crystal'
-  | 'spots'
-  | 'rubble';
+  'bedrock' | 'soil' | 'grain' | 'smooth' | 'fiber' | 'block' | 'vein' | 'crystal' | 'spots';
 
 export interface MaterialVisual {
   base: ColorName;
@@ -36,7 +27,6 @@ export interface MaterialDef {
   heatLimit: number;
   /** How fast heat passes through, 1–10. */
   conductivity: number;
-  supportSpan: number;
   fuel: number;
   trait: string | null;
   /** Light emitted by the tile itself, 0–15. */
@@ -54,7 +44,6 @@ const PATTERNS: readonly TilePattern[] = [
   'vein',
   'crystal',
   'spots',
-  'rubble',
 ];
 
 /** Lookup of all materials by numeric id and by key. */
@@ -63,8 +52,6 @@ export class MaterialRegistry {
   private readonly byKey = new Map<string, MaterialDef>();
   readonly air: MaterialDef;
   readonly bedrock: MaterialDef;
-  /** What collapsed ceilings become; it remembers what it was in the tile's origin. */
-  readonly rubble: MaterialDef;
 
   constructor(defs: readonly MaterialDef[]) {
     for (const def of defs) {
@@ -75,7 +62,6 @@ export class MaterialRegistry {
     }
     this.air = this.require('air');
     this.bedrock = this.require('bedrock');
-    this.rubble = this.require('rubble');
     if (this.air.numId !== 0) throw new Error('Material "air" must have numId 0');
   }
 
@@ -91,11 +77,6 @@ export class MaterialRegistry {
     const def = this.byKey.get(key);
     if (!def) throw new Error(`Unknown material "${key}"`);
     return def;
-  }
-
-  /** Loose materials (sand, rubble) fall when nothing solid is under them. */
-  falls(def: MaterialDef): boolean {
-    return def.trait === 'falls';
   }
 
   /** Numeric ids are dense, so this is a safe upper bound for lookup tables. */
@@ -149,7 +130,6 @@ export function loadMaterials(): MaterialRegistry {
       weight: raw.weight,
       heatLimit: raw.heatLimit,
       conductivity: raw.conductivity,
-      supportSpan: raw.supportSpan,
       fuel: raw.fuel,
       trait: raw.trait,
       light: 'light' in raw ? Number(raw.light) : 0,

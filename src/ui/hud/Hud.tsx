@@ -3,8 +3,8 @@ import { hud, hurtPulse } from '../stores/gameStore';
 const BUBBLES = 5;
 
 /**
- * Health and breath. Both hide while full, so the screen stays clear until
- * something is wrong. A red vignette deepens as health drops and flashes on
+ * Health and breath. The health bar is always shown; breath only appears
+ * while it's being used up. A red vignette deepens as health drops and flashes on
  * each hit; an orange haze creeps in from the edges as it gets hot.
  */
 export function Hud() {
@@ -31,11 +31,9 @@ export function Hud() {
             })}
           </div>
         )}
-        {health < maxHealth && (
-          <div class="health" aria-label={`health ${health} of ${maxHealth}`}>
-            <div class="health-fill" style={{ width: `${(health / maxHealth) * 100}%` }} />
-          </div>
-        )}
+        <div class="health" aria-label={`health ${health} of ${maxHealth}`}>
+          <div class="health-fill" style={{ width: `${(health / maxHealth) * 100}%` }} />
+        </div>
       </div>
     </>
   );

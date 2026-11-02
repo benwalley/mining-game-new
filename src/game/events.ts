@@ -10,7 +10,7 @@ export interface GameEvents {
   landed: { speed: number };
   inspect: { x: number; y: number };
   splash: { x: number; y: number; fluid: number; speed: number };
-  hurt: { cause: 'drowning' | 'fluid' | 'gas' | 'crushed'; fluid: number };
+  hurt: { cause: 'drowning' | 'fluid' | 'gas'; fluid: number };
   /** A drop of sweat leaves the mole (it's hot). */
   sweat: { x: number; y: number };
   /** The air crackles (extreme heat); strength 0.5–1. */
@@ -19,8 +19,4 @@ export interface GameEvents {
   quench: SimEvent;
   ignite: SimEvent;
   vent: SimEvent;
-  creak: SimEvent;
-  collapse: SimEvent;
-  loose: SimEvent;
-  land: SimEvent;
 }

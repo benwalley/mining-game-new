@@ -157,23 +157,25 @@ describe.each([
     expect(home?.type === 'chunk' && home.chunk.fluidAmount[i]).toBe(0);
   });
 
-  it('leaves an undermined ceiling standing but lets sand fall', async () => {
+  it('leaves sand and ceilings where they are when you dig under them', async () => {
     const store = await makeStore();
-    const worldId = `${WORLD}-f`;
     const host = createHost(store);
-    await host.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
-    // The test world's wide flat room in dirt (x 100–113, y 34–36), and its sand band below.
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-f`,
+    });
     await host.send({ type: 'requestChunks', chunks: [[3, 1]] });
-    await host.send({ type: 'digTile', x: 101, y: 33, toolPower: 3 });
     // Dirt at the top of the band under the sand (sand runs to y 61).
     await host.send({ type: 'digTile', x: 104, y: 62, toolPower: 3 });
-    const seconds = tuning.support.failSeconds + 2;
-    for (let t = 0; t < seconds * tuning.sim.ticksPerSecond; t++) host.host.tick();
-    const events = host.out.flatMap((m) => (m.type === 'simEvents' ? m.events : []));
-    expect(events.map((e) => e.kind)).not.toContain('collapse');
-    expect(events.map((e) => e.kind)).toEqual(expect.arrayContaining(['loose', 'land']));
-    await host.send({ type: 'flush' });
-    expect(host.last('saved')?.chunks).toBeGreaterThan(0);
+    for (let t = 0; t < 3 * tuning.sim.ticksPerSecond; t++) host.host.tick();
+    const changed = host.out.flatMap((m) => (m.type === 'tilesChanged' ? m.changes : []));
+    expect(changed).toEqual([{ x: 104, y: 62, material: materials.air.numId }]);
+    await host.send({ type: 'requestChunks', chunks: [[3, 1]] });
+    const chunk = host.last('chunk')!.chunk;
+    const at = (x: number, y: number) => chunk.material[(y - CHUNK_SIZE) * CHUNK_SIZE + x - 96]!;
+    expect(at(104, 61)).toBe(materials.require('sand').numId);
   });
 
   it('warms the tiles around lava and streams temperature changes', async () => {

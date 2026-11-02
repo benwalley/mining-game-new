@@ -23,11 +23,9 @@ export interface FluidReaction {
 
 /**
  * World events the sim reports for feedback: lava quenched; firedamp ignited;
- * gas hissing out of a dug-open pocket; a ceiling tile starts to fail (and
- * keeps shedding dust); it collapses; loose sand starts to slip; a falling
- * tile lands.
+ * gas hissing out of a dug-open pocket.
  */
-export type SimEventKind = 'quench' | 'ignite' | 'vent' | 'creak' | 'collapse' | 'loose' | 'land';
+export type SimEventKind = 'quench' | 'ignite' | 'vent';
 
 export type FluidKind = 'liquid' | 'gas';
 

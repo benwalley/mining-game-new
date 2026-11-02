@@ -8,7 +8,7 @@ import type { SimEventKind } from '@/content/fluids';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -36,10 +36,6 @@ export interface TileChange {
   x: number;
   y: number;
   material: number;
-  /** Set when the change also sets damage (cracks while a ceiling fails). */
-  damage?: number;
-  /** What the tile remembers being (rubble). */
-  origin?: number;
 }
 
 export interface DamageChange {
@@ -77,8 +73,6 @@ export interface SimEvent {
   kind: SimEventKind;
   x: number;
   y: number;
-  /** The material involved, when there is one (what collapsed or landed). */
-  material?: number;
 }
 
 export type ToSim =
@@ -113,7 +107,6 @@ export type FromSim =
       tickMs: number;
       tickMsMax: number;
       awakeTiles: number;
-      solidsActive: number;
       /** Chunks whose heat is still changing. */
       heatChunks: number;
       /** Chunks the sim holds in memory. */

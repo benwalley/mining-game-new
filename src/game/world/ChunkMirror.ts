@@ -85,14 +85,10 @@ export class ChunkMirror {
     for (const l of this.listeners) l.chunkUnloaded(cx, cy);
   }
 
-  setMaterial(x: number, y: number, material: number, origin = 0): void {
-    if (this.store.materialAt(x, y) === material && this.store.originAt(x, y) === origin) return;
-    if (!this.store.setMaterial(x, y, material, origin)) return;
+  setMaterial(x: number, y: number, material: number): void {
+    if (this.store.materialAt(x, y) === material) return;
+    if (!this.store.setMaterial(x, y, material)) return;
     for (const l of this.listeners) l.tileChanged(x, y);
-  }
-
-  originAt(x: number, y: number): number {
-    return this.store.originAt(x, y);
   }
 
   damageAt(x: number, y: number): number {
@@ -109,12 +105,7 @@ export class ChunkMirror {
   }
 
   applyChanges(changes: readonly TileChange[]): void {
-    for (const c of changes) {
-      this.setMaterial(c.x, c.y, c.material, c.origin ?? 0);
-      if (c.damage !== undefined && this.store.damageAt(c.x, c.y) !== c.damage) {
-        this.setDamage(c.x, c.y, c.damage, true);
-      }
-    }
+    for (const c of changes) this.setMaterial(c.x, c.y, c.material);
   }
 
   applyFluids(patches: readonly FluidPatch[]): void {

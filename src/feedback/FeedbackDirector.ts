@@ -9,15 +9,11 @@ import type { AudioService } from './AudioService';
 import type { Haptics } from './haptics';
 
 /**
- * Minimum gap between repeats of a sound. Quenching, creaking and landing can
+ * Minimum gap between repeats of a sound. Quenching and igniting can
  * happen dozens of times a tick; one per window is plenty.
  */
 const SOUND_GAP_MS = {
   hiss: 90,
-  creak: 300,
-  rumble: 150,
-  thud: 70,
-  trickle: 150,
   whoomph: 250,
   vent: 400,
 };
@@ -102,26 +98,6 @@ export class FeedbackDirector {
     });
     events.on('vent', () => this.throttled('vent', () => this.audio.vent()));
     events.on('quench', () => this.throttled('hiss', () => this.audio.hiss()));
-    events.on('creak', (e) => {
-      this.throttled('creak', () => this.audio.creak());
-      // Dust sifting down from the failing tile.
-      this.dust(e.x + 0.5, e.y + 1, e.material, 2);
-    });
-    events.on('collapse', (e) => {
-      this.throttled('rumble', () => {
-        this.audio.rumble();
-        this.haptics.pulse();
-      });
-      if (e.material !== undefined) this.debris(e.x, e.y, e.material, 6, 3);
-    });
-    events.on('loose', (e) => {
-      this.throttled('trickle', () => this.audio.trickle());
-      this.dust(e.x + 0.5, e.y + 1, e.material, 4);
-    });
-    events.on('land', (e) => {
-      this.throttled('thud', () => this.audio.thud());
-      this.dust(e.x + 0.5, e.y + 1, e.material, 3);
-    });
   }
 
   private throttled(sound: keyof typeof SOUND_GAP_MS, play: () => void): void {
@@ -129,12 +105,6 @@ export class FeedbackDirector {
     if (now - (this.lastSoundAt.get(sound) ?? -Infinity) < SOUND_GAP_MS[sound]) return;
     this.lastSoundAt.set(sound, now);
     play();
-  }
-
-  /** A few slow motes drifting down. */
-  private dust(x: number, y: number, material: number | undefined, count: number): void {
-    const color = material === undefined ? palette.fog : this.materials.colorOf(material, 'light');
-    this.particles.burst(x, y, count, [color, palette.fog], { speed: 0.8, life: 0.7, dirY: 1 });
   }
 
   private debris(

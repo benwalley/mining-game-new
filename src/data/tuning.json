@@ -93,14 +93,6 @@
     "drownDamagePerSecond": 12,
     "hurtEventInterval": 0.4
   },
-  "support": {
-    "ceilingsCollapse": false,
-    "failSeconds": 2.5,
-    "chainFailSeconds": 0.6,
-    "looseSeconds": 0.4,
-    "dustEverySeconds": 0.35,
-    "fallHitDamage": 15
-  },
   "heat": {
     "rate": 0.25,
     "loss": 0.025,

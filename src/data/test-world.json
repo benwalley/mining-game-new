@@ -192,14 +192,6 @@
       "label": "lava basin in the chamber floor"
     },
     {
-      "op": "carve",
-      "x": 100,
-      "y": 34,
-      "w": 14,
-      "h": 3,
-      "label": "wide flat room in dirt (cave-in test)"
-    },
-    {
       "op": "pool",
       "fluid": "spore-gas",
       "x": 87,
@@ -233,23 +225,6 @@
       "w": 2,
       "h": 3,
       "label": "near spawn: lava behind the firedamp room's east wall (dig right from the floor)"
-    },
-    {
-      "op": "carve",
-      "x": 117,
-      "y": 24,
-      "w": 5,
-      "h": 3,
-      "label": "near spawn: pit under a sand slab"
-    },
-    {
-      "op": "fill",
-      "material": "sand",
-      "x": 117,
-      "y": 23,
-      "w": 5,
-      "h": 1,
-      "label": "near spawn: sand slab over the pit (dig any of it and it drops)"
     },
     {
       "op": "pool",

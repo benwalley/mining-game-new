@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "numId is persisted in saves and must never change or be reused. conductivity (1-10) is how fast heat passes through a tile; the design doc gives no values, so these are proposals (metals high, loose or fibrous stuff low, obsidian insulates). light (0-15) is how much a tile glows; omitted means 0. slate, mudstone, basalt and elderstone are proposed base rocks for the deeper layers (not in the design doc).",
+  "notes": "numId is persisted in saves and must never change or be reused. conductivity (1-10) is how fast heat passes through a tile; the design doc gives no values, so these are proposals (metals high, loose or fibrous stuff low, obsidian insulates). light (0-15) is how much a tile glows; omitted means 0. slate, mudstone, basalt and elderstone are proposed base rocks for the deeper layers (not in the design doc). Retired numIds, never to be reused: 22 (rubble) and 23 (flowstone), from cave-ins, which were dropped.",
   "materials": [
     {
       "numId": 0,
@@ -12,7 +12,6 @@
       "weight": 0,
       "heatLimit": 10,
       "conductivity": 3,
-      "supportSpan": 0,
       "fuel": 0,
       "trait": null,
       "visual": null
@@ -28,7 +27,6 @@
       "weight": 10,
       "heatLimit": 10,
       "conductivity": 5,
-      "supportSpan": 99,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -48,7 +46,6 @@
       "weight": 3,
       "heatLimit": 9,
       "conductivity": 3,
-      "supportSpan": 2,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -68,9 +65,8 @@
       "weight": 4,
       "heatLimit": 6,
       "conductivity": 2,
-      "supportSpan": 0,
       "fuel": 0,
-      "trait": "falls",
+      "trait": null,
       "visual": {
         "base": "sand",
         "dark": "soilLight",
@@ -88,7 +84,6 @@
       "weight": 4,
       "heatLimit": 8,
       "conductivity": 3,
-      "supportSpan": 3,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -108,7 +103,6 @@
       "weight": 2,
       "heatLimit": 3,
       "conductivity": 2,
-      "supportSpan": 4,
       "fuel": 5,
       "trait": "flexible",
       "visual": {
@@ -128,7 +122,6 @@
       "weight": 6,
       "heatLimit": 8,
       "conductivity": 5,
-      "supportSpan": 5,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -148,7 +141,6 @@
       "weight": 3,
       "heatLimit": 2,
       "conductivity": 3,
-      "supportSpan": 3,
       "fuel": 9,
       "trait": null,
       "visual": {
@@ -170,7 +162,6 @@
       "weight": 6,
       "heatLimit": 5,
       "conductivity": 9,
-      "supportSpan": 6,
       "fuel": 0,
       "trait": "conductive",
       "visual": {
@@ -192,7 +183,6 @@
       "weight": 5,
       "heatLimit": 3,
       "conductivity": 7,
-      "supportSpan": 4,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -214,7 +204,6 @@
       "weight": 3,
       "heatLimit": 8,
       "conductivity": 4,
-      "supportSpan": 3,
       "fuel": 0,
       "trait": "clear",
       "visual": {
@@ -235,7 +224,6 @@
       "weight": 8,
       "heatLimit": 7,
       "conductivity": 7,
-      "supportSpan": 8,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -257,7 +245,6 @@
       "weight": 1,
       "heatLimit": 2,
       "conductivity": 2,
-      "supportSpan": 0,
       "fuel": 3,
       "trait": "glows",
       "visual": {
@@ -279,7 +266,6 @@
       "weight": 1,
       "heatLimit": 3,
       "conductivity": 1,
-      "supportSpan": 0,
       "fuel": 2,
       "trait": "flexible",
       "visual": {
@@ -299,7 +285,6 @@
       "weight": 7,
       "heatLimit": 10,
       "conductivity": 1,
-      "supportSpan": 6,
       "fuel": 0,
       "trait": "insulating",
       "visual": {
@@ -320,7 +305,6 @@
       "weight": 2,
       "heatLimit": 10,
       "conductivity": 4,
-      "supportSpan": 2,
       "fuel": 10,
       "trait": "volatile",
       "visual": {
@@ -342,7 +326,6 @@
       "weight": 9,
       "heatLimit": 4,
       "conductivity": 8,
-      "supportSpan": 3,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -364,7 +347,6 @@
       "weight": 2,
       "heatLimit": 9,
       "conductivity": 6,
-      "supportSpan": 10,
       "fuel": 0,
       "trait": "attuned",
       "visual": {
@@ -385,7 +367,6 @@
       "weight": 6,
       "heatLimit": 8,
       "conductivity": 5,
-      "supportSpan": 7,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -405,7 +386,6 @@
       "weight": 5,
       "heatLimit": 7,
       "conductivity": 4,
-      "supportSpan": 3,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -425,7 +405,6 @@
       "weight": 8,
       "heatLimit": 9,
       "conductivity": 5,
-      "supportSpan": 8,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -445,7 +424,6 @@
       "weight": 7,
       "heatLimit": 10,
       "conductivity": 6,
-      "supportSpan": 9,
       "fuel": 0,
       "trait": null,
       "visual": {
@@ -454,46 +432,6 @@
         "light": "elderLight",
         "accent": "violet",
         "pattern": "crystal"
-      }
-    },
-    {
-      "numId": 22,
-      "key": "rubble",
-      "name": "Rubble",
-      "solid": true,
-      "hardness": 1,
-      "toughness": 1,
-      "weight": 5,
-      "heatLimit": 8,
-      "conductivity": 2,
-      "supportSpan": 0,
-      "fuel": 0,
-      "trait": "falls",
-      "visual": {
-        "base": "stone",
-        "dark": "coal",
-        "light": "pebble",
-        "pattern": "rubble"
-      }
-    },
-    {
-      "numId": 23,
-      "key": "flowstone",
-      "name": "Flowstone",
-      "solid": true,
-      "hardness": 5,
-      "toughness": 6,
-      "weight": 6,
-      "heatLimit": 9,
-      "conductivity": 5,
-      "supportSpan": 14,
-      "fuel": 0,
-      "trait": null,
-      "visual": {
-        "base": "pebble",
-        "dark": "stone",
-        "light": "bone",
-        "pattern": "smooth"
       }
     }
   ]
