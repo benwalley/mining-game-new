@@ -5,7 +5,7 @@ import { palette } from '@/content/palette';
 import type { CameraTuning, HeatTuning, LightTuning } from '@/content/tuning';
 import type { LightView } from '@/game/light/LightField';
 import { fluidAmount, fluidType, type ChunkMirror } from '@/game/world/ChunkMirror';
-import type { GhostBlock, RenderFrame, Renderer } from '../Renderer';
+import type { GhostBlock, RenderFrame, Renderer, TileTint } from '../Renderer';
 import { ChunkCache } from './ChunkCache';
 import { createSurface, type Ctx2D, type Surface } from './surface';
 import { drawPlayer } from './playerSprite';
@@ -179,8 +179,24 @@ export class CanvasRenderer implements Renderer {
       ctx.restore();
     }
 
+    if (frame.tint) this.drawTint(frame.tint, ox, oy, tile);
     if (frame.ghost) this.drawGhost(frame.ghost, ox, oy, tile);
     if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+  }
+
+  /** A faint blue wash on every tile a block could go on. */
+  private drawTint(t: TileTint, ox: number, oy: number, tile: number): void {
+    const { ctx } = this;
+    const w = t.view.x1 - t.view.x0;
+    ctx.fillStyle = palette.sky;
+    ctx.globalAlpha = 0.16;
+    for (let i = 0; i < t.mask.length; i++) {
+      if (!t.mask[i]) continue;
+      const x = t.view.x0 + (i % w);
+      const y = t.view.y0 + Math.floor(i / w);
+      ctx.fillRect(Math.round(ox + x * tile), Math.round(oy + y * tile), tile, tile);
+    }
+    ctx.globalAlpha = 1;
   }
 
   private drawGhost(g: GhostBlock, ox: number, oy: number, tile: number): void {

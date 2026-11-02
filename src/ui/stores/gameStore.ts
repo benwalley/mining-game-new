@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import type { FanSlot } from '@/game/pack/fanLayout';
+import { MODES, type Mode } from '@/game/pack/modes';
 
 /** UI-facing game state. The game writes these at a low rate; Preact components read them. */
 
@@ -90,10 +91,22 @@ export interface FanView {
   open: boolean;
   slots: FanSlot[];
   hover: number | null;
-  /** A ghost block is being aimed; the fan dims. */
-  ghosting: boolean;
 }
 
-export const fanView = signal<FanView>({ open: false, slots: [], hover: null, ghosting: false });
+export const fanView = signal<FanView>({ open: false, slots: [], hover: null });
+
+export interface ModeView {
+  mode: Mode;
+  /** While the button is being scrubbed: the mode a release would pick. */
+  preview: Mode | null;
+  modes: readonly Mode[];
+  /** Counts up each time a tap finds nothing to place, to pulse the button. */
+  pulse: number;
+}
+
+export const modeView = signal<ModeView>({ mode: 'dig', preview: null, modes: MODES, pulse: 0 });
+
+/** Set for the undo window after a block is placed; `id` changes each time, to restart the ring. */
+export const undoView = signal<{ id: number; ms: number } | null>(null);
 /** The full-screen pack. */
 export const sheetOpen = signal(false);

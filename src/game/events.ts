@@ -10,6 +10,10 @@ export interface GameEvents {
   packFull: { x: number; y: number; material: number };
   /** The player put a block into the world. */
   placed: { x: number; y: number; material: number };
+  /** The player took the last placed block back. */
+  unplaced: { x: number; y: number; material: number };
+  /** A tap or release on a tile that can't take a block. */
+  placeDenied: { x: number; y: number };
   /** The ghost block moved onto a new tile. */
   ghostStep: Record<string, never>;
   jumped: Record<string, never>;

@@ -182,7 +182,16 @@ export class Game {
           y1: Math.ceil(this.camera.y + v.h / 2),
         };
       },
+      tileAt: (cssX, cssY) => {
+        const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
+        return { x: Math.floor(t.x), y: Math.floor(t.y) };
+      },
       onPausedChange: () => this.syncSimPause(),
+      onModeChange: (mode) => {
+        // Leaving dig mode saves a half-dug tile; build mode turns touches on the world into placing.
+        this.dig.flush();
+        this.pointer.setBuildMode(mode === 'build' ? tuning.placing.holdMs : null);
+      },
     });
     this.particles = new Particles(256, createRng(`fx/${world.seed}`), tuning.fx.particleGravity);
     this.haptics = createHaptics();
@@ -200,6 +209,9 @@ export class Game {
       onGesture: () => this.audio.unlock(),
       onTap: (x, y) => this.onTap(x, y),
       onLongPress: (x, y) => this.inspectAt(x, y),
+      onHold: (x, y) => this.packCtl.holdStart(x, y),
+      onHoldMove: (x, y) => this.packCtl.holdMove(x, y),
+      onHoldEnd: (x, y, commit) => this.packCtl.holdEnd(x, y, commit),
     });
     this.keyboard = new KeyboardInput(
       window,
@@ -224,7 +236,7 @@ export class Game {
         this.mirror.addChunk(chunk);
       }),
       sim.on('tilesChanged', ({ changes }) => this.mirror.applyChanges(changes)),
-      sim.on('placeRejected', ({ material }) => this.packCtl.refund(material)),
+      sim.on('placeRejected', ({ x, y, material }) => this.packCtl.refund(x, y, material)),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
       sim.on('heatChanged', ({ patches }) => this.mirror.applyHeat(patches)),
       sim.on('simEvents', ({ events }) => {
@@ -359,7 +371,8 @@ export class Game {
       setButton: (center) => this.packCtl.setButton(center),
       down: (p) => g.down(p, performance.now()),
       move: (p) => g.move(p),
-      up: (p) => g.up(p),
+      up: () => g.up(),
+      undo: () => this.packCtl.undo(),
       cancel: () => g.cancel(),
       tick: () => g.tick(performance.now()),
       closeSheet: () => this.packCtl.closeSheet(),
@@ -392,13 +405,13 @@ export class Game {
     this.packCtl.update();
     // The fan and the full pack freeze the world; only the ghost and the UI keep moving.
     if (this.packCtl.isPaused) {
+      this.particles.update(dt, solid);
       this.syncPlayer(false);
       this.updateHud();
       return;
     }
     if (this.worldReadyAroundPlayer()) {
       const intent = this.intent();
-      this.packCtl.noteMovement(Math.hypot(intent.x, intent.y) > 0);
       this.player.speedScale = this.pack.speedFactor;
       this.player.jumpScale = this.pack.jumpFactor;
       const contact = this.controller.sense(this.player, solid, this.mirror.fluidAt);
@@ -433,9 +446,10 @@ export class Game {
   }
 
   private onTap(cssX: number, cssY: number): void {
+    // In build mode every tap on the world is for placing.
+    if (this.packCtl.building) return this.packCtl.tapWorld(cssX, cssY);
     if (this.packCtl.isPaused) return;
     const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
-    if (this.packCtl.tap(Math.floor(t.x), Math.floor(t.y))) return;
     // No other context actions yet (talk, use); debug can pour fluid.
     const pour = debugPour.value;
     if (pour === 'off') return;
@@ -529,6 +543,7 @@ export class Game {
       },
       particles: this.particles,
       ghost: this.packCtl.ghost,
+      tint: this.packCtl.tint,
       light: debugLighting.value ? this.light.view : null,
       time: performance.now() / 1000,
       debug: { grid: debugGrid.value, heat: debugHeat.value },
@@ -595,6 +610,9 @@ export class Game {
     if (code === 'BracketRight') this.setToolPower(this.dig.toolPower + 1);
     if (code === 'BracketLeft') this.setToolPower(this.dig.toolPower - 1);
     if (code === 'KeyP') this.cyclePour();
+    if (code === 'KeyB') this.packCtl.setMode(this.packCtl.building ? 'dig' : 'build');
+    if (code === 'Escape') this.packCtl.setMode('dig');
+    if (code === 'KeyU') this.packCtl.undo();
   }
 
   /** Debug: what a tap pours: nothing, then each fluid in turn. */

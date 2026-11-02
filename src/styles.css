@@ -130,8 +130,15 @@ body {
   place-items: center;
   border-radius: 50%;
   background: var(--panel);
+  border: 2.5px solid var(--bone);
   touch-action: none;
-  transition: transform 0.2s;
+  transition:
+    transform 0.2s,
+    border-color 0.2s;
+}
+
+.pack-button.mode-build {
+  border-color: #8fc8e8;
 }
 
 .pack-ring {
@@ -189,10 +196,6 @@ body {
   inset: 0;
   pointer-events: none;
   transition: opacity 0.15s;
-}
-
-.fan.dim {
-  opacity: 0.3;
 }
 
 .fan-slot {
@@ -320,4 +323,131 @@ body {
 
 .sheet button:active:not(:disabled) {
   background: #4a4550;
+}
+
+/* Modes: the tag, the scrub rail, the undo chip */
+
+.mode-tag {
+  position: absolute;
+  left: calc(env(safe-area-inset-left) + 14px);
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  padding: 4px 10px;
+  border: 1px solid #8fc8e8;
+  border-radius: 8px;
+  background: var(--panel);
+  color: #8fc8e8;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.mode-rail {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 20px);
+  bottom: calc(env(safe-area-inset-bottom) + 82px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.mode-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid #4a4550;
+  border-radius: 50%;
+  background: var(--panel);
+  transition: transform 0.1s;
+}
+
+.mode-chip.picked {
+  border-color: #8fc8e8;
+  transform: scale(1.14);
+}
+
+.mode-glyph {
+  fill: none;
+  stroke: var(--bone);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mode-label {
+  position: absolute;
+  right: 54px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* The chip is 86 px wide and centered 81 px left of the pack button (see UNDO_CHIP_DX_PX). */
+.undo-chip {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 80px);
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 86px;
+  height: 40px;
+  border: 1.5px solid var(--bone);
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--bone);
+  font: inherit;
+  font-size: 14px;
+  touch-action: none;
+}
+
+.undo-track,
+.undo-ring {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.undo-track {
+  stroke: #4a4550;
+}
+
+.undo-ring {
+  stroke: var(--bone);
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: undo-count linear forwards;
+}
+
+@keyframes undo-count {
+  to {
+    stroke-dashoffset: 56.55px;
+  }
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid #ff8a3a;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: pack-pulse 0.4s ease-out forwards;
+}
+
+@keyframes pack-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
 }

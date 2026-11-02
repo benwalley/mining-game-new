@@ -3,45 +3,53 @@ import tuningData from '@/data/tuning.json';
 import { PackGesture } from './PackGesture';
 
 const BUTTON = { x: 300, y: 500 };
-// With the default tuning the first slots sit about here, along the arc up and left of the button.
+// With the default tuning the first fan entries sit about here, along the arc up and left of the button.
 const SLOT = [
-  { x: 300, y: 372 },
-  { x: 252, y: 381 },
-  { x: 211, y: 408 },
-  { x: 183, y: 448 },
+  { x: 234, y: 386 },
+  { x: 199, y: 415 },
+  { x: 176, y: 455 },
+  { x: 168, y: 500 },
 ];
 
-function setup(entries = 4, ghostOk = true) {
+function setup(entries = 4, modes = 3) {
   const calls: string[] = [];
   const g = new PackGesture(tuningData.placing, {
+    nextMode: () => calls.push('nextMode'),
+    scrub: (i) => calls.push(`scrub ${i}`),
+    scrubEnd: (i) => calls.push(`scrubEnd ${i}`),
     openFan: () => calls.push('openFan'),
     closeFan: () => calls.push('closeFan'),
     openSheet: () => calls.push('openSheet'),
     pick: (i) => calls.push(`pick ${i}`),
-    ghostStart: (i) => {
-      calls.push(`ghostStart ${i}`);
-      return ghostOk;
-    },
-    ghostMove: (dx, dy) => calls.push(`ghostMove ${dx},${dy}`),
-    ghostEnd: (commit) => calls.push(`ghostEnd ${commit}`),
     changed: () => {},
   });
   g.setLayout(BUTTON, entries);
+  g.setModes(0, modes);
   const tap = (p: { x: number; y: number }) => {
     g.down(p, 0);
-    g.up(p);
+    g.up();
   };
-  return { g, calls, tap };
+  /** A swipe left far enough to open the fan, ending at `to`. */
+  const swipeOut = (to: { x: number; y: number }) => {
+    g.down(BUTTON, 0);
+    g.move({ x: BUTTON.x - 20, y: BUTTON.y });
+    g.move(to);
+  };
+  return { g, calls, tap, swipeOut };
 }
 
 describe('PackGesture', () => {
-  it('opens the fan on a tap and closes it on another', () => {
-    const { g, calls, tap } = setup();
+  it('goes to the next mode on a tap, and a tap with the fan open closes the fan', () => {
+    const { g, calls, tap, swipeOut } = setup();
     tap(BUTTON);
-    expect(g.fanOpen).toBe(true);
-    tap(BUTTON);
+    expect(calls).toEqual(['nextMode']);
     expect(g.fanOpen).toBe(false);
-    expect(calls).toEqual(['openFan', 'closeFan']);
+
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    tap(BUTTON);
+    expect(calls).toEqual(['nextMode', 'openFan', 'closeFan']);
+    expect(g.fanOpen).toBe(false);
   });
 
   it('ignores touches that miss the button while the fan is closed', () => {
@@ -50,115 +58,136 @@ describe('PackGesture', () => {
     expect(g.phase).toBe('idle');
   });
 
-  it('picks the entry the finger lets go over after a swipe out', () => {
+  it('scrubs forward going up and back going down, wrapping around', () => {
     const { g, calls } = setup();
     g.down(BUTTON, 0);
-    g.move(SLOT[0]!);
-    g.move(SLOT[1]!);
+    g.move({ x: BUTTON.x, y: BUTTON.y - 40 }); // One step up.
+    g.move({ x: BUTTON.x + 3, y: BUTTON.y - 80 }); // Two steps.
+    g.up();
+    expect(calls).toEqual(['scrub 0', 'scrub 1', 'scrub 2', 'scrubEnd 2']);
+
+    const down = setup();
+    down.g.down(BUTTON, 0);
+    down.g.move({ x: BUTTON.x, y: BUTTON.y + 40 }); // One step back wraps to the last mode.
+    down.g.up();
+    expect(down.calls).toEqual(['scrub 0', 'scrub 2', 'scrubEnd 2']);
+  });
+
+  it('wraps a long scrub past the end', () => {
+    const { g, calls } = setup(4, 2);
+    g.down(BUTTON, 0);
+    g.move({ x: BUTTON.x, y: BUTTON.y - 150 }); // Four steps on two modes is back where it began.
+    g.up();
+    expect(calls.at(-1)).toBe('scrubEnd 0');
+  });
+
+  it('cancels a scrub without picking anything', () => {
+    const { g, calls } = setup();
+    g.down(BUTTON, 0);
+    g.move({ x: BUTTON.x, y: BUTTON.y - 40 });
+    g.cancel();
+    expect(calls.at(-1)).toBe('scrubEnd null');
+  });
+
+  it('opens the fan on a swipe left and picks the entry the finger lets go over', () => {
+    const { g, calls, swipeOut } = setup();
+    swipeOut(SLOT[1]!);
     expect(g.fanOpen).toBe(true);
     expect(g.hover).toBe(1);
-    g.up(SLOT[1]!);
+    g.up();
     expect(calls).toEqual(['openFan', 'pick 1']);
     expect(g.fanOpen).toBe(false);
   });
 
   it('leaves the fan open when the finger lets go away from every entry', () => {
-    const { g, calls } = setup();
-    g.down(BUTTON, 0);
-    g.move({ x: 280, y: 440 });
-    g.up({ x: 280, y: 440 });
+    const { g, calls, swipeOut } = setup();
+    swipeOut({ x: 270, y: 470 });
+    g.up();
     expect(calls).toEqual(['openFan']);
     expect(g.fanOpen).toBe(true);
   });
 
-  it('opens the full pack when swiping out with the fan already open', () => {
-    const { g, calls, tap } = setup();
-    tap(BUTTON);
+  it('does nothing on a swipe to the right', () => {
+    const { g, calls } = setup();
     g.down(BUTTON, 0);
-    g.move(SLOT[1]!);
-    g.up(SLOT[1]!);
+    g.move({ x: BUTTON.x + 30, y: BUTTON.y });
+    g.up();
+    expect(calls).toEqual([]);
+    expect(g.fanOpen).toBe(false);
+  });
+
+  it('opens the full pack when swiping left with the fan already open', () => {
+    const { g, calls, tap, swipeOut } = setup();
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    swipeOut(SLOT[1]!);
+    g.up();
     expect(calls).toEqual(['openFan', 'openSheet']);
     expect(g.fanOpen).toBe(false);
+    void tap;
   });
 
-  it('starts a ghost on a hold, follows the finger, and places on release', () => {
+  it('closes the fan and scrubs when swiping up with the fan open', () => {
+    const { g, calls, swipeOut } = setup();
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    g.down(BUTTON, 0);
+    g.move({ x: BUTTON.x, y: BUTTON.y - 40 });
+    g.up();
+    expect(calls).toEqual(['openFan', 'closeFan', 'scrub 0', 'scrub 1', 'scrubEnd 1']);
+    expect(g.fanOpen).toBe(false);
+  });
+
+  it('opens the full pack on a hold, and a quick press is only a tap', () => {
     const { g, calls } = setup();
     g.down(BUTTON, 0);
-    g.tick(100);
+    g.tick(300);
     expect(g.phase).toBe('pressButton');
-    g.tick(300);
-    expect(g.ghosting).toBe(true);
-    g.move({ x: BUTTON.x - 56, y: BUTTON.y + 28 });
-    g.up({ x: BUTTON.x - 56, y: BUTTON.y + 28 });
-    expect(calls).toEqual(['ghostStart null', 'ghostMove -56,28', 'ghostEnd true']);
+    g.tick(400);
+    g.up();
+    expect(calls).toEqual(['openSheet']);
+
+    const quick = setup();
+    quick.g.down(BUTTON, 0);
+    quick.g.tick(200);
+    quick.g.up();
+    expect(quick.calls).toEqual(['nextMode']);
   });
 
-  it('cancels the ghost when the finger lets go back on the button', () => {
-    const { g, calls } = setup();
-    g.down(BUTTON, 0);
-    g.tick(300);
-    g.move({ x: BUTTON.x - 80, y: BUTTON.y });
-    g.move(BUTTON);
-    g.up(BUTTON);
-    expect(calls.at(-1)).toBe('ghostEnd false');
-  });
-
-  it('holding an entry in the open fan starts its ghost', () => {
-    const { g, calls, tap } = setup();
-    tap(BUTTON);
-    g.down(SLOT[2]!, 1000);
-    g.tick(1300);
-    g.up({ x: 100, y: 300 });
-    expect(calls).toEqual(['openFan', 'ghostStart 2', 'ghostEnd true']);
-    expect(g.fanOpen).toBe(false);
-  });
-
-  it('does nothing on a hold when there is nothing to place', () => {
-    const { g, calls } = setup(4, false);
-    g.down(BUTTON, 0);
-    g.tick(300);
-    g.up(BUTTON);
-    expect(calls).toEqual(['ghostStart null']);
-    expect(g.fanOpen).toBe(false);
-  });
-
-  it('opens the full pack when its entry is picked or held', () => {
-    const { g, calls, tap } = setup();
-    tap(BUTTON);
+  it('picks a tapped entry, and the last entry is for the pack to handle', () => {
+    const { g, calls, tap, swipeOut } = setup();
+    swipeOut({ x: 100, y: 300 });
+    g.up();
     tap(SLOT[3]!); // The last of four entries.
     expect(calls).toEqual(['openFan', 'pick 3']);
-
-    const held = setup();
-    held.tap(BUTTON);
-    held.g.down(SLOT[3]!, 0);
-    held.g.tick(300);
-    expect(held.calls).toEqual(['openFan', 'openSheet']);
     expect(g.fanOpen).toBe(false);
   });
 
   it('closes the fan on a tap outside it', () => {
-    const { g, calls, tap } = setup();
-    tap(BUTTON);
+    const { g, calls, tap, swipeOut } = setup();
+    swipeOut({ x: 100, y: 300 });
+    g.up();
     tap({ x: 40, y: 40 });
     expect(calls).toEqual(['openFan', 'closeFan']);
     expect(g.fanOpen).toBe(false);
   });
 
   it('scrolls when dragged along the arc, and stays within the entries', () => {
-    const { g, tap } = setup(10);
-    tap(BUTTON);
-    g.down({ x: 211, y: 408 }, 0);
-    g.move({ x: 222, y: 402 });
-    g.move({ x: 300, y: 372 });
-    g.up({ x: 300, y: 372 });
+    const { g, swipeOut } = setup(10);
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    g.down(SLOT[2]!, 0);
+    g.move({ x: 190, y: 440 });
+    g.move(SLOT[0]!);
+    g.up();
     expect(g.fanOpen).toBe(true);
-    expect(g.scroll).toBeGreaterThan(1.5);
-    expect(g.scroll).toBeLessThan(2);
+    expect(g.scroll).toBeGreaterThan(1.4);
+    expect(g.scroll).toBeLessThan(1.8);
 
-    g.down({ x: 300, y: 372 }, 0);
-    g.move({ x: 285, y: 373 });
-    g.move({ x: 100, y: 450 });
-    g.up({ x: 100, y: 450 });
+    g.down({ x: 234, y: 386 }, 0);
+    g.move({ x: 222, y: 392 });
+    g.move({ x: 100, y: 455 });
+    g.up();
     expect(g.scroll).toBe(0);
   });
 });

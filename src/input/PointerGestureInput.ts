@@ -5,6 +5,11 @@ export interface GestureHandlers {
   /** Quick touch with little movement. Position in CSS pixels relative to the element. */
   onTap(x: number, y: number): void;
   onLongPress(x: number, y: number): void;
+  /** Build mode only: the finger has been held still long enough; it now drags something. */
+  onHold(x: number, y: number): void;
+  onHoldMove(x: number, y: number): void;
+  /** The held finger lifted (`commit`) or the browser took the touch away. */
+  onHoldEnd(x: number, y: number, commit: boolean): void;
   /** First user gesture: the moment browsers allow audio to start. */
   onGesture(): void;
 }
@@ -24,6 +29,9 @@ export class PointerGestureInput {
   private movedFar = false;
   private longPressTimer: ReturnType<typeof setTimeout> | undefined;
   private longPressFired = false;
+  /** Build mode: the hold time, and whether a hold is being dragged right now. */
+  private buildHoldMs: number | null = null;
+  private holdActive = false;
 
   constructor(
     private readonly element: HTMLElement,
@@ -37,13 +45,25 @@ export class PointerGestureInput {
     element.addEventListener('contextmenu', preventDefault);
   }
 
+  /**
+   * In build mode (a hold time) the world no longer moves the player: taps still
+   * arrive as taps, and a hold becomes a drag. Pass null to go back to digging.
+   */
+  setBuildMode(holdMs: number | null): void {
+    if (this.holdActive) this.handlers.onHoldEnd(this.curX, this.curY, false);
+    this.holdActive = false;
+    this.buildHoldMs = holdMs;
+  }
+
   get active(): boolean {
     return this.pointerId !== null;
   }
 
   /** Current movement intent. Zero inside the dead zone; full speed at `fullSpeedPx`. */
   intent(): MoveIntent {
-    if (this.pointerId === null || this.longPressFired) return { x: 0, y: 0 };
+    if (this.pointerId === null || this.longPressFired || this.buildHoldMs !== null) {
+      return { x: 0, y: 0 };
+    }
     const dx = this.curX - this.originX;
     const dy = this.curY - this.originY;
     const len = Math.hypot(dx, dy);
@@ -82,8 +102,13 @@ export class PointerGestureInput {
     this.longPressTimer = setTimeout(() => {
       if (this.pointerId === null || this.movedFar) return;
       this.longPressFired = true;
-      this.handlers.onLongPress(this.originX, this.originY);
-    }, this.tuning.longPressMs);
+      if (this.buildHoldMs !== null) {
+        this.holdActive = true;
+        this.handlers.onHold(this.originX, this.originY);
+      } else {
+        this.handlers.onLongPress(this.originX, this.originY);
+      }
+    }, this.buildHoldMs ?? this.tuning.longPressMs);
   };
 
   private readonly onMove = (e: PointerEvent): void => {
@@ -93,6 +118,7 @@ export class PointerGestureInput {
     const { x, y } = this.local(latest);
     this.curX = x;
     this.curY = y;
+    if (this.holdActive) this.handlers.onHoldMove(x, y);
     if (Math.hypot(x - this.originX, y - this.originY) > this.tuning.tapMaxMovePx) {
       this.movedFar = true;
     }
@@ -100,6 +126,11 @@ export class PointerGestureInput {
 
   private readonly onUp = (e: PointerEvent): void => {
     if (e.pointerId !== this.pointerId) return;
+    if (this.holdActive) {
+      const { x, y } = this.local(e);
+      this.holdActive = false;
+      this.handlers.onHoldEnd(x, y, true);
+    }
     const isTap =
       !this.movedFar && !this.longPressFired && e.timeStamp - this.downAt < this.tuning.tapMaxMs;
     if (isTap) this.handlers.onTap(this.originX, this.originY);
@@ -107,7 +138,12 @@ export class PointerGestureInput {
   };
 
   private readonly onCancel = (e: PointerEvent): void => {
-    if (e.pointerId === this.pointerId) this.release();
+    if (e.pointerId !== this.pointerId) return;
+    if (this.holdActive) {
+      this.holdActive = false;
+      this.handlers.onHoldEnd(this.curX, this.curY, false);
+    }
+    this.release();
   };
 
   private release(): void {

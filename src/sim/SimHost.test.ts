@@ -106,6 +106,45 @@ describe.each([
     });
   });
 
+  it('undoes a placement, putting back the fluid it pushed out', async () => {
+    const store = await makeStore();
+    const worldId = `${WORLD}-unplace`;
+    const host = createHost(store);
+    await host.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const stone = materials.require('stone').numId;
+    const water = fluids.require('water').id;
+    await host.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+    await host.send({ type: 'pourFluid', x: spawn.x, y: spawn.y, fluid: water, amount: 6 });
+    await host.send({ type: 'placeTile', x: spawn.x, y: spawn.y, material: stone });
+
+    const undo: ToSim = {
+      type: 'unplaceTile',
+      x: spawn.x,
+      y: spawn.y,
+      material: stone,
+      fluidType: water,
+      fluidAmount: 6,
+    };
+    await host.send(undo);
+    expect(host.last('tilesChanged')?.changes).toEqual([
+      { x: spawn.x, y: spawn.y, material: materials.air.numId },
+    ]);
+    // A second undo, with the block already gone, changes nothing.
+    await host.send(undo);
+    expect(host.last('tilesChanged')?.changes[0]?.material).toBe(materials.air.numId);
+    await host.send({ type: 'flush' });
+
+    const second = createHost(store);
+    await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
+    await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const chunk = second.last('chunk')!.chunk;
+    const idx = (spawn.y % CHUNK_SIZE) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE);
+    expect(chunk.material[idx]).toBe(materials.air.numId);
+    expect(chunk.fluidType[idx]).toBe(water);
+    expect(chunk.fluidAmount[idx]).toBe(6);
+  });
+
   it('wipes the save on reset', async () => {
     const store = await makeStore();
     const worldId = `${WORLD}-c`;

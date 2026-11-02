@@ -117,6 +117,9 @@ export class SimHost {
       case 'placeTile':
         this.placeTile(msg.x, msg.y, msg.material);
         return;
+      case 'unplaceTile':
+        this.unplaceTile(msg.x, msg.y, msg.material, msg.fluidType, msg.fluidAmount);
+        return;
       case 'playerState':
         this.player = msg.player;
         this.playerDirty = true;
@@ -368,6 +371,34 @@ export class SimHost {
     world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
     world.heat.tileChanged(x, y);
     this.post({ type: 'tilesChanged', changes: [{ x, y, material }] });
+  }
+
+  /**
+   * Takes back a block the player just placed, and the fluid it pushed out. Does
+   * nothing if the tile no longer holds that block. Always answers with what the
+   * tile is now.
+   */
+  private unplaceTile(
+    x: number,
+    y: number,
+    material: number,
+    fluidType: number,
+    fluidAmount: number,
+  ): void {
+    const world = this.requireWorld();
+    const current = world.chunks.materialAt(x, y);
+    if (current === UNLOADED) return;
+    if (current === material) {
+      world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
+      this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+      if (fluidAmount > 0) world.fluids.setFluid(x, y, fluidType, fluidAmount);
+      world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
+      world.heat.tileChanged(x, y);
+    }
+    this.post({
+      type: 'tilesChanged',
+      changes: [{ x, y, material: world.chunks.materialAt(x, y) }],
+    });
   }
 
   /** Whether a gas sits next to (x, y): digging there opens a pocket. */

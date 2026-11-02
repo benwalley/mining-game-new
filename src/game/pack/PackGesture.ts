@@ -4,25 +4,28 @@ import { angleFrom, fanSlots, maxScroll, slotAt, type FanSlot, type Point } from
 export type GesturePhase =
   | 'idle'
   | 'pressButton'
+  /** Swiping left: the fan follows the finger. */
   | 'swiping'
+  /** Swiping up or down: stepping through modes. */
+  | 'scrubbing'
   | 'pressSlot'
   | 'pressEmpty'
   | 'scrolling'
-  | 'ghost'
   /** A finger that has already done its job; ignore it until it lifts. */
   | 'spent';
 
 export interface PackGestureHooks {
+  /** A tap on the button: switch to the next mode. */
+  nextMode(): void;
+  /** While scrubbing: the mode a release would pick. */
+  scrub(index: number): void;
+  /** The scrub ended on `index`, or was cancelled (null). */
+  scrubEnd(index: number | null): void;
   openFan(): void;
   closeFan(): void;
   openSheet(): void;
   /** The player chose entry `index`: a stack, or the last entry, which opens the full pack. */
   pick(index: number): void;
-  /** Begins a ghost for the stack at `index`, or for the held block when null. False if nothing can be placed. */
-  ghostStart(index: number | null): boolean;
-  /** Finger travel since the ghost began, in CSS pixels. */
-  ghostMove(dxPx: number, dyPx: number): void;
-  ghostEnd(commit: boolean): void;
   /** Anything the view draws changed. */
   changed(): void;
 }
@@ -34,11 +37,12 @@ const MIN_SCROLL_RADIUS_PX = 40;
  * The pack button and its fan, as a state machine over one finger. Pure: it
  * knows nothing about the DOM or the game, only points, times and hooks.
  *
- * - Tap the button: open or close the fan.
- * - Swipe out from the button: the fan opens and follows the finger; letting go
- *   over an entry picks it, letting go elsewhere leaves the fan open.
- * - Swipe out with the fan already open: the full pack.
- * - Hold the button, or an entry, without moving: a ghost block to place.
+ * - Tap the button: next mode. With the fan open, close the fan.
+ * - Swipe up or down: scrub through modes, a step every `modeStepPx`; up is forward.
+ * - Swipe left: the fan opens and follows the finger; letting go over an entry
+ *   picks it, letting go elsewhere leaves the fan open. With the fan already
+ *   open, swiping left opens the full pack.
+ * - Hold the button without moving: the full pack.
  * - In the open fan: tap an entry to pick it, drag along the arc to scroll.
  */
 export class PackGesture {
@@ -50,9 +54,10 @@ export class PackGesture {
 
   private button: Point = { x: 0, y: 0 };
   private entries = 1;
+  private modeIndex = 0;
+  private modeCount = 1;
+  private scrubIndex = 0;
   private origin: Point = { x: 0, y: 0 };
-  private cur: Point = { x: 0, y: 0 };
-  private ghostOrigin: Point = { x: 0, y: 0 };
   private downAt = 0;
   private slot: number | null = null;
   private fanWasOpen = false;
@@ -70,12 +75,14 @@ export class PackGesture {
     this.scroll = Math.min(this.scroll, maxScroll(entries, this.t));
   }
 
-  get slots(): FanSlot[] {
-    return this.fanOpen ? fanSlots(this.button, this.entries, this.scroll, this.t) : [];
+  /** Which mode is current, out of how many. */
+  setModes(current: number, count: number): void {
+    this.modeIndex = current;
+    this.modeCount = count;
   }
 
-  get ghosting(): boolean {
-    return this.phase === 'ghost';
+  get slots(): FanSlot[] {
+    return this.fanOpen ? fanSlots(this.button, this.entries, this.scroll, this.t) : [];
   }
 
   /** The fan was closed from outside (the full pack opened, say). */
@@ -89,7 +96,7 @@ export class PackGesture {
   /** Returns false if the touch isn't ours: the fan is closed and it missed the button. */
   down(p: Point, now: number): boolean {
     if (this.phase !== 'idle') return true;
-    this.origin = this.cur = p;
+    this.origin = p;
     this.downAt = now;
     if (this.onButton(p)) {
       this.phase = 'pressButton';
@@ -104,22 +111,29 @@ export class PackGesture {
   }
 
   move(p: Point): void {
-    this.cur = p;
-    const far = dist(p, this.origin) > this.t.swipeMovePx;
+    const dx = p.x - this.origin.x;
+    const dy = p.y - this.origin.y;
+    const far = Math.hypot(dx, dy) > this.t.swipeMovePx;
     switch (this.phase) {
       case 'pressButton':
         if (!far) return;
-        if (this.fanWasOpen) {
+        if (Math.abs(dy) > Math.abs(dx)) this.startScrub(dy);
+        else if (dx < 0 && this.fanWasOpen) {
           this.fanOpen = false;
           this.phase = 'spent';
           this.hooks.openSheet();
-        } else {
+        } else if (dx < 0) {
           this.fanOpen = true;
           this.phase = 'swiping';
           this.hover = slotAt(p, this.slots, this.t);
           this.hooks.openFan();
+        } else {
+          this.phase = 'spent';
         }
         break;
+      case 'scrubbing':
+        this.scrubTo(dy);
+        return;
       case 'swiping':
         this.hover = slotAt(p, this.slots, this.t);
         break;
@@ -132,9 +146,6 @@ export class PackGesture {
       case 'scrolling':
         this.scrollTo(p);
         break;
-      case 'ghost':
-        this.hooks.ghostMove(p.x - this.ghostOrigin.x, p.y - this.ghostOrigin.y);
-        return;
       default:
         return;
     }
@@ -143,32 +154,27 @@ export class PackGesture {
 
   /** Call every frame or on a timer while a finger is down, to catch holds. */
   tick(now: number): void {
-    const pressing = this.phase === 'pressButton' || this.phase === 'pressSlot';
-    if (!pressing || now - this.downAt < this.t.holdMs) return;
-    const index = this.phase === 'pressSlot' ? this.slot : null;
-    if (index === this.entries - 1) {
-      // Holding the "open pack" entry is just opening it.
-      this.phase = 'spent';
-      this.fanOpen = false;
-      this.hooks.openSheet();
-    } else if (this.hooks.ghostStart(index)) {
-      this.phase = 'ghost';
-      this.ghostOrigin = this.cur;
-    } else {
-      this.phase = 'spent';
-    }
+    if (this.phase !== 'pressButton' || now - this.downAt < this.t.packHoldMs) return;
+    this.phase = 'spent';
+    this.fanOpen = false;
+    this.hooks.openSheet();
     this.hooks.changed();
   }
 
-  up(p: Point): void {
-    this.cur = p;
+  up(): void {
     const phase = this.phase;
     this.phase = 'idle';
     switch (phase) {
       case 'pressButton':
-        this.fanOpen = !this.fanWasOpen;
-        if (this.fanOpen) this.hooks.openFan();
-        else this.hooks.closeFan();
+        if (this.fanWasOpen) {
+          this.fanOpen = false;
+          this.hooks.closeFan();
+        } else {
+          this.hooks.nextMode();
+        }
+        break;
+      case 'scrubbing':
+        this.hooks.scrubEnd(this.scrubIndex);
         break;
       case 'swiping':
         if (this.hover !== null) this.choose(this.hover);
@@ -180,11 +186,6 @@ export class PackGesture {
         this.fanOpen = false;
         this.hooks.closeFan();
         break;
-      case 'ghost':
-        // Letting go back on the button cancels.
-        this.fanOpen = false;
-        this.hooks.ghostEnd(!this.onButton(p));
-        break;
       default:
         break;
     }
@@ -192,15 +193,34 @@ export class PackGesture {
     this.hooks.changed();
   }
 
-  /** The browser took the touch away. Nothing is picked or placed. */
+  /** The browser took the touch away. Nothing is picked. */
   cancel(): void {
-    if (this.phase === 'ghost') {
-      this.fanOpen = false;
-      this.hooks.ghostEnd(false);
-    }
+    if (this.phase === 'scrubbing') this.hooks.scrubEnd(null);
     this.phase = 'idle';
     this.hover = null;
     this.hooks.changed();
+  }
+
+  private startScrub(dy: number): void {
+    if (this.fanWasOpen) {
+      this.fanOpen = false;
+      this.hooks.closeFan();
+    }
+    this.phase = 'scrubbing';
+    this.scrubIndex = this.modeIndex;
+    this.hooks.scrub(this.modeIndex);
+    // The move that crossed the threshold may already be a step or more.
+    this.scrubTo(dy);
+  }
+
+  /** Up is forward; stepping past either end wraps around. */
+  private scrubTo(dy: number): void {
+    const steps = Math.round(-dy / this.t.modeStepPx);
+    const n = this.modeCount;
+    const index = (((this.modeIndex + steps) % n) + n) % n;
+    if (index === this.scrubIndex) return;
+    this.scrubIndex = index;
+    this.hooks.scrub(index);
   }
 
   private choose(index: number): void {
@@ -209,7 +229,7 @@ export class PackGesture {
   }
 
   private scrollTo(p: Point): void {
-    if (dist(p, this.button) < MIN_SCROLL_RADIUS_PX) return;
+    if (Math.hypot(p.x - this.button.x, p.y - this.button.y) < MIN_SCROLL_RADIUS_PX) return;
     const angle = angleFrom(this.button, p);
     // Entries follow the finger along the arc.
     this.scroll -= (angle - this.lastAngle) / this.t.fanSlotSpacingDeg;
@@ -218,8 +238,6 @@ export class PackGesture {
   }
 
   private onButton(p: Point): boolean {
-    return dist(p, this.button) <= this.t.buttonPx / 2 + 6;
+    return Math.hypot(p.x - this.button.x, p.y - this.button.y) <= this.t.buttonPx / 2 + 6;
   }
 }
-
-const dist = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);

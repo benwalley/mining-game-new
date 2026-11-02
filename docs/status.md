@@ -41,15 +41,20 @@ Design sections to read: [02](design/02-core-loop.md) (pack weight sets the trip
   in the world. You can carry any number of kinds; only total weight limits you.
 - **Capacity is weight only,** using each material's weight. Past the limit you can still
   dig; the pack bulges and you slow down.
-- **No hotbar.** The corner fan replaces it, and any block in the pack can be placed. The
-  gestures are in [design 03](design/03-controls.md) and the HUD in
-  [design 04](design/04-look-sound-ui.md), both under "Decided since".
-- **Pausing:** the fan and the full pack both pause the game. Aiming a ghost block from the
-  paused fan stays paused, so you can build in frozen time. That's intended, not a bug.
+- **No hotbar, and two modes.** The game has **dig** (the world runs) and **build** (the world
+  is frozen; tap a tile to place, hold to aim a ghost above the finger; undo lasts one second
+  and covers only the last block). The pack button cycles modes on a tap and scrubs through
+  them on an up or down swipe; swipe left for the block picker fan. A block can go on any
+  on-screen tile the player could reach through open tiles without breaking anything, and may
+  push fluid out. The gestures are in [design 03](design/03-controls.md) and the HUD in
+  [design 04](design/04-look-sound-ui.md), both under "Decided since". The mode list is
+  `src/game/pack/modes.ts`, so a third mode is one entry.
+- **Pausing:** build mode, the fan and the full pack all freeze the world. Freezing time to
+  build (catching a fall with a platform) is intended, not a bug.
 - **The full pack** is a full-screen, scrollable list of everything carried, with weights.
   You rearrange items there, and the fan follows that order. New items go at the end, and
   the game never reorders anything. You can discard a stack or part of one. Inspecting an
-  item happens here, since long-press in the fan starts a ghost.
+  item happens here.
 - **Chests and the first camp** move to slice 2.
 
 Starting numbers are in `tuning.json` under `pack` and `placing` (not yet confirmed by the
@@ -57,21 +62,21 @@ owner): capacity 200 weight (about 66 dirt or 33 stone); no slowdown up to the l
 and jump height fall in a straight line to 45% at 1.5× capacity; at 1.5× digging is blocked
 until you make room, with a "pack full" thud and buzz.
 
-Save and protocol: the pack and its order are saved (bump `SAVE_VERSION`, old saves start
-with an empty pack), and dig and place messages change (bump `PROTOCOL_VERSION`). Placing
-while paused means the sim has to accept place messages while paused.
+Save and protocol: the pack and its order are saved (`SAVE_VERSION` 4, old saves start with
+an empty pack). `placeTile` and `unplaceTile` (undo, which restores the fluid) are sim
+messages (`PROTOCOL_VERSION` 9), and the sim accepts them while paused. The mode isn't saved.
 
 ### What slice 1 left out, for the owner's check
 
-- **Not tried on a real phone.** It was checked in the browser pane (one real tap, the rest
-  through the gesture code) and by tests. Please playtest the swipe, hold and drag feel, and
-  the numbers in `placing` (hold time, 28 px per tile, fan radius).
+- **Not tried on a real phone.** It was checked in the browser pane (real taps and clicks, the
+  rest through pointer events and the gesture code) and by tests. Please playtest the swipes,
+  the hold and the ghost, and the numbers in `placing` (hold times, mode step, fan radius and
+  arc, ghost offset, undo time).
 - **The full pack reorders with up and down buttons,** not by dragging. Inspect shows only the
   count and weight; properties come with discovery.
-- **Placing from the fan closes it and resumes the game,** so building several blocks in
-  frozen time means reopening the fan each time. Tap to place carries on once it resumes.
-- **The fan scrolls by dragging along the arc,** with no flick momentum. No keyboard shortcut
-  for the fan on desktop yet.
+- **The fan scrolls by dragging along the arc,** with no flick momentum. Scrubbing down has
+  little room at the bottom of the screen, which is fine with two modes since up wraps.
+- **Build mode doesn't pan,** so building further means leaving it and walking.
 - **Left-handed mirroring** (a Could) isn't built.
 
 ### Questions to ask before slice 2
@@ -86,6 +91,7 @@ Ask these; don't assume the answers. Read [design 08](design/08-crafting.md) and
 - **Crafting from chests within about 8 tiles.** Does it take from the pack first or the chests
   first, and does the sheet show both?
 - **Placeable things beyond blocks.** The fan only holds materials for now. When items such as
-  chests and workbenches exist, do they sit in the same fan, or in a section of it?
+  chests and workbenches exist, do they sit in the same fan, or in a section of it, and does
+  placing them need build mode?
 - **Slice 1 feedback.** What the owner found when playtesting the fan on a phone: the numbers
   in `placing`, and whether the full pack needs drag to reorder.

@@ -7,10 +7,12 @@ export interface PackActions {
   /** False if the touch isn't for the button or fan. */
   down(p: Point): boolean;
   move(p: Point): void;
-  up(p: Point): void;
+  up(): void;
   cancel(): void;
   /** Call while a finger is down, to catch holds. */
   tick(): void;
+  /** Takes back the last block placed. */
+  undo(): void;
   closeSheet(): void;
   select(numId: number): void;
   moveItem(from: number, to: number): void;

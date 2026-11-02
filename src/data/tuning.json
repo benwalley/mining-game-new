@@ -47,11 +47,16 @@
   },
   "placing": {
     "holdMs": 300,
+    "packHoldMs": 400,
     "swipeMovePx": 10,
-    "ghostPxPerTile": 28,
-    "fanRadiusPx": 128,
+    "ghostOffsetTiles": 2,
+    "modeStepPx": 36,
+    "undoMs": 1000,
+    "fanRadiusPx": 132,
     "fanSlotPx": 44,
-    "fanSlotSpacingDeg": 22,
+    "fanSlotSpacingDeg": 20,
+    "fanArcStartDeg": 30,
+    "fanArcEndDeg": 90,
     "buttonPx": 56
   },
   "camera": {

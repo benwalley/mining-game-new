@@ -8,7 +8,7 @@ import type { SimEventKind } from '@/content/fluids';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -92,6 +92,15 @@ export type ToSim =
   | { type: 'damageTiles'; changes: DamageChange[] }
   /** Put a block into an empty tile. Works while paused. Answered with `tilesChanged`, or `placeRejected`. */
   | { type: 'placeTile'; x: number; y: number; material: number }
+  /** Undo a `placeTile`: take the block out again and put back the fluid it pushed aside. */
+  | {
+      type: 'unplaceTile';
+      x: number;
+      y: number;
+      material: number;
+      fluidType: number;
+      fluidAmount: number;
+    }
   | { type: 'playerState'; player: PlayerSnapshot }
   | { type: 'setPaused'; paused: boolean }
   /** Save everything dirty right now (page is hiding or closing). */

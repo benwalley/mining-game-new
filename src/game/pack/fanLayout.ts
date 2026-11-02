@@ -14,12 +14,9 @@ export interface FanSlot {
   alpha: number;
 }
 
-/** The fan covers a quarter circle, from straight up to straight left of the button. */
-const ARC_DEG = 90;
-
 /** How many slots fit on the arc at once. */
 export function slotsOnArc(t: PlacingTuning): number {
-  return Math.floor(ARC_DEG / t.fanSlotSpacingDeg) + 1;
+  return Math.floor((t.fanArcEndDeg - t.fanArcStartDeg) / t.fanSlotSpacingDeg) + 1;
 }
 
 export function maxScroll(count: number, t: PlacingTuning): number {
@@ -29,7 +26,8 @@ export function maxScroll(count: number, t: PlacingTuning): number {
 /**
  * Where each visible entry sits. The angle runs from straight up (0) toward
  * straight left (90), so the fan opens away from a button in the bottom-right
- * corner. `scroll` is in slots; entries beyond the arc are left out.
+ * corner. The arc starts short of straight up, which stays free for the mode
+ * scrub. `scroll` is in slots; entries beyond the arc are left out.
  */
 export function fanSlots(
   center: Point,
@@ -40,8 +38,8 @@ export function fanSlots(
   const fade = t.fanSlotSpacingDeg * 0.6;
   const out: FanSlot[] = [];
   for (let index = 0; index < count; index++) {
-    const deg = (index - scroll) * t.fanSlotSpacingDeg;
-    const overshoot = Math.max(-deg, deg - ARC_DEG);
+    const deg = t.fanArcStartDeg + (index - scroll) * t.fanSlotSpacingDeg;
+    const overshoot = Math.max(t.fanArcStartDeg - deg, deg - t.fanArcEndDeg);
     if (overshoot >= fade) continue;
     const rad = (deg * Math.PI) / 180;
     out.push({

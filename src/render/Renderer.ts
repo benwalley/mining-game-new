@@ -10,6 +10,12 @@ export interface GhostBlock {
   valid: boolean;
 }
 
+/** Tiles to tint faintly, one byte per tile in the view, row-major. */
+export interface TileTint {
+  view: { x0: number; y0: number; x1: number; y1: number };
+  mask: Uint8Array;
+}
+
 export interface RenderFrame {
   /** View center in tiles. */
   cameraX: number;
@@ -17,6 +23,8 @@ export interface RenderFrame {
   player: PlayerPose & { x: number; y: number };
   particles: Particles;
   ghost: GhostBlock | null;
+  /** Where a block could go, in build mode. */
+  tint: TileTint | null;
   /** Null draws everything fully lit (debug). */
   light: LightView | null;
   /** Seconds, for animated effects (heat shimmer). */
