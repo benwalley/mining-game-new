@@ -17,7 +17,8 @@ only; a future backend would only do cloud save and sync.
 - **Slices with an owner check.** Build one slice, show it, and stop for the owner's review.
   Don't start the next slice or phase until the owner says so.
 - **Commit and push only when the owner says "Commit and push."** Commit straight to `main`.
-  End commit messages with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. A push
+  End commit messages with the `Co-Authored-By` line the session gives you, so it names the
+  model that did the work (it changes if the owner switches models). A push
   to `main` (over SSH, `benwalley/mining-game-new`) deploys GitHub Pages at
   https://benwalley.github.io/mining-game-new/. `gh` isn't installed, so to check a deploy,
   curl the live `index.html` and grep its bundle for a string from the new build.
