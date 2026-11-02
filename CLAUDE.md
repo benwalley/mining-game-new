@@ -47,6 +47,45 @@ only; a future backend would only do cloud save and sync.
   `npm run format:check`. Run `npm run build` before a push. Keep the output short, for
   example `npx vitest run --reporter=dot` and `npm run lint 2>&1 | tail -20`.
 
+## Doing the work well
+
+The owner judges a change by playing it on their phone. Passing tests is the floor, not the
+goal. These habits are what made past sessions land; follow them every time.
+
+- **Find the real cause before changing anything.** When the owner says something "doesn't
+  work", trace the path the player actually takes through the code and name the cause in one
+  line. Don't patch the symptom or guess. (Building "didn't work on mobile" because digging
+  never set a held block, not because of touch handling.)
+- **Test the flow a new player hits.** Start from an empty or fresh state and go through the
+  real steps: dig, switch mode, place. Setting up state from the console to skip ahead can
+  hide exactly the bug the owner will hit. Setting the held block by hand once hid that bug.
+- **Design for a thumb, not a mouse.** Thumbs wobble 10 to 20 px, tiles are about 24 px on
+  screen, a drag can't go past the screen edge, and the owner has **no haptics**. Give touches
+  slack, think about where the thumb is and what it covers, and give every cue a sound or a
+  visual.
+- **Read the intent, not just the words.** Ask what the change is for and build that. "Make
+  the fan look nice" means a designed component with motion, real tile art and clear states,
+  not a restyle of the old one. When a request shows a lasting preference, save it to memory.
+- **Make it feel good to play.** The owner wants the character to feel powerful: snappy
+  feedback, motion that reads, nothing fiddly. Challenge comes from the world, not from the
+  controls. Freezing time to build is a feature, not an exploit.
+- **Keep logic pure and tested.** Gesture and game rules go in plain modules or state machines
+  with tests (`PackGesture`, `placement.ts`, `carousel.ts`); UI components only draw and
+  forward events. Test the behaviour the owner described, including the edges: wrap-around,
+  end stops, catching a moving thing, a finger that stops before lifting.
+- **When a test fails, work out which side is wrong.** Sometimes the test's setup is off;
+  sometimes it just found a real bug (a stale cache, a velocity window that never dropped old
+  samples). Check before editing either, and say which it was.
+- **Look at visual work, and change the design if it doesn't read.** Screenshot the moments
+  that matter (mid-animation, settled). If an effect is too fast, too faint or covered,
+  rethink it rather than only nudging numbers.
+- **Finish the whole job.** Docs match the code (the design doc's "Decided since" notes,
+  `docs/status.md`, the README), tunable numbers are in `src/data/tuning.json`, and old code
+  and styles the change replaced are removed.
+- **Report plainly.** Say what changed, how you checked it, what you couldn't check (usually
+  a real phone), and any choices you made for the owner so they can overrule them. Never say
+  it works on a phone when only the browser pane showed it.
+
 ## Keeping token use down
 
 Every turn resends the whole conversation, so anything pulled into context keeps costing
