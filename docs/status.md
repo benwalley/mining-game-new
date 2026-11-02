@@ -42,7 +42,7 @@ Design sections to read: [02](design/02-core-loop.md) (pack weight sets the trip
 - **Capacity is weight only,** using each material's weight. Past the limit you can still
   dig; the pack bulges and you slow down.
 - **No hotbar, and two modes.** The game has **dig** (the world runs) and **build** (the world
-  is frozen; tap a tile to place, hold to aim a ghost above the finger; undo lasts one second
+  is frozen; tap a tile to place, hold anywhere to start a ghost on the facing tile and drag it; undo lasts one second
   and covers only the last block). The pack button is a window onto an endless strip of modes
   (the pick for dig, the held block for build): a tap slides to the next, and an up or down
   swipe drags the strip behind it; swipe left for the block picker fan. A block can go on any

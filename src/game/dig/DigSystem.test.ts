@@ -65,6 +65,8 @@ describe('DigSystem', () => {
     const { run, pack, dirt } = setup();
     run(2, { x: 0, y: 1 });
     expect(pack.count(dirt)).toBeGreaterThan(0);
+    // The first thing dug is held, ready to place.
+    expect(pack.held).toBe(dirt);
   });
 
   it("won't finish a tile when the pack is at its hard limit", () => {

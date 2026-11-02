@@ -51,15 +51,17 @@ Movement is 8-directional. Digging is 4-directional (left, right, up, down) to k
 >   tiles are tinted faintly blue.
 >   - **Tap** a tile to place the held block there. A tile that won't take it flashes red
 >     with a soft buzz.
->   - **Hold** (0.3 s, without moving) to show a ghost block two tiles above the finger, so
->     the thumb doesn't hide it, flipping below the finger near the top of the screen. It
->     follows the finger tile by tile, with a tick per tile, and turns red where a block
->     can't go. Release to place it. Release on the pack button or the undo chip to cancel,
->     or on a red tile, where nothing happens.
+>   - **Hold** anywhere on the world (0.3 s, and a thumb may wander a little) to show a ghost
+>     block on the tile the player is facing. Drag to move it, a tile for every tile of
+>     finger travel, with a tick per tile, so the finger can start anywhere and never needs
+>     to be near where the block is going. The ghost turns red where a block can't go.
+>     Release to place it. Release on the pack button or the undo chip to cancel. On a red
+>     tile nothing is placed.
 >   - **Fluids:** a block can go into a tile holding water, lava or gas; the fluid is pushed
 >     out.
->   - **Out of blocks:** the held block greys out; tapping the world pulses the button.
->     Nothing switches blocks for the player.
+>   - **Out of blocks:** the held block greys out; tapping the world pulses the button. It
+>     isn't swapped for another, but the next different thing the player picks up takes its
+>     place.
 >   - **Undo:** after a placement an undo chip appears beside the button with a ring that
 >     counts down 1 second. Tapping it removes the last block, puts it back in the pack and
 >     restores the tile's exact fluid. Placing another block moves undo to that one. Only the last
@@ -67,8 +69,9 @@ Movement is 8-directional. Digging is 4-directional (left, right, up, down) to k
 > - **Freezing time to build** (catching a fall with a platform, walling off lava) is
 >   intended, not a bug.
 > - **The fan's order** comes from the full pack, where the player arranges items. New items
->   go at the end and the game never reorders. When a stack runs out, its block stays on the
->   button greyed out.
+>   go at the end and the game never reorders. The first thing picked up is held straight
+>   away, so building works without opening the fan. When a stack runs out, its block stays
+>   on the button greyed out until something else is picked up.
 > - The mode isn't saved; the game always loads in dig mode.
 > - **On desktop:** B toggles build mode, U undoes, Esc returns to dig mode, and click and
 >   click-and-hold work as tap and hold.

@@ -53,6 +53,7 @@ function setup(dirtCount = 5) {
     pack,
     view: () => ({ x0: 0, y0: 0, x1: 32, y1: 32 }),
     tileAt: (x, y) => ({ x: Math.floor(x / TILE_PX), y: Math.floor(y / TILE_PX) }),
+    tilePx: () => TILE_PX,
     onPausedChange: (p) => pauses.push(p),
     onModeChange: (m) => modes.push(m),
     now: () => clock.now,
@@ -60,7 +61,21 @@ function setup(dirtCount = 5) {
   ctl.setButton(BUTTON);
   const build = () => ctl.setMode('build');
   const placeTiles = () => sent.filter((m) => m.type === 'placeTile');
-  return { ctl, mirror, chunk, pack, sent, seen, pauses, modes, clock, dirt, build, placeTiles };
+  return {
+    ctl,
+    mirror,
+    chunk,
+    pack,
+    player,
+    sent,
+    seen,
+    pauses,
+    modes,
+    clock,
+    dirt,
+    build,
+    placeTiles,
+  };
 }
 
 const air = materials.air.numId;
@@ -197,33 +212,45 @@ describe('PackController build mode', () => {
     expect(placeTiles()).toHaveLength(0);
   });
 
-  it('shows a ghost two tiles above the finger, follows it, and places on release', () => {
+  it('puts the ghost on the tile the player faces, wherever the hold is, and moves it with the finger', () => {
     const { ctl, mirror, pack, build, dirt, seen } = setup();
     build();
-    ctl.holdStart(at(8), at(9));
-    expect(ctl.ghost).toEqual({ x: 8, y: 7, material: dirt, valid: true });
-    ctl.holdMove(at(9), at(9));
-    expect(ctl.ghost).toMatchObject({ x: 9, y: 7 });
+    // Held far from the player and the button: the ghost still starts in front of the mole.
+    ctl.holdStart(at(20), at(3));
+    expect(ctl.ghost).toEqual({ x: 6, y: 9, material: dirt, valid: true });
+    // A tile of finger travel moves it a tile: two right and one up.
+    ctl.holdMove(at(20) + 2 * TILE_PX, at(3) - TILE_PX);
+    expect(ctl.ghost).toMatchObject({ x: 8, y: 8, valid: true });
     expect(seen).toEqual(['ghostStep']);
-    ctl.holdEnd(at(9), at(9), true);
+    ctl.holdEnd(at(20) + 2 * TILE_PX, at(3) - TILE_PX, true);
     expect(ctl.ghost).toBeNull();
-    expect(mirror.materialAt(9, 7)).toBe(dirt);
+    expect(mirror.materialAt(8, 8)).toBe(dirt);
     expect(pack.count(dirt)).toBe(4);
   });
 
-  it('flips the ghost below the finger near the top of the screen', () => {
-    const { ctl, build } = setup();
+  it('starts the ghost on the other side when the player faces left', () => {
+    const { ctl, player, build } = setup();
+    player.facing = -1;
     build();
-    ctl.holdStart(at(8), at(1));
-    expect(ctl.ghost).toMatchObject({ x: 8, y: 3 });
+    ctl.holdStart(at(20), at(3));
+    expect(ctl.ghost).toMatchObject({ x: 4, y: 9 });
+  });
+
+  it('places in front of the player when a hold is released without dragging', () => {
+    const { ctl, mirror, build, dirt } = setup();
+    build();
+    ctl.holdStart(at(25), at(2));
+    ctl.holdEnd(at(25), at(2), true);
+    expect(mirror.materialAt(6, 9)).toBe(dirt);
   });
 
   it('turns the ghost red over solid ground and places nothing there', () => {
     const { ctl, pack, build, dirt, placeTiles } = setup();
     build();
-    ctl.holdStart(at(8), at(12)); // The ghost lands in row 10: dirt.
-    expect(ctl.ghost).toMatchObject({ x: 8, y: 10, valid: false });
-    ctl.holdEnd(at(8), at(12), true);
+    ctl.holdStart(at(20), at(3));
+    ctl.holdMove(at(20), at(3) + TILE_PX); // One tile down is row 10: dirt.
+    expect(ctl.ghost).toMatchObject({ x: 6, y: 10, valid: false });
+    ctl.holdEnd(at(20), at(3) + TILE_PX, true);
     expect(placeTiles()).toHaveLength(0);
     expect(pack.count(dirt)).toBe(5);
   });

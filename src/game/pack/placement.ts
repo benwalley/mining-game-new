@@ -88,6 +88,11 @@ export function placeBlocker(x: number, y: number, ctx: PlaceContext): PlaceBloc
   return null;
 }
 
+/** The tile the player faces, one step ahead at body height. */
+export function facingTile(box: Box, facing: 1 | -1): { x: number; y: number } {
+  return { x: Math.floor(box.x) + facing, y: Math.floor(box.y - box.h / 2) };
+}
+
 /** The tile the player is standing in, at body height. */
 export function bodyTile(box: Box): { x: number; y: number } {
   return { x: Math.floor(box.x), y: Math.floor(box.y - box.h / 2) };

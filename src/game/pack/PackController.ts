@@ -12,7 +12,14 @@ import type { Point } from './fanLayout';
 import { DEFAULT_MODE, freezesWorld, MODES, type Mode } from './modes';
 import type { Pack } from './Pack';
 import { PackGesture } from './PackGesture';
-import { bodyTile, placeBlocker, reachMask, type ReachMask, type TileView } from './placement';
+import {
+  bodyTile,
+  facingTile,
+  placeBlocker,
+  reachMask,
+  type ReachMask,
+  type TileView,
+} from './placement';
 
 export interface PackControllerDeps {
   tuning: PlacingTuning;
@@ -26,6 +33,8 @@ export interface PackControllerDeps {
   view(): TileView;
   /** The tile under a point on screen, in CSS pixels. */
   tileAt(cssX: number, cssY: number): Point;
+  /** How wide a tile is on screen, in CSS pixels. */
+  tilePx(): number;
   /** The fan, the full pack or build mode started or stopped freezing the world. */
   onPausedChange(paused: boolean): void;
   onModeChange(mode: Mode): void;
@@ -66,6 +75,9 @@ export class PackController {
   private pulse = 0;
   private shownRevision = -1;
   private ghostTile: Point | null = null;
+  /** Where the held finger came down, and the tile the ghost started on. */
+  private holdFrom: Point = { x: 0, y: 0 };
+  private ghostFrom: Point = { x: 0, y: 0 };
   private ghostValid = false;
   private flash: { x: number; y: number; until: number } | null = null;
   private last: Placed | null = null;
@@ -153,16 +165,30 @@ export class PackController {
     this.tryPlace(t.x, t.y);
   }
 
-  /** A held finger on the world: a ghost block appears above it. */
+  /**
+   * A held finger anywhere on the world: a ghost block appears on the tile the
+   * player is facing. Dragging then moves it, a tile for every tile of finger
+   * travel, so the finger never has to be near where the block is going.
+   */
   holdStart(cssX: number, cssY: number): void {
     if (!this.building) return;
     const held = this.d.pack.held;
     if (held === null || this.d.pack.count(held) < 1) return this.denyEmpty();
-    this.aim(cssX, cssY);
+    this.holdFrom = { x: cssX, y: cssY };
+    this.ghostFrom = facingTile(this.d.player.box, this.d.player.facing);
+    this.ghostTile = this.ghostFrom;
+    this.ghostValid = this.canPlace(this.ghostFrom.x, this.ghostFrom.y);
   }
 
   holdMove(cssX: number, cssY: number): void {
-    if (this.ghostTile) this.aim(cssX, cssY);
+    if (!this.ghostTile) return;
+    const per = this.d.tilePx();
+    const x = this.ghostFrom.x + Math.trunc((cssX - this.holdFrom.x) / per);
+    const y = this.ghostFrom.y + Math.trunc((cssY - this.holdFrom.y) / per);
+    if (x === this.ghostTile.x && y === this.ghostTile.y) return;
+    this.d.events.emit('ghostStep', {});
+    this.ghostTile = { x, y };
+    this.ghostValid = this.canPlace(x, y);
   }
 
   /** Releasing places the ghost, unless the finger came back to the button or the undo chip. */
@@ -234,18 +260,6 @@ export class PackController {
   private setPreview(mode: Mode | null): void {
     this.preview = mode;
     this.publishMode();
-  }
-
-  /** Puts the ghost two tiles above the finger, or below it near the top of the screen. */
-  private aim(cssX: number, cssY: number): void {
-    const t = this.d.tileAt(cssX, cssY);
-    const up = t.y - this.d.tuning.ghostOffsetTiles;
-    const y = up >= this.d.view().y0 ? up : t.y + this.d.tuning.ghostOffsetTiles;
-    if (!this.ghostTile || this.ghostTile.x !== t.x || this.ghostTile.y !== y) {
-      if (this.ghostTile) this.d.events.emit('ghostStep', {});
-      this.ghostTile = { x: t.x, y };
-      this.ghostValid = this.canPlace(t.x, y);
-    }
   }
 
   private inCancelZone(x: number, y: number): boolean {

@@ -48,8 +48,8 @@
   "placing": {
     "holdMs": 300,
     "packHoldMs": 400,
-    "swipeMovePx": 10,
-    "ghostOffsetTiles": 2,
+    "swipeMovePx": 16,
+    "holdSlopPx": 18,
     "modeStepPx": 50,
     "undoMs": 1000,
     "fanRadiusPx": 132,

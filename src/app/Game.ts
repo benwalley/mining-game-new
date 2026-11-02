@@ -186,11 +186,15 @@ export class Game {
         const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
         return { x: Math.floor(t.x), y: Math.floor(t.y) };
       },
+      tilePx: () => canvas.clientWidth / this.renderer.viewTiles.w,
       onPausedChange: () => this.syncSimPause(),
       onModeChange: (mode) => {
         // Leaving dig mode saves a half-dug tile; build mode turns touches on the world into placing.
         this.dig.flush();
-        this.pointer.setBuildMode(mode === 'build' ? tuning.placing.holdMs : null);
+        this.pointer.setBuildMode(
+          mode === 'build' ? tuning.placing.holdMs : null,
+          tuning.placing.holdSlopPx,
+        );
       },
     });
     this.particles = new Particles(256, createRng(`fx/${world.seed}`), tuning.fx.particleGravity);

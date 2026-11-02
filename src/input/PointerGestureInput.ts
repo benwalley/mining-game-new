@@ -31,6 +31,8 @@ export class PointerGestureInput {
   private longPressFired = false;
   /** Build mode: the hold time, and whether a hold is being dragged right now. */
   private buildHoldMs: number | null = null;
+  /** Build mode: how far a thumb may wander and still count as a tap or a hold. */
+  private buildSlopPx = 0;
   private holdActive = false;
 
   constructor(
@@ -47,12 +49,14 @@ export class PointerGestureInput {
 
   /**
    * In build mode (a hold time) the world no longer moves the player: taps still
-   * arrive as taps, and a hold becomes a drag. Pass null to go back to digging.
+   * arrive as taps, and a hold becomes a drag. A thumb is allowed to wander
+   * `slopPx` and still count. Pass null to go back to digging.
    */
-  setBuildMode(holdMs: number | null): void {
+  setBuildMode(holdMs: number | null, slopPx = 0): void {
     if (this.holdActive) this.handlers.onHoldEnd(this.curX, this.curY, false);
     this.holdActive = false;
     this.buildHoldMs = holdMs;
+    this.buildSlopPx = slopPx;
   }
 
   get active(): boolean {
@@ -119,7 +123,8 @@ export class PointerGestureInput {
     this.curX = x;
     this.curY = y;
     if (this.holdActive) this.handlers.onHoldMove(x, y);
-    if (Math.hypot(x - this.originX, y - this.originY) > this.tuning.tapMaxMovePx) {
+    const slop = this.buildHoldMs !== null ? this.buildSlopPx : this.tuning.tapMaxMovePx;
+    if (Math.hypot(x - this.originX, y - this.originY) > slop) {
       this.movedFar = true;
     }
   };

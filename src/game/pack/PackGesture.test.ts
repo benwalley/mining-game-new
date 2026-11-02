@@ -196,7 +196,7 @@ describe('PackGesture', () => {
     expect(g.scroll).toBeLessThan(1.8);
 
     g.down({ x: 234, y: 386 }, 0);
-    g.move({ x: 222, y: 392 });
+    g.move({ x: 216, y: 398 });
     g.move({ x: 100, y: 455 });
     g.up();
     expect(g.scroll).toBe(0);

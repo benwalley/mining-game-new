@@ -6,8 +6,9 @@ export const EMPTY_PACK: PackSnapshot = { items: [], held: null };
 /**
  * Everything the player carries. Capacity is weight only; any number of kinds
  * fit. The order is the player's: new kinds go to the end and nothing is ever
- * reordered except by `move`. The held block stays set when its stack runs out,
- * so the button can show it greyed out.
+ * reordered except by `move`. The held block is the first thing picked up, and
+ * stays set when its stack runs out so the button can show it greyed out; the
+ * next different thing picked up takes its place.
  */
 export class Pack {
   held: number | null = null;
@@ -62,6 +63,10 @@ export class Pack {
     const have = this.counts.get(numId);
     if (have === undefined) this.order.push(numId);
     this.counts.set(numId, (have ?? 0) + n);
+    // Nothing to place yet, or the held stack ran out: what was just picked up is ready to go.
+    if (this.held === null || (this.held !== numId && !this.counts.has(this.held))) {
+      this.held = numId;
+    }
     this.revision++;
     return true;
   }

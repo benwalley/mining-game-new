@@ -198,7 +198,8 @@ modes (`src/game/pack/modes.ts`: dig shows the pick, build shows the held block)
 to the next, or swipe up or down to drag the strip behind it, one for one with your finger. Swipe left for the block
 picker fan, swipe left again or hold for the full pack: reorder, hold, discard. In **build
 mode** the world is frozen and the whole screen takes touches: tap a tile to place the held
-block, or hold to aim a ghost two tiles above your finger and release to place it. Blocks go
+block, or hold anywhere to start a ghost on the tile you're facing, drag it a tile for every tile
+of finger travel, and release to place it. The first thing you dig is held automatically. Blocks go
 on on-screen tiles the player could reach through open tiles without breaking anything (tinted
 blue), and may push fluid out. An undo chip lasts one second and covers only the last block.
 The fan and the full pack freeze the world too. On desktop, B toggles build mode, U undoes and

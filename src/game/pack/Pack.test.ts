@@ -37,6 +37,27 @@ describe('Pack', () => {
     expect(pack.items).toEqual([{ numId: 2, count: 1 }]);
   });
 
+  it('holds the first thing picked up, so it can be placed straight away', () => {
+    const pack = make();
+    expect(pack.held).toBeNull();
+    pack.add(2, 1);
+    expect(pack.held).toBe(2);
+    pack.add(1, 3);
+    expect(pack.held).toBe(2);
+  });
+
+  it('switches to what is picked up next once the held stack has run out', () => {
+    const pack = make();
+    pack.add(1, 1);
+    pack.take(1);
+    expect(pack.held).toBe(1);
+    pack.add(2, 1);
+    expect(pack.held).toBe(2);
+    // Picking up more of the held kind, or of another while it's still there, changes nothing.
+    pack.add(1, 1);
+    expect(pack.held).toBe(2);
+  });
+
   it('keeps the held block set when its stack runs out', () => {
     const pack = make();
     pack.add(1, 1);
