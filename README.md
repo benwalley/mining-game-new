@@ -189,5 +189,18 @@ into its 300 rows (warm below about 190, hot below about 230), and its lava pock
 105–106 warms the rock around it. Heat damage, suits, melting and igniting come in phase 2
 with fire, torches and furnaces.
 
-Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
+**Phase 2, slice 1 (done):** the pack and the corner fan (`src/game/pack/`, `src/ui/pack/`).
+Every dug tile goes into the pack, which is limited by weight only (`tuning.json` `pack`:
+capacity 200). Past capacity you slow down and jump lower, down to 45% at 1.5×, where digging
+is blocked. There's no hotbar. The pack button in the bottom-right corner shows the held
+block, and a ring around it fills with weight. Tap it to open a fan of everything carried;
+swipe out and let go over an item to pick it; hold the button or an item to aim a ghost block
+(one tile per 28 px of finger travel, red where it can't go) and let go to place it, or let go
+back on the button to cancel. After placing, taps place more until you move. Swipe out again
+with the fan open for the full pack: reorder, hold, discard. The fan and the full pack pause
+the game, but placing still works then. Gestures live in the pure `PackGesture` state machine,
+and `PackController` ties it to the world. The pack is saved with the player (`SAVE_VERSION` 4)
+and `placeTile` is the new sim message (`PROTOCOL_VERSION` 8).
+
+Not built yet (later phases): crafting, chests, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

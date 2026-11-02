@@ -8,7 +8,7 @@ import type { WorldDims } from '@/core/world/constants';
  * When a record's shape changes: bump SAVE_VERSION and add a migration from the
  * previous version. Never edit an existing migration.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface WorldMeta {
   saveVersion: number;
@@ -50,9 +50,18 @@ const chunkMigrations: Record<number, Migration> = {
   1: (r) => ({ ...r, origin: new Uint16Array((r.material as Uint16Array).length) }),
   // v3 dropped it again, with cave-ins.
   2: ({ origin: _origin, ...r }) => r,
+  3: (r) => r,
 };
-const metaMigrations: Record<number, Migration> = { 1: (r) => r, 2: (r) => r };
-const entityMigrations: Record<number, Migration> = { 1: (r) => r, 2: (r) => r };
+const metaMigrations: Record<number, Migration> = { 1: (r) => r, 2: (r) => r, 3: (r) => r };
+const entityMigrations: Record<number, Migration> = {
+  1: (r) => r,
+  2: (r) => r,
+  // v4 added the pack to the player; old saves start with an empty one.
+  3: (r) => ({
+    ...r,
+    data: { ...(r.data as Record<string, unknown>), pack: { items: [], held: null } },
+  }),
+};
 
 function migrate<T>(record: { saveVersion: number }, migrations: Record<number, Migration>): T {
   let current = record as unknown as Record<string, unknown> & { saveVersion: number };

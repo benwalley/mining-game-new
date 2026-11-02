@@ -55,6 +55,28 @@ describe('PlayerController', () => {
     expect(player.grounded).toBe(true);
   });
 
+  it('runs slower and jumps lower when the pack is overloaded', () => {
+    const light = simulate(flat, 2.5, 4);
+    light.run(0.5, { x: 1, y: 0 });
+    const heavy = simulate(flat, 2.5, 4);
+    heavy.player.speedScale = 0.5;
+    heavy.run(0.5, { x: 1, y: 0 });
+    expect(heavy.player.vx).toBeCloseTo(light.player.vx * 0.5);
+
+    const peak = (scale: number) => {
+      const { player, run } = simulate(flat, 2.5, 4);
+      player.jumpScale = scale;
+      let top = 4;
+      run(0.05, { x: 0, y: -1 });
+      for (let i = 0; i < 60; i++) {
+        run(1 / 60, { x: 0, y: -1 });
+        top = Math.min(top, player.y);
+      }
+      return 4 - top;
+    };
+    expect(peak(0.45)).toBeLessThan(peak(1) * 0.7);
+  });
+
   it('falls into a shaft instead of hanging on its walls', () => {
     const shaft = grid(['#.##', '#.##', '#.##', '#.##', '#.##', '####']);
     const { player, run } = simulate(shaft, 1.5, 2);

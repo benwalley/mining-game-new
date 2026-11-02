@@ -16,6 +16,7 @@ const SOUND_GAP_MS = {
   hiss: 90,
   whoomph: 250,
   vent: 400,
+  packFull: 500,
 };
 
 const DIR_VECTORS = {
@@ -53,6 +54,20 @@ export class FeedbackDirector {
       this.haptics.tick();
       this.debris(e.x, e.y, e.material, this.fx.breakParticles, 5);
     });
+    events.on('placed', (e) => {
+      const m = this.materials.get(e.material);
+      if (!m) return;
+      this.audio.place(m);
+      this.haptics.tick();
+      this.debris(e.x, e.y, e.material, 5, 2);
+    });
+    events.on('ghostStep', () => this.haptics.tick());
+    events.on('packFull', () =>
+      this.throttled('packFull', () => {
+        this.audio.packFull();
+        this.haptics.pulse();
+      }),
+    );
     events.on('digBlocked', (e) => {
       this.audio.blocked();
       this.particles.burst(e.x + 0.5, e.y + 0.5, 2, [palette.bone, palette.ember], {

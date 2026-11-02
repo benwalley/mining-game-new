@@ -8,6 +8,7 @@ import { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
 import { NO_FLUID } from '../physics/fluidContact';
 import { Player } from '../player/Player';
+import { Pack } from '../pack/Pack';
 import { ChunkMirror } from '../world/ChunkMirror';
 import { DigSystem } from './DigSystem';
 import { MAX_DAMAGE } from './crack';
@@ -22,16 +23,11 @@ function setup() {
   for (let y = 10; y < 32; y++) for (let x = 0; x < 32; x++) chunk.material[tileIndex(x, y)] = dirt;
   mirror.addChunk(chunk);
 
+  const events = new EventBus<GameEvents>();
+  const pack = new Pack(tuning.pack, (id) => materials.get(id)?.weight ?? 0);
   const sent: ToSim[] = [];
   const sim = new SimClient({ post: (m) => sent.push(m), onMessage: () => {} });
-  const dig = new DigSystem(
-    tuning.dig,
-    tuning.input,
-    materials,
-    mirror,
-    sim,
-    new EventBus<GameEvents>(),
-  );
+  const dig = new DigSystem(tuning.dig, tuning.input, materials, mirror, sim, events, pack);
   const player = new Player(tuning.player, tuning.vitals);
   player.placeAt(5.5, 10);
   const contact = {
@@ -45,7 +41,7 @@ function setup() {
   const run = (seconds: number, intent: { x: number; y: number }) => {
     for (let i = 0; i < Math.round(seconds * 60); i++) dig.update(player, intent, contact, 1 / 60);
   };
-  return { mirror, dig, run, sent, dirt };
+  return { mirror, dig, run, sent, dirt, pack, events };
 }
 
 describe('DigSystem', () => {
@@ -63,5 +59,22 @@ describe('DigSystem', () => {
     run(digTime * 0.55, { x: 0, y: 1 });
     expect(mirror.materialAt(5, 10)).not.toBe(dirt);
     expect(mirror.damageAt(5, 10)).toBe(0);
+  });
+
+  it('puts what it digs into the pack', () => {
+    const { run, pack, dirt } = setup();
+    run(2, { x: 0, y: 1 });
+    expect(pack.count(dirt)).toBeGreaterThan(0);
+  });
+
+  it("won't finish a tile when the pack is at its hard limit", () => {
+    const { mirror, run, pack, dirt, events } = setup();
+    pack.add(dirt, 100); // 300 weight: exactly the limit.
+    let announced = 0;
+    events.on('packFull', () => announced++);
+    run(2, { x: 0, y: 1 });
+    expect(mirror.materialAt(5, 10)).toBe(dirt);
+    expect(pack.count(dirt)).toBe(100);
+    expect(announced).toBeGreaterThan(0);
   });
 });

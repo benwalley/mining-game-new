@@ -6,6 +6,12 @@ export interface GameEvents {
   digHit: { x: number; y: number; material: number; stage: number; dir: DigDirection };
   digBlocked: { x: number; y: number; material: number };
   tileBroken: { x: number; y: number; material: number };
+  /** A dig that can't finish because the pack is at its hard limit. */
+  packFull: { x: number; y: number; material: number };
+  /** The player put a block into the world. */
+  placed: { x: number; y: number; material: number };
+  /** The ghost block moved onto a new tile. */
+  ghostStep: Record<string, never>;
   jumped: Record<string, never>;
   landed: { speed: number };
   inspect: { x: number; y: number };

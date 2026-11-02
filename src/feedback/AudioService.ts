@@ -59,6 +59,19 @@ export class AudioService {
     if (p.ring > 0) this.tone(p.noiseHz * 0.9, p.ring * 1.5, 0.15, 'triangle');
   }
 
+  /** A block set into the world: a soft thud, duller for harder material. */
+  place(m: MaterialDef): void {
+    const p = this.profile(m);
+    this.noiseBurst(p.noiseHz * 0.5, 0.8, 0.12, 0.45);
+    this.sweep(110, 60, 0.1, 0.4);
+  }
+
+  /** The pack can't take more. */
+  packFull(): void {
+    this.tone(95, 0.18, 0.3, 'sawtooth');
+    this.tone(70, 0.22, 0.3, 'square');
+  }
+
   blocked(): void {
     this.tone(1900, 0.08, 0.18, 'triangle');
     this.tone(2600, 0.05, 0.1, 'square');

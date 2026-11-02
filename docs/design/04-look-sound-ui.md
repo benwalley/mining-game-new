@@ -33,6 +33,13 @@ The HUD shows almost nothing. State is communicated through the world and screen
 
 No numbers appear in the HUD. Numbers are fine inside the crafting sheet and journal, where players compare items.
 
+> **Decided since (owner, 2026-11-02):** the hotbar is replaced by a single pack button in
+> the bottom-right corner and a fan of items that opens from it (gestures in section 3). The
+> button shows the held block, and a ring around it fills with pack weight, with no numbers;
+> it swells and changes colour when overloaded. Both the fan and the full pack pause the
+> game. The full pack is a full-screen, scrollable list where the player rearranges and
+> discards items, and inspects them.
+
 ### Talking to creatures
 
 Creatures speak in **picture icons** at first: an item they want, a heart for gratitude, a warning symbol, a location pin. As bonds grow, the player learns words of that species' language and short text phrases start to appear (Could). This makes communication itself a form of progress.

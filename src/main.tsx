@@ -30,6 +30,18 @@ async function boot(): Promise<void> {
         runBenchmark: () => game?.runBenchmark(),
         resetWorld: () => game?.resetWorld(),
       }}
+      pack={{
+        setButton: (c) => game?.packActions.setButton(c),
+        down: (p) => game?.packActions.down(p) ?? false,
+        move: (p) => game?.packActions.move(p),
+        up: (p) => game?.packActions.up(p),
+        cancel: () => game?.packActions.cancel(),
+        tick: () => game?.packActions.tick(),
+        closeSheet: () => game?.packActions.closeSheet(),
+        select: (n) => game?.packActions.select(n),
+        moveItem: (a, b) => game?.packActions.moveItem(a, b),
+        discard: (n, c) => game?.packActions.discard(n, c),
+      }}
     />,
     uiRoot,
   );

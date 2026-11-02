@@ -2,12 +2,21 @@ import type { Particles } from '@/fx/Particles';
 import type { LightView } from '@/game/light/LightField';
 import type { PlayerPose } from './canvas2d/playerSprite';
 
+/** A block the player is aiming: drawn see-through, outlined red where it can't go. */
+export interface GhostBlock {
+  x: number;
+  y: number;
+  material: number;
+  valid: boolean;
+}
+
 export interface RenderFrame {
   /** View center in tiles. */
   cameraX: number;
   cameraY: number;
   player: PlayerPose & { x: number; y: number };
   particles: Particles;
+  ghost: GhostBlock | null;
   /** Null draws everything fully lit (debug). */
   light: LightView | null;
   /** Seconds, for animated effects (heat shimmer). */

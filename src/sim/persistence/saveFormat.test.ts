@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createChunk } from '@/core/world/chunk';
-import { decodeChunk, encodeChunk, SAVE_VERSION, type ChunkRecord } from './saveFormat';
+import {
+  decodeChunk,
+  decodeEntity,
+  encodeChunk,
+  SAVE_VERSION,
+  type ChunkRecord,
+  type EntityRecord,
+} from './saveFormat';
 
 describe('saveFormat', () => {
   it('round-trips a chunk', () => {
@@ -13,7 +20,7 @@ describe('saveFormat', () => {
   });
 
   it('upgrades v1 and v2 chunks, ending without the dropped origin field', () => {
-    expect(SAVE_VERSION).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
     const current = encodeChunk('w', createChunk(0, 0));
     const v2 = {
       ...current,
@@ -26,5 +33,17 @@ describe('saveFormat', () => {
       expect('origin' in chunk).toBe(false);
       expect(chunk.material.length).toBe(current.material.length);
     }
+  });
+
+  it('gives players from before the pack an empty one', () => {
+    const old: EntityRecord = {
+      saveVersion: 3,
+      worldId: 'w',
+      id: 'player',
+      data: { x: 4, y: 9, facing: 1 },
+    };
+    const back = decodeEntity(old);
+    expect(back.saveVersion).toBe(SAVE_VERSION);
+    expect(back.data).toEqual({ x: 4, y: 9, facing: 1, pack: { items: [], held: null } });
   });
 });

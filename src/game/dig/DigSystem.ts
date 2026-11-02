@@ -5,6 +5,7 @@ import type { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
 import type { Contact, MoveIntent } from '../player/PlayerController';
 import type { Player } from '../player/Player';
+import type { Pack } from '../pack/Pack';
 import type { ChunkMirror } from '../world/ChunkMirror';
 import { crackStage, damageFromProgress, MAX_DAMAGE } from './crack';
 import { chooseDigTarget, type DigTarget } from './digTarget';
@@ -53,6 +54,7 @@ export class DigSystem {
     private readonly mirror: ChunkMirror,
     private readonly sim: SimClient,
     private readonly events: EventBus<GameEvents>,
+    private readonly pack: Pack,
   ) {
     this.toolPower = tuning.defaultToolPower;
   }
@@ -133,6 +135,13 @@ export class DigSystem {
       return;
     }
 
+    // Past the hard limit nothing more fits: the tile stays where it is until there's room.
+    if (!this.pack.canAdd(material.numId)) {
+      this.blocked = true;
+      if (swing) this.events.emit('packFull', { ...tilePos(target), material: material.numId });
+      return;
+    }
+
     const stageBefore = this.stage;
     this.progress += dt / digTimeFor(material, this.toolPower, this.tuning);
     if (this.progress >= 1) {
@@ -158,6 +167,7 @@ export class DigSystem {
     // Breaking clears the tile's damage on both sides; no need to send it.
     this.pendingDamage.delete(`${target.x},${target.y}`);
     this.mirror.setMaterial(target.x, target.y, this.materials.air.numId);
+    this.pack.add(material.numId);
     this.sim.send({ type: 'digTile', x: target.x, y: target.y, toolPower: this.toolPower });
     this.events.emit('tileBroken', { ...tilePos(target), material: material.numId });
     this.target = null;

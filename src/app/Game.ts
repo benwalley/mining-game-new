@@ -17,6 +17,8 @@ import { PlayerController, type MoveIntent } from '@/game/player/PlayerControlle
 import { HeatSense } from '@/game/player/HeatSense';
 import { Vitals } from '@/game/player/Vitals';
 import { LightField } from '@/game/light/LightField';
+import { Pack } from '@/game/pack/Pack';
+import { PackController } from '@/game/pack/PackController';
 import { ChunkMirror, fluidAmount, fluidType } from '@/game/world/ChunkMirror';
 import { ChunkStreamer } from '@/game/world/ChunkStreamer';
 import { KeyboardInput } from '@/input/KeyboardInput';
@@ -39,6 +41,7 @@ import {
   hurtPulse,
   toolPower,
 } from '@/ui/stores/gameStore';
+import type { PackActions } from '@/ui/pack/packActions';
 import { Benchmark } from './Benchmark';
 import { GameLoop } from './GameLoop';
 
@@ -70,6 +73,8 @@ export class Game {
   private readonly vitals: Vitals;
   private readonly heat: HeatSense;
   private readonly dig: DigSystem;
+  private readonly pack: Pack;
+  private readonly packCtl: PackController;
   private readonly camera: Camera;
   private readonly particles: Particles;
   private readonly audio = new AudioService();
@@ -88,6 +93,8 @@ export class Game {
   private lastSyncedX = NaN;
   private lastSyncedY = NaN;
   private lastSyncedHealth = NaN;
+  private lastSyncedPack = -1;
+  private hidden = false;
   private lastSave = 'never';
   private inspected: string | null = null;
   private simStats = '—';
@@ -104,8 +111,10 @@ export class Game {
     });
     const { world, player } = await ready;
     const game = new Game(deps, world);
-    if (player) game.player.restore(player);
-    else game.player.placeAt(world.spawn.x + 0.5, world.spawn.y);
+    if (player) {
+      game.player.restore(player);
+      if (player.pack) game.pack.restore(player.pack);
+    } else game.player.placeAt(world.spawn.x + 0.5, world.spawn.y);
     game.camera.snapTo(game.player.x, game.player.y - game.player.h / 2);
     game.streamTick();
     game.loop.start();
@@ -144,9 +153,37 @@ export class Game {
     this.vitals = new Vitals(tuning.vitals, fluids, this.events);
     this.heat = new HeatSense(tuning.heat, this.events, createRng(`heat/${world.seed}`));
     this.events.on('hurt', () => (hurtPulse.value += 1));
-    this.dig = new DigSystem(tuning.dig, tuning.input, materials, this.mirror, sim, this.events);
+    this.pack = new Pack(tuning.pack, (id) => materials.get(id)?.weight ?? 0);
+    this.dig = new DigSystem(
+      tuning.dig,
+      tuning.input,
+      materials,
+      this.mirror,
+      sim,
+      this.events,
+      this.pack,
+    );
     toolPower.value = this.dig.toolPower;
     this.camera = new Camera(tuning.camera, tuning.player, world.dims);
+    this.packCtl = new PackController({
+      tuning: tuning.placing,
+      materials,
+      mirror: this.mirror,
+      sim,
+      events: this.events,
+      player: this.player,
+      pack: this.pack,
+      view: () => {
+        const v = this.renderer.viewTiles;
+        return {
+          x0: Math.floor(this.camera.x - v.w / 2),
+          y0: Math.floor(this.camera.y - v.h / 2),
+          x1: Math.ceil(this.camera.x + v.w / 2),
+          y1: Math.ceil(this.camera.y + v.h / 2),
+        };
+      },
+      onPausedChange: () => this.syncSimPause(),
+    });
     this.particles = new Particles(256, createRng(`fx/${world.seed}`), tuning.fx.particleGravity);
     this.haptics = createHaptics();
     new FeedbackDirector(
@@ -187,6 +224,7 @@ export class Game {
         this.mirror.addChunk(chunk);
       }),
       sim.on('tilesChanged', ({ changes }) => this.mirror.applyChanges(changes)),
+      sim.on('placeRejected', ({ material }) => this.packCtl.refund(material)),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
       sim.on('heatChanged', ({ patches }) => this.mirror.applyHeat(patches)),
       sim.on('simEvents', ({ events }) => {
@@ -212,12 +250,14 @@ export class Game {
       this.loop.stop();
       this.dig.flush();
       this.syncPlayer(true);
-      this.deps.sim.send({ type: 'setPaused', paused: true });
+      this.hidden = true;
+      this.syncSimPause();
       this.deps.sim.send({ type: 'flush' });
       this.audio.suspend();
     };
     const onShow = (): void => {
-      this.deps.sim.send({ type: 'setPaused', paused: false });
+      this.hidden = false;
+      this.syncSimPause();
       this.audio.resume();
       this.loop.start();
     };
@@ -303,7 +343,30 @@ export class Game {
   }
 
   private intent(): MoveIntent {
+    if (this.packCtl.isPaused) return { x: 0, y: 0 };
     return this.pointer.active ? this.pointer.intent() : this.keyboard.intent();
+  }
+
+  /** The sim stands still while the page is hidden or the fan or full pack is open. */
+  private syncSimPause(): void {
+    this.deps.sim.send({ type: 'setPaused', paused: this.hidden || this.packCtl.isPaused });
+  }
+
+  /** The numbers the pack UI sends back: gestures on the button and fan, and the full pack. */
+  get packActions(): PackActions {
+    const g = this.packCtl.gesture;
+    return {
+      setButton: (center) => this.packCtl.setButton(center),
+      down: (p) => g.down(p, performance.now()),
+      move: (p) => g.move(p),
+      up: (p) => g.up(p),
+      cancel: () => g.cancel(),
+      tick: () => g.tick(performance.now()),
+      closeSheet: () => this.packCtl.closeSheet(),
+      select: (numId) => this.packCtl.select(numId),
+      moveItem: (from, to) => this.packCtl.moveItem(from, to),
+      discard: (numId, count) => this.packCtl.discard(numId, count),
+    };
   }
 
   /** The player waits, frozen, until the chunks around them have arrived. */
@@ -326,8 +389,18 @@ export class Game {
 
   private update(dt: number): void {
     const solid = this.mirror.isSolid;
+    this.packCtl.update();
+    // The fan and the full pack freeze the world; only the ghost and the UI keep moving.
+    if (this.packCtl.isPaused) {
+      this.syncPlayer(false);
+      this.updateHud();
+      return;
+    }
     if (this.worldReadyAroundPlayer()) {
       const intent = this.intent();
+      this.packCtl.noteMovement(Math.hypot(intent.x, intent.y) > 0);
+      this.player.speedScale = this.pack.speedFactor;
+      this.player.jumpScale = this.pack.jumpFactor;
       const contact = this.controller.sense(this.player, solid, this.mirror.fluidAt);
       this.dig.update(this.player, intent, contact, dt);
       this.controller.step(this.player, intent, contact, solid, dt, this.dig.isDigging);
@@ -360,10 +433,12 @@ export class Game {
   }
 
   private onTap(cssX: number, cssY: number): void {
-    // Phase 1 has no context actions yet (talk, use, place); debug can pour fluid.
+    if (this.packCtl.isPaused) return;
+    const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
+    if (this.packCtl.tap(Math.floor(t.x), Math.floor(t.y))) return;
+    // No other context actions yet (talk, use); debug can pour fluid.
     const pour = debugPour.value;
     if (pour === 'off') return;
-    const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
     const fluid = this.deps.fluids.require(pour).id;
     // A 3×3 block, enough to start a real flood.
     for (let dy = -1; dy <= 1; dy++) {
@@ -386,12 +461,19 @@ export class Game {
     const p = this.player;
     const health = Math.ceil(p.health);
     const same =
-      p.x === this.lastSyncedX && p.y === this.lastSyncedY && health === this.lastSyncedHealth;
+      p.x === this.lastSyncedX &&
+      p.y === this.lastSyncedY &&
+      health === this.lastSyncedHealth &&
+      this.pack.revision === this.lastSyncedPack;
     if (same && !force) return;
     this.lastSyncedX = p.x;
     this.lastSyncedY = p.y;
     this.lastSyncedHealth = health;
-    this.deps.sim.send({ type: 'playerState', player: p.snapshot() });
+    this.lastSyncedPack = this.pack.revision;
+    this.deps.sim.send({
+      type: 'playerState',
+      player: { ...p.snapshot(), pack: this.pack.snapshot() },
+    });
   }
 
   private streamTick(): void {
@@ -446,6 +528,7 @@ export class Game {
         appearance: p.appearance,
       },
       particles: this.particles,
+      ghost: this.packCtl.ghost,
       light: debugLighting.value ? this.light.view : null,
       time: performance.now() / 1000,
       debug: { grid: debugGrid.value, heat: debugHeat.value },
@@ -488,6 +571,7 @@ export class Game {
   }
 
   private inspectAt(cssX: number, cssY: number): void {
+    if (this.packCtl.isPaused) return;
     const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
     const x = Math.floor(t.x);
     const y = Math.floor(t.y);

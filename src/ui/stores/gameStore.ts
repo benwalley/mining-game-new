@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import type { FanSlot } from '@/game/pack/fanLayout';
 
 /** UI-facing game state. The game writes these at a low rate; Preact components read them. */
 
@@ -58,3 +59,41 @@ export interface HudState {
 export const hud = signal<HudState>({ health: 100, maxHealth: 100, breath: 1, heat: 0 });
 /** Increments each time the player is hurt, to retrigger the damage flash. */
 export const hurtPulse = signal(0);
+
+export interface PackItemView {
+  numId: number;
+  name: string;
+  color: string;
+  count: number;
+  unitWeight: number;
+}
+
+export interface PackView {
+  items: PackItemView[];
+  /** The block that tapping places. Its stack may be empty (the button greys it out). */
+  held: { numId: number; name: string; color: string; count: number } | null;
+  weight: number;
+  capacity: number;
+  /** Weight over capacity; past 1 the pack is overloaded. */
+  load: number;
+}
+
+export const packView = signal<PackView>({
+  items: [],
+  held: null,
+  weight: 0,
+  capacity: 1,
+  load: 0,
+});
+
+export interface FanView {
+  open: boolean;
+  slots: FanSlot[];
+  hover: number | null;
+  /** A ghost block is being aimed; the fan dims. */
+  ghosting: boolean;
+}
+
+export const fanView = signal<FanView>({ open: false, slots: [], hover: null, ghosting: false });
+/** The full-screen pack. */
+export const sheetOpen = signal(false);

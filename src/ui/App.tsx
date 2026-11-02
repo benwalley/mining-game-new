@@ -1,11 +1,16 @@
-import { bootError, bootState, debugVisible } from './stores/gameStore';
+import { bootError, bootState, debugVisible, sheetOpen } from './stores/gameStore';
 import { DebugOverlay, type DebugActions } from './debug/DebugOverlay';
 import { Hud } from './hud/Hud';
+import type { PackActions } from './pack/packActions';
+import { PackControl } from './pack/PackControl';
+import { PackSheet } from './pack/PackSheet';
 
-export function App({ debug }: { debug: DebugActions }) {
+export function App({ debug, pack }: { debug: DebugActions; pack: PackActions }) {
   return (
     <>
       {bootState.value === 'ready' && <Hud />}
+      {bootState.value === 'ready' && <PackControl actions={pack} />}
+      {bootState.value === 'ready' && sheetOpen.value && <PackSheet actions={pack} />}
       {bootState.value !== 'ready' && <BootScreen />}
       {debugVisible.value && <DebugOverlay actions={debug} />}
     </>

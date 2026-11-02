@@ -78,6 +78,34 @@ describe.each([
     expect(chunk.material[idx]).toBe(materials.air.numId);
   });
 
+  it('places blocks into empty tiles, even while paused, and refuses solid ones', async () => {
+    const store = await makeStore();
+    const host = createHost(store);
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-place`,
+    });
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const stone = materials.require('stone').numId;
+    await host.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+
+    await host.send({ type: 'setPaused', paused: true });
+    await host.send({ type: 'placeTile', x: spawn.x, y: spawn.y, material: stone });
+    expect(host.last('tilesChanged')?.changes).toEqual([
+      { x: spawn.x, y: spawn.y, material: stone },
+    ]);
+
+    await host.send({ type: 'placeTile', x: spawn.x, y: spawn.y, material: stone });
+    expect(host.last('placeRejected')).toEqual({
+      type: 'placeRejected',
+      x: spawn.x,
+      y: spawn.y,
+      material: stone,
+    });
+  });
+
   it('wipes the save on reset', async () => {
     const store = await makeStore();
     const worldId = `${WORLD}-c`;

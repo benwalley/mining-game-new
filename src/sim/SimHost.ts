@@ -114,6 +114,9 @@ export class SimHost {
       case 'damageTiles':
         this.damageTiles(msg.changes);
         return;
+      case 'placeTile':
+        this.placeTile(msg.x, msg.y, msg.material);
+        return;
       case 'playerState':
         this.player = msg.player;
         this.playerDirty = true;
@@ -340,6 +343,31 @@ export class SimHost {
       type: 'tilesChanged',
       changes: [{ x, y, material: world.chunks.materialAt(x, y) }],
     });
+  }
+
+  /**
+   * Puts a block into a non-solid tile, pushing out any fluid there. Allowed while
+   * paused: the player can build in frozen time. A refusal tells the main thread
+   * to give the block back.
+   */
+  private placeTile(x: number, y: number, material: number): void {
+    const world = this.requireWorld();
+    const current = world.chunks.materialAt(x, y);
+    const incoming = this.deps.materials.get(material);
+    const here = current === UNLOADED ? undefined : this.deps.materials.get(current);
+    if (!incoming || !incoming.solid || !here || here.solid) {
+      this.post({ type: 'placeRejected', x, y, material });
+      // Also correct the main thread's guess about what the tile is.
+      if (current !== UNLOADED)
+        this.post({ type: 'tilesChanged', changes: [{ x, y, material: current }] });
+      return;
+    }
+    world.fluids.setFluid(x, y, 0, 0);
+    world.chunks.setMaterial(x, y, material);
+    this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+    world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
+    world.heat.tileChanged(x, y);
+    this.post({ type: 'tilesChanged', changes: [{ x, y, material }] });
   }
 
   /** Whether a gas sits next to (x, y): digging there opens a pocket. */

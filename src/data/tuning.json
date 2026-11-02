@@ -39,6 +39,21 @@
     "swingInterval": 0.22,
     "flushTolerance": 0.05
   },
+  "pack": {
+    "capacity": 200,
+    "hardLimit": 1.5,
+    "minSpeedFactor": 0.45,
+    "minJumpFactor": 0.45
+  },
+  "placing": {
+    "holdMs": 300,
+    "swipeMovePx": 10,
+    "ghostPxPerTile": 28,
+    "fanRadiusPx": 128,
+    "fanSlotPx": 44,
+    "fanSlotSpacingDeg": 22,
+    "buttonPx": 56
+  },
   "camera": {
     "targetTilesAcross": 14,
     "minPixelScale": 2,

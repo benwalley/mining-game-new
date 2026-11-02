@@ -5,7 +5,7 @@ import { palette } from '@/content/palette';
 import type { CameraTuning, HeatTuning, LightTuning } from '@/content/tuning';
 import type { LightView } from '@/game/light/LightField';
 import { fluidAmount, fluidType, type ChunkMirror } from '@/game/world/ChunkMirror';
-import type { RenderFrame, Renderer } from '../Renderer';
+import type { GhostBlock, RenderFrame, Renderer } from '../Renderer';
 import { ChunkCache } from './ChunkCache';
 import { createSurface, type Ctx2D, type Surface } from './surface';
 import { drawPlayer } from './playerSprite';
@@ -179,7 +179,26 @@ export class CanvasRenderer implements Renderer {
       ctx.restore();
     }
 
+    if (frame.ghost) this.drawGhost(frame.ghost, ox, oy, tile);
     if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+  }
+
+  private drawGhost(g: GhostBlock, ox: number, oy: number, tile: number): void {
+    const { ctx, scale } = this;
+    const sx = Math.round(ox + g.x * tile);
+    const sy = Math.round(oy + g.y * tile);
+    ctx.globalAlpha = g.valid ? 0.6 : 0.35;
+    this.atlas.drawMaterial(ctx, g.material, sx, sy, tile);
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = scale;
+    ctx.strokeStyle = g.valid ? palette.bone : palette.lava;
+    ctx.strokeRect(sx + scale / 2, sy + scale / 2, tile - scale, tile - scale);
+    if (!g.valid) {
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = palette.lava;
+      ctx.fillRect(sx, sy, tile, tile);
+      ctx.globalAlpha = 1;
+    }
   }
 
   /**
@@ -445,7 +464,7 @@ export class CanvasRenderer implements Renderer {
       ctx.fillRect(0, y, canvas.width, 1);
     }
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = palette.ember;
+    ctx.fillStyle = palette.lava;
     const chunk = CHUNK_SIZE * tile;
     for (let x = ((ox % chunk) + chunk) % chunk; x < canvas.width; x += chunk) {
       ctx.fillRect(x, 0, 2, canvas.height);

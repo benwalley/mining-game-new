@@ -41,6 +41,10 @@ export class Player {
   /** Seconds since the player last took damage. */
   sinceHurt = Infinity;
 
+  /** Set from the pack each frame: 1 unless overloaded. */
+  speedScale = 1;
+  jumpScale = 1;
+
   /** Set by DigSystem: the direction being dug this step, or null. */
   digDir: DigDirection | null = null;
   /** Set by DigSystem for vertical digs: column to center the body over. */

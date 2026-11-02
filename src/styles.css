@@ -118,3 +118,206 @@ body {
   background: #d9401f;
   transition: width 0.15s;
 }
+
+/* Pack button, fan and full pack */
+
+.pack-button {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 14px);
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel);
+  touch-action: none;
+  transition: transform 0.2s;
+}
+
+.pack-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.ring-track,
+.ring-fill {
+  fill: none;
+  stroke-width: 3;
+}
+
+.ring-track {
+  stroke: #4a4550;
+}
+
+.ring-fill {
+  stroke: var(--bone);
+  transition: stroke 0.2s;
+}
+
+.pack-button.over .ring-fill {
+  stroke: #d9401f;
+}
+
+.swatch {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid rgba(236, 230, 220, 0.55);
+}
+
+.pack-glyph {
+  display: block;
+  width: 20px;
+  height: 18px;
+  border-radius: 6px 6px 3px 3px;
+  border: 2px solid var(--bone);
+  border-top-width: 5px;
+}
+
+.fan-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(13, 11, 16, 0.35);
+  touch-action: none;
+}
+
+.fan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.fan.dim {
+  opacity: 0.3;
+}
+
+.fan-slot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid #4a4550;
+}
+
+.fan-slot.held {
+  border-color: var(--bone);
+}
+
+.fan-slot.hover {
+  background: #4a4550;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 14px) calc(env(safe-area-inset-right) + 14px)
+    calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 14px);
+  background: rgba(13, 11, 16, 0.94);
+  touch-action: pan-y;
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sheet-title {
+  font-size: 20px;
+}
+
+.sheet-weight {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--fog);
+}
+
+.sheet-weight.over {
+  color: #ff8a3a;
+}
+
+.sheet-bar {
+  height: 6px;
+  margin: 12px 0;
+  border-radius: 3px;
+  background: #2f2a33;
+  overflow: hidden;
+}
+
+.sheet-bar-fill {
+  height: 100%;
+  background: var(--bone);
+}
+
+.sheet-bar-fill.over {
+  background: #d9401f;
+}
+
+.sheet-empty {
+  color: var(--fog);
+}
+
+.sheet-list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid #2f2a33;
+}
+
+.sheet-row.held .sheet-name {
+  color: #b8f070;
+}
+
+.sheet-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+}
+
+.sheet-name small {
+  color: var(--fog);
+  font-size: 12px;
+}
+
+.sheet button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid #4a4550;
+  border-radius: 8px;
+  background: #1f1b22;
+  color: var(--bone);
+  font: inherit;
+  font-size: 14px;
+}
+
+.sheet button:disabled {
+  opacity: 0.3;
+}
+
+.sheet button:active:not(:disabled) {
+  background: #4a4550;
+}

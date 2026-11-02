@@ -8,10 +8,16 @@ import type { SimEventKind } from '@/content/fluids';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
+
+/** What a save keeps of the pack: stacks in display order, and the held block. */
+export interface PackSnapshot {
+  items: [numId: number, count: number][];
+  held: number | null;
+}
 
 export interface PlayerSnapshot {
   x: number;
@@ -20,6 +26,8 @@ export interface PlayerSnapshot {
   /** Missing in saves from before slice 5; restore treats them as full. */
   health?: number;
   breath?: number;
+  /** Missing in saves from before the pack; restore starts empty. */
+  pack?: PackSnapshot;
 }
 
 export interface WorldInfo {
@@ -82,6 +90,8 @@ export type ToSim =
   | { type: 'digTile'; x: number; y: number; toolPower: number }
   /** Partial dig progress, so half-dug tiles stay half-dug. */
   | { type: 'damageTiles'; changes: DamageChange[] }
+  /** Put a block into an empty tile. Works while paused. Answered with `tilesChanged`, or `placeRejected`. */
+  | { type: 'placeTile'; x: number; y: number; material: number }
   | { type: 'playerState'; player: PlayerSnapshot }
   | { type: 'setPaused'; paused: boolean }
   /** Save everything dirty right now (page is hiding or closing). */
@@ -95,6 +105,8 @@ export type FromSim =
   | { type: 'chunk'; chunk: ChunkData }
   /** Authoritative tile values; the main thread overwrites its mirror with these. */
   | { type: 'tilesChanged'; changes: TileChange[] }
+  /** A `placeTile` the sim refused (solid or unloaded tile); the block goes back in the pack. */
+  | { type: 'placeRejected'; x: number; y: number; material: number }
   /** Fluid that moved this tick, for chunks the main thread holds. */
   | { type: 'fluidsChanged'; patches: FluidPatch[] }
   /** Temperatures that changed, a few times a second, for chunks the main thread holds. */

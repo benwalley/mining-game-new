@@ -92,6 +92,9 @@ export class PlayerController {
     digging: boolean,
   ): void {
     const t = this.tuning;
+    // An overloaded pack scales speed and jump height, not the input itself.
+    const climb = t.climbSpeed * player.speedScale;
+    const jump = this.jumpVelocity * Math.sqrt(player.jumpScale);
     player.prevX = player.x;
     player.prevY = player.y;
 
@@ -124,7 +127,7 @@ export class PlayerController {
       player.cling === 'none';
 
     if (player.climbing) {
-      player.vy = verticalIntent && !digging ? intent.y * t.climbSpeed : 0;
+      player.vy = verticalIntent && !digging ? intent.y * climb : 0;
       player.jumping = false;
     } else if (player.cling === 'wall') {
       // Straight into the wall holds still (and digs); otherwise walk along it.
@@ -133,7 +136,7 @@ export class PlayerController {
         ? t.gripSlideSpeed * (player.gripTimer / t.gripTime)
         : digging || shape.straightHorizontal
           ? 0
-          : intent.y * t.climbSpeed;
+          : intent.y * climb;
       if (Math.abs(player.vy) > 0.5) player.climbDir = player.vy < 0 ? -1 : 1;
       player.jumping = false;
     } else if (player.cling === 'ceiling') {
@@ -141,7 +144,7 @@ export class PlayerController {
       player.vy = -1;
       player.jumping = false;
     } else if (swimming) {
-      const speed = swim.swimSpeed * inFluid.swimSpeedScale;
+      const speed = swim.swimSpeed * inFluid.swimSpeedScale * player.speedScale;
       const stroking = Math.abs(intent.y) > 0.2;
       const target = stroking ? intent.y * speed : swim.maxSinkSpeed * inFluid.swimSpeedScale;
       // Diving in fast is braked hard; otherwise ease toward the stroke or a slow sink.
@@ -155,7 +158,7 @@ export class PlayerController {
       player.jumping = false;
       // Head above the surface while stroking up: hop out onto the bank.
       if (upHeld && contact.fluid.headFluid === 0 && !contact.ceiling && !digging) {
-        player.vy = -this.jumpVelocity * swim.exitJumpScale;
+        player.vy = -jump * swim.exitJumpScale;
         player.jumping = true;
       }
     } else {
@@ -165,7 +168,7 @@ export class PlayerController {
     const canJump = player.jumpBufferTimer > 0 && player.coyoteTimer > 0;
     const free = !player.climbing && player.cling === 'none' && !swimming;
     if (free && !digging && canJump && !contact.ceiling) {
-      player.vy = -this.jumpVelocity;
+      player.vy = -jump;
       player.jumpBufferTimer = 0;
       player.coyoteTimer = 0;
       player.jumping = true;
@@ -181,10 +184,10 @@ export class PlayerController {
     if (player.cling === 'wall') {
       // Keep pushing into the wall: it holds contact, and at the top of the
       // wall the push becomes a mantle onto the ledge.
-      player.vx = player.clingSide * t.climbSpeed;
+      player.vx = player.clingSide * climb;
       this.moveHorizontal(player, solid, dt);
     } else if (player.cling === 'ceiling') {
-      player.vx = slipping ? 0 : intent.x * t.climbSpeed;
+      player.vx = slipping ? 0 : intent.x * climb;
       this.moveHorizontal(player, solid, dt);
       if (player.vx !== 0 && !touching(player.box, 'up', solid)) {
         this.wrapOverCeilingEdge(player, solid, player.vx > 0 ? 1 : -1);
@@ -196,7 +199,8 @@ export class PlayerController {
     } else {
       // Wading or swimming slows the run.
       const wading = inFluid !== undefined && contact.fluid.submersion >= swim.wadeSubmersion;
-      const target = intent.x * t.maxRunSpeed * (wading ? inFluid.moveScale : 1);
+      const target =
+        intent.x * t.maxRunSpeed * player.speedScale * (wading ? inFluid.moveScale : 1);
       const accel = swimming
         ? swim.swimAccel
         : contact.grounded
