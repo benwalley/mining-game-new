@@ -33,7 +33,7 @@ export function PackSheet({ actions }: { actions: PackActions }) {
         <ul class="sheet-list">
           {items.map((item, i) => (
             <li key={item.numId} class={`sheet-row${held?.numId === item.numId ? ' held' : ''}`}>
-              <span class="swatch" style={{ background: item.color }} />
+              <img src={item.icon} class="tile-icon" alt="" draggable={false} />
               <span class="sheet-name">
                 {item.name}
                 <small>

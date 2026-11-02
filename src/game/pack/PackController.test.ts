@@ -54,6 +54,7 @@ function setup(dirtCount = 5) {
     view: () => ({ x0: 0, y0: 0, x1: 32, y1: 32 }),
     tileAt: (x, y) => ({ x: Math.floor(x / TILE_PX), y: Math.floor(y / TILE_PX) }),
     tilePx: () => TILE_PX,
+    iconOf: (numId) => `icon:${numId}`,
     onPausedChange: (p) => pauses.push(p),
     onModeChange: (m) => modes.push(m),
     now: () => clock.now,

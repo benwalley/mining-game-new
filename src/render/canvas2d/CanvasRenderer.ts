@@ -5,7 +5,7 @@ import { palette } from '@/content/palette';
 import type { CameraTuning, HeatTuning, LightTuning } from '@/content/tuning';
 import type { LightView } from '@/game/light/LightField';
 import { fluidAmount, fluidType, type ChunkMirror } from '@/game/world/ChunkMirror';
-import type { GhostBlock, RenderFrame, Renderer, TileTint } from '../Renderer';
+import type { FreezeFx, GhostBlock, RenderFrame, Renderer, TileTint } from '../Renderer';
 import { ChunkCache } from './ChunkCache';
 import { createSurface, type Ctx2D, type Surface } from './surface';
 import { drawPlayer } from './playerSprite';
@@ -36,6 +36,7 @@ export class CanvasRenderer implements Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly cache: ChunkCache;
   private readonly atlas: TileAtlas;
+  private readonly icons = new Map<number, string>();
   /** Screen pixels per source pixel. Always a whole number. */
   private scale = 1;
   private dpr = 1;
@@ -164,6 +165,8 @@ export class CanvasRenderer implements Renderer {
     // Darkness goes over the world but under the player, who carries the lamp.
     if (frame.light) this.drawDarkness(frame.light, ox, oy, tile);
     if (frame.debug.heat) this.drawHeatmap(tx0, ty0, tx1, ty1, ox, oy);
+    // Frozen time greys the world but not the player, who is the one thing still moving.
+    if (frame.freeze) this.drawFreeze(frame.freeze, ox, oy, tile);
 
     // Player, with feet snapped to the source-pixel grid.
     const p = frame.player;
@@ -182,6 +185,74 @@ export class CanvasRenderer implements Renderer {
     if (frame.tint) this.drawTint(frame.tint, ox, oy, tile);
     if (frame.ghost) this.drawGhost(frame.ghost, ox, oy, tile);
     if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+  }
+
+  /** Drawn once per material at twice the tile size, crisp, and kept. */
+  tileIcon(numId: number): string {
+    let url = this.icons.get(numId);
+    if (url === undefined) {
+      const c = document.createElement('canvas');
+      c.width = c.height = TILE_PX * 2;
+      const ctx = c.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+      this.atlas.drawMaterial(ctx, numId, 0, 0, TILE_PX * 2);
+      url = c.toDataURL();
+      this.icons.set(numId, url);
+    }
+    return url;
+  }
+
+  /**
+   * The grey spreads out from the player behind the ring as time stops, and
+   * shrinks back into them when it resumes, so colour returns from the edges.
+   */
+  private drawFreeze(f: FreezeFx, ox: number, oy: number, tile: number): void {
+    const { ctx, canvas } = this;
+    const sx = ox + f.x * tile;
+    const sy = oy + f.y * tile;
+    // Far enough to reach the furthest corner, wherever the player is on screen.
+    const reach = Math.max(
+      Math.hypot(sx, sy),
+      Math.hypot(canvas.width - sx, sy),
+      Math.hypot(sx, canvas.height - sy),
+      Math.hypot(canvas.width - sx, canvas.height - sy),
+    );
+    const t = f.ring;
+    const eased = t === null ? 1 : 1 - (1 - t) ** 2;
+    const r = t === null ? null : Math.max(1, (f.ringDir === 1 ? eased : 1 - eased) * reach);
+
+    ctx.save();
+    if (r !== null) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.clip();
+    }
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.globalAlpha = f.desaturate;
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = f.tint;
+    ctx.fillStyle = palette.deepBlue;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    if (r === null || t === null) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = palette.sky;
+    // A bright edge with a softer, wider echo trailing it.
+    ctx.globalAlpha = 0.9 * (1 - t * t);
+    ctx.lineWidth = tile * (0.18 + 0.35 * (1 - t));
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.35 * (1 - t);
+    ctx.lineWidth = tile * (0.6 + 1.4 * (1 - t));
+    ctx.beginPath();
+    ctx.arc(sx, sy, Math.max(1, r - f.ringDir * tile), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** A faint blue wash on every tile a block could go on. */

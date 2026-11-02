@@ -35,6 +35,8 @@ export interface PackControllerDeps {
   tileAt(cssX: number, cssY: number): Point;
   /** How wide a tile is on screen, in CSS pixels. */
   tilePx(): number;
+  /** A material's tile as an image URL, for the UI. */
+  iconOf(numId: number): string;
   /** The fan, the full pack or build mode started or stopped freezing the world. */
   onPausedChange(paused: boolean): void;
   onModeChange(mode: Mode): void;
@@ -144,6 +146,7 @@ export class PackController {
     this.reachStale = true;
     if (this.last && this.now() - this.last.at > this.d.tuning.undoMs) this.clearUndo();
     if (this.ghostTile) this.ghostValid = this.canPlace(this.ghostTile.x, this.ghostTile.y);
+    if (this.gesture.animate(this.now())) this.publishFan();
     if (this.d.pack.revision !== this.shownRevision) this.publish();
   }
 
@@ -339,6 +342,11 @@ export class PackController {
     if (undoView.value) undoView.value = null;
   }
 
+  private publishFan(): void {
+    const g = this.gesture;
+    fanView.value = { open: g.fanOpen, slots: g.slots, hover: g.hover, center: this.button };
+  }
+
   /** Just the mode signal, so a drag across the button doesn't rebuild the whole pack view. */
   private publishMode(): void {
     modeView.value = {
@@ -367,6 +375,7 @@ export class PackController {
         numId,
         name: nameOf(numId),
         color: colorOf(numId),
+        icon: this.d.iconOf(numId),
         count,
         unitWeight: materials.get(numId)?.weight ?? 0,
       })),
@@ -377,6 +386,7 @@ export class PackController {
               numId: pack.held,
               name: nameOf(pack.held),
               color: colorOf(pack.held),
+              icon: this.d.iconOf(pack.held),
               count: pack.count(pack.held),
             },
       weight: pack.weight,
@@ -385,7 +395,7 @@ export class PackController {
     };
 
     const g = this.gesture;
-    fanView.value = { open: g.fanOpen, slots: g.slots, hover: g.hover };
+    this.publishFan();
     sheetOpen.value = this.sheet;
     this.publishMode();
 

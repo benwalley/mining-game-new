@@ -27,7 +27,7 @@ import { PROTOCOL_VERSION, type WorldInfo, type WorldKind } from '@/protocol/mes
 import type { SimClient } from '@/protocol/SimClient';
 import { CanvasRenderer } from '@/render/canvas2d/CanvasRenderer';
 import { orientationFor } from '@/render/canvas2d/playerSprite';
-import type { Renderer } from '@/render/Renderer';
+import type { FreezeFx, Renderer } from '@/render/Renderer';
 import {
   debugGrid,
   debugHeat,
@@ -95,6 +95,9 @@ export class Game {
   private lastSyncedHealth = NaN;
   private lastSyncedPack = -1;
   private hidden = false;
+  /** When the time-stop ring last started, on real time (gameplay time is what's frozen). */
+  private freezeRingAt = -Infinity;
+  private freezeRingDir: 1 | -1 = 1;
   private lastSave = 'never';
   private inspected: string | null = null;
   private simStats = '—';
@@ -187,10 +190,14 @@ export class Game {
         return { x: Math.floor(t.x), y: Math.floor(t.y) };
       },
       tilePx: () => canvas.clientWidth / this.renderer.viewTiles.w,
+      iconOf: (numId) => this.renderer.tileIcon(numId),
       onPausedChange: () => this.syncSimPause(),
       onModeChange: (mode) => {
         // Leaving dig mode saves a half-dug tile; build mode turns touches on the world into placing.
         this.dig.flush();
+        this.freezeRingAt = performance.now();
+        this.freezeRingDir = mode === 'build' ? 1 : -1;
+        this.events.emit(mode === 'build' ? 'timeFrozen' : 'timeResumed', {});
         this.pointer.setBuildMode(
           mode === 'build' ? tuning.placing.holdMs : null,
           tuning.placing.holdSlopPx,
@@ -374,8 +381,8 @@ export class Game {
     return {
       setButton: (center) => this.packCtl.setButton(center),
       down: (p) => g.down(p, performance.now()),
-      move: (p) => g.move(p),
-      up: () => g.up(),
+      move: (p) => g.move(p, performance.now()),
+      up: () => g.up(performance.now()),
       undo: () => this.packCtl.undo(),
       cancel: () => g.cancel(),
       tick: () => g.tick(performance.now()),
@@ -408,8 +415,8 @@ export class Game {
     const solid = this.mirror.isSolid;
     this.packCtl.update();
     // The fan and the full pack freeze the world; only the ghost and the UI keep moving.
+    // Particles hang in the air too.
     if (this.packCtl.isPaused) {
-      this.particles.update(dt, solid);
       this.syncPlayer(false);
       this.updateHud();
       return;
@@ -548,11 +555,22 @@ export class Game {
       particles: this.particles,
       ghost: this.packCtl.ghost,
       tint: this.packCtl.tint,
+      freeze: this.freezeFx(x, y - p.h / 2),
       light: debugLighting.value ? this.light.view : null,
       time: performance.now() / 1000,
       debug: { grid: debugGrid.value, heat: debugHeat.value },
     });
     this.updateDebug();
+  }
+
+  /** The time-stop effect for this frame, or null when time is running and the ring has closed. */
+  private freezeFx(x: number, y: number): FreezeFx | null {
+    const t = this.deps.tuning.freeze;
+    const ringT = (performance.now() - this.freezeRingAt) / t.ringMs;
+    const ring = ringT < 1 ? ringT : null;
+    const closing = ring !== null && this.freezeRingDir === -1;
+    if (!this.packCtl.building && !closing) return null;
+    return { desaturate: t.desaturate, tint: t.tint, x, y, ring, ringDir: this.freezeRingDir };
   }
 
   private updateDebug(): void {

@@ -52,12 +52,21 @@
     "holdSlopPx": 18,
     "modeStepPx": 50,
     "undoMs": 1000,
-    "fanRadiusPx": 132,
-    "fanSlotPx": 44,
+    "fanRadiusPx": 138,
+    "fanTrackPx": 58,
+    "fanSlotPx": 40,
     "fanSlotSpacingDeg": 20,
-    "fanArcStartDeg": 30,
-    "fanArcEndDeg": 90,
+    "fanArcStartDeg": 5,
+    "fanArcEndDeg": 85,
+    "fanFlickMin": 1.5,
+    "fanFriction": 3.5,
+    "fanSnapRate": 16,
     "buttonPx": 56
+  },
+  "freeze": {
+    "ringMs": 560,
+    "desaturate": 0.85,
+    "tint": 0.2
   },
   "camera": {
     "targetTilesAcross": 14,

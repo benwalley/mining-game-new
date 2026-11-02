@@ -7,6 +7,7 @@ export type PlayerTuning = Tuning['player'];
 export type DigTuning = Tuning['dig'];
 export type PackTuning = Tuning['pack'];
 export type PlacingTuning = Tuning['placing'];
+export type FreezeTuning = Tuning['freeze'];
 export type CameraTuning = Tuning['camera'];
 export type FxTuning = Tuning['fx'];
 export type LightTuning = Tuning['light'];

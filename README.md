@@ -202,7 +202,10 @@ block, or hold anywhere to start a ghost on the tile you're facing, drag it a ti
 of finger travel, and release to place it. The first thing you dig is held automatically. Blocks go
 on on-screen tiles the player could reach through open tiles without breaking anything (tinted
 blue), and may push fluid out. An undo chip lasts one second and covers only the last block.
-The fan and the full pack freeze the world too. On desktop, B toggles build mode, U undoes and
+Entering build mode stops time with a ring that spreads from the mole and greys the world
+behind it (the mole stays in colour, particles hang), and leaving pulls the colour back in. The
+block picker is a quarter-circle track of tile icons that scrolls, flicks and settles on an
+entry. The fan and the full pack freeze the world too. On desktop, B toggles build mode, U undoes and
 Esc returns to dig. Gestures live in the pure `PackGesture` state machine, and
 `PackController` ties it to the world. The pack is saved with the player (`SAVE_VERSION` 4);
 `placeTile` and `unplaceTile` are sim messages (`PROTOCOL_VERSION` 9).

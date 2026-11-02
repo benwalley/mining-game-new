@@ -16,6 +16,24 @@ export interface TileTint {
   mask: Uint8Array;
 }
 
+/**
+ * Time stopping. The world (not the player) drains toward a cold grey behind a
+ * ring that spreads out from the player, and comes back when the ring closes in.
+ */
+export interface FreezeFx {
+  /** Strength of the grey, 0–1. */
+  desaturate: number;
+  /** Strength of the cold tint over it, 0–1. */
+  tint: number;
+  /** Center of the ring, in world tiles. */
+  x: number;
+  y: number;
+  /** Progress of the ring, 0–1, or null when there is none (the grey then covers everything). */
+  ring: number | null;
+  /** 1: spreading out (time stops). -1: closing in (time resumes). */
+  ringDir: 1 | -1;
+}
+
 export interface RenderFrame {
   /** View center in tiles. */
   cameraX: number;
@@ -25,6 +43,7 @@ export interface RenderFrame {
   ghost: GhostBlock | null;
   /** Where a block could go, in build mode. */
   tint: TileTint | null;
+  freeze: FreezeFx | null;
   /** Null draws everything fully lit (debug). */
   light: LightView | null;
   /** Seconds, for animated effects (heat shimmer). */
@@ -46,6 +65,8 @@ export interface Renderer {
     cameraX: number,
     cameraY: number,
   ): { x: number; y: number };
+  /** A material's tile as an image URL, for the UI to show (the fan, the pack). */
+  tileIcon(numId: number): string;
   /** Drop all cached world graphics (for example after a world reset). */
   clearCache(): void;
 }

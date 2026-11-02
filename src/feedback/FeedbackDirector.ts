@@ -62,6 +62,11 @@ export class FeedbackDirector {
       this.debris(e.x, e.y, e.material, 5, 2);
     });
     events.on('ghostStep', () => this.haptics.tick());
+    events.on('timeFrozen', () => {
+      this.audio.freeze();
+      this.haptics.pulse();
+    });
+    events.on('timeResumed', () => this.audio.thaw());
     events.on('packFull', () =>
       this.throttled('packFull', () => {
         this.audio.packFull();

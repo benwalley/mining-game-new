@@ -32,6 +32,9 @@ export interface PackGestureHooks {
   changed(): void;
 }
 
+/** How much of a drag's end counts toward a flick's speed. */
+const FLICK_WINDOW_MS = 100;
+
 /** Below this distance from the button, the angle is too jumpy to scroll by. */
 const MIN_SCROLL_RADIUS_PX = 40;
 
@@ -65,6 +68,12 @@ export class PackGesture {
   private slot: number | null = null;
   private fanWasOpen = false;
   private lastAngle = 0;
+  /** Recent (time, scroll) pairs while dragging the fan, to measure a flick. */
+  private samples: { t: number; s: number }[] = [];
+  /** After a release the fan coasts at `velocity` (slots a second), then settles on an entry. */
+  private settling = false;
+  private velocity = 0;
+  private lastAnimAt: number | null = null;
 
   constructor(
     private readonly t: PlacingTuning,
@@ -99,6 +108,9 @@ export class PackGesture {
   /** Returns false if the touch isn't ours: the fan is closed and it missed the button. */
   down(p: Point, now: number): boolean {
     if (this.phase !== 'idle') return true;
+    // A finger on a coasting fan catches it.
+    this.settling = false;
+    this.velocity = 0;
     this.origin = p;
     this.downAt = now;
     if (this.onButton(p)) {
@@ -113,7 +125,7 @@ export class PackGesture {
     return true;
   }
 
-  move(p: Point): void {
+  move(p: Point, now = 0): void {
     const dx = p.x - this.origin.x;
     const dy = p.y - this.origin.y;
     const far = Math.hypot(dx, dy) > this.t.swipeMovePx;
@@ -145,9 +157,12 @@ export class PackGesture {
         if (!far) return;
         this.phase = 'scrolling';
         this.lastAngle = angleFrom(this.button, p);
+        this.samples = [{ t: now, s: this.scroll }];
         return this.hooks.changed();
       case 'scrolling':
         this.scrollTo(p);
+        this.samples.push({ t: now, s: this.scroll });
+        while (this.samples.length > 8) this.samples.shift();
         break;
       default:
         return;
@@ -164,7 +179,8 @@ export class PackGesture {
     this.hooks.changed();
   }
 
-  up(): void {
+  /** `now` lets a finger that stopped before lifting count as no flick. */
+  up(now?: number): void {
     const phase = this.phase;
     this.phase = 'idle';
     switch (phase) {
@@ -189,11 +205,57 @@ export class PackGesture {
         this.fanOpen = false;
         this.hooks.closeFan();
         break;
+      case 'scrolling':
+        this.release(now);
+        break;
       default:
         break;
     }
     this.hover = null;
     this.hooks.changed();
+  }
+
+  /**
+   * Moves a coasting or settling fan on. Call once a frame; returns true if the
+   * fan moved and needs drawing again.
+   */
+  animate(now: number): boolean {
+    if (!this.settling) return false;
+    const dt = this.lastAnimAt === null ? 0 : Math.min(0.05, (now - this.lastAnimAt) / 1000);
+    this.lastAnimAt = now;
+    if (dt === 0) return false;
+    const max = maxScroll(this.entries, this.t);
+    if (Math.abs(this.velocity) > this.t.fanFlickMin) {
+      this.scroll += this.velocity * dt;
+      this.velocity *= Math.exp(-this.t.fanFriction * dt);
+      // The ends stop it dead rather than letting it fly past.
+      if (this.scroll <= 0 || this.scroll >= max) {
+        this.scroll = Math.max(0, Math.min(max, this.scroll));
+        this.velocity = 0;
+      }
+      return true;
+    }
+    const target = Math.max(0, Math.min(max, Math.round(this.scroll)));
+    this.scroll += (target - this.scroll) * (1 - Math.exp(-this.t.fanSnapRate * dt));
+    if (Math.abs(target - this.scroll) < 0.002) {
+      this.scroll = target;
+      this.settling = false;
+    }
+    return true;
+  }
+
+  /** The finger left a dragged fan: a fast one coasts, a slow one just settles. */
+  private release(now?: number): void {
+    // Only the last tenth of a second of movement counts.
+    const last = this.samples.at(-1);
+    const recent = last ? this.samples.filter((p) => p.t >= last.t - FLICK_WINDOW_MS) : [];
+    const first = recent[0];
+    const span = first && last ? last.t - first.t : 0;
+    const stopped = last !== undefined && now !== undefined && now - last.t > FLICK_WINDOW_MS;
+    this.velocity = span > 0 && !stopped ? ((last!.s - first!.s) * 1000) / span : 0;
+    if (Math.abs(this.velocity) < this.t.fanFlickMin) this.velocity = 0;
+    this.settling = true;
+    this.lastAnimAt = null;
   }
 
   /** The browser took the touch away. Nothing is picked. */

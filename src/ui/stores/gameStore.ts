@@ -65,6 +65,8 @@ export interface PackItemView {
   numId: number;
   name: string;
   color: string;
+  /** The material's tile, as an image URL. */
+  icon: string;
   count: number;
   unitWeight: number;
 }
@@ -72,7 +74,7 @@ export interface PackItemView {
 export interface PackView {
   items: PackItemView[];
   /** The block that tapping places. Its stack may be empty (the button greys it out). */
-  held: { numId: number; name: string; color: string; count: number } | null;
+  held: { numId: number; name: string; color: string; icon: string; count: number } | null;
   weight: number;
   capacity: number;
   /** Weight over capacity; past 1 the pack is overloaded. */
@@ -91,9 +93,16 @@ export interface FanView {
   open: boolean;
   slots: FanSlot[];
   hover: number | null;
+  /** The pack button's center, which the fan's track curves around. */
+  center: { x: number; y: number };
 }
 
-export const fanView = signal<FanView>({ open: false, slots: [], hover: null });
+export const fanView = signal<FanView>({
+  open: false,
+  slots: [],
+  hover: null,
+  center: { x: 0, y: 0 },
+});
 
 export interface ModeView {
   mode: Mode;

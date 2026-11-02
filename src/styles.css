@@ -166,14 +166,6 @@ body {
   stroke: #d9401f;
 }
 
-.swatch {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 2px solid rgba(236, 230, 220, 0.55);
-}
-
 .pack-glyph {
   display: block;
   width: 20px;
@@ -181,40 +173,6 @@ body {
   border-radius: 6px 6px 3px 3px;
   border: 2px solid var(--bone);
   border-top-width: 5px;
-}
-
-.fan-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  background: rgba(13, 11, 16, 0.35);
-  touch-action: none;
-}
-
-.fan {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-}
-
-.fan-slot {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  transform: translate(-50%, -50%);
-  border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid #4a4550;
-}
-
-.fan-slot.held {
-  border-color: var(--bone);
-}
-
-.fan-slot.hover {
-  background: #4a4550;
-  transform: translate(-50%, -50%) scale(1.15);
 }
 
 .sheet {
@@ -448,4 +406,128 @@ body {
   background: var(--panel);
   font-size: 13px;
   pointer-events: none;
+}
+
+/* The block picker: a quarter-circle track around the pack button */
+
+.fan-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+  animation: scrim-in 0.18s ease-out;
+}
+
+.fan-track {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.track-edge,
+.track-band,
+.track-shine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--len) calc(var(--len) * 3);
+  animation: track-open 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.track-edge {
+  stroke: rgba(236, 230, 220, 0.16);
+}
+
+.track-band {
+  stroke: rgba(18, 16, 23, 0.92);
+}
+
+.track-shine {
+  stroke: rgba(143, 200, 232, 0.22);
+  stroke-width: 1.5;
+}
+
+.bead {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(236, 230, 220, 0.18);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3a3440, #1a171e 70%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%) scale(var(--k, 1));
+  transition:
+    transform 0.12s ease-out,
+    border-color 0.12s,
+    box-shadow 0.12s;
+  pointer-events: none;
+}
+
+.bead.pop {
+  animation: bead-pop 0.2s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+.bead.held {
+  border: 2px solid #8fc8e8;
+  box-shadow:
+    0 0 0 3px rgba(143, 200, 232, 0.18),
+    0 0 14px rgba(143, 200, 232, 0.45);
+}
+
+.bead.hover {
+  background: radial-gradient(circle at 35% 30%, #4d4656, #221e27 70%);
+  transform: translate(-50%, -50%) scale(calc(var(--k, 1) * 1.2));
+}
+
+.tile-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  image-rendering: pixelated;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.face-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.all-glyph {
+  fill: var(--bone);
+  opacity: 0.85;
+}
+
+.fan-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 4px 10px;
+  border: 1px solid rgba(236, 230, 220, 0.14);
+  border-radius: 10px;
+  background: rgba(13, 11, 16, 0.85);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes track-open {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bead-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
 }

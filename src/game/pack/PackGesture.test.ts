@@ -5,10 +5,10 @@ import { PackGesture } from './PackGesture';
 const BUTTON = { x: 300, y: 500 };
 // With the default tuning the first fan entries sit about here, along the arc up and left of the button.
 const SLOT = [
-  { x: 234, y: 386 },
-  { x: 199, y: 415 },
-  { x: 176, y: 455 },
-  { x: 168, y: 500 },
+  { x: 288, y: 362 },
+  { x: 242, y: 375 },
+  { x: 202, y: 402 },
+  { x: 175, y: 442 },
 ];
 
 function setup(entries = 4, modes = 3) {
@@ -183,22 +183,86 @@ describe('PackGesture', () => {
     expect(g.fanOpen).toBe(false);
   });
 
-  it('scrolls when dragged along the arc, and stays within the entries', () => {
+  it('scrolls when dragged along the arc, settles on an entry, and stays within the entries', () => {
     const { g, swipeOut } = setup(10);
     swipeOut({ x: 100, y: 300 });
     g.up();
+    // A slow drag: no flick, so it just settles on the nearest entry.
     g.down(SLOT[2]!, 0);
-    g.move({ x: 190, y: 440 });
-    g.move(SLOT[0]!);
+    g.move({ x: 190, y: 415 }, 0);
+    g.move(SLOT[0]!, 1000);
     g.up();
     expect(g.fanOpen).toBe(true);
-    expect(g.scroll).toBeGreaterThan(1.4);
-    expect(g.scroll).toBeLessThan(1.8);
+    expect(g.scroll).toBeGreaterThan(2.2);
+    expect(g.scroll).toBeLessThan(2.5);
+    for (let t = 0; t <= 1000; t += 16) g.animate(1000 + t);
+    expect(g.scroll).toBe(2);
 
-    g.down({ x: 234, y: 386 }, 0);
-    g.move({ x: 216, y: 398 });
-    g.move({ x: 100, y: 455 });
+    g.down({ x: 288, y: 362 }, 3000);
+    g.move({ x: 270, y: 368 }, 3000);
+    g.move({ x: 100, y: 455 }, 4000);
     g.up();
+    for (let t = 0; t <= 1000; t += 16) g.animate(5000 + t);
     expect(g.scroll).toBe(0);
+  });
+
+  it('coasts after a flick, slows down and lands exactly on an entry', () => {
+    const { g, swipeOut } = setup(20);
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    // Two slots' worth of arc in 50 ms is a fast flick toward later entries.
+    g.down(SLOT[2]!, 0);
+    g.move({ x: 190, y: 415 }, 10);
+    g.move(SLOT[0]!, 60);
+    g.up();
+    const released = g.scroll;
+    let t = 60;
+    g.animate(t);
+    for (let i = 0; i < 20; i++) g.animate((t += 16));
+    expect(g.scroll).toBeGreaterThan(released + 1);
+    for (let i = 0; i < 200; i++) g.animate((t += 16));
+    expect(Number.isInteger(g.scroll)).toBe(true);
+    expect(g.scroll).toBeGreaterThan(released + 2);
+  });
+
+  it('stops a coasting fan when a finger lands on it', () => {
+    const { g, swipeOut } = setup(20);
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    g.down(SLOT[2]!, 0);
+    g.move({ x: 190, y: 415 }, 10);
+    g.move(SLOT[0]!, 60);
+    g.up();
+    g.animate(60);
+    g.animate(76);
+    const caught = g.scroll;
+    g.down({ x: 230, y: 380 }, 80);
+    expect(g.animate(200)).toBe(false);
+    expect(g.scroll).toBe(caught);
+  });
+
+  it("doesn't flick when the finger stopped before lifting", () => {
+    const { g, swipeOut } = setup(20);
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    g.down(SLOT[2]!, 0);
+    g.move({ x: 190, y: 415 }, 10);
+    g.move(SLOT[0]!, 60);
+    g.up(400);
+    const released = g.scroll;
+    for (let t = 400; t < 2000; t += 16) g.animate(t);
+    expect(g.scroll).toBe(Math.round(released));
+  });
+
+  it('stops dead at the end instead of flying past it', () => {
+    const { g, swipeOut } = setup(6);
+    swipeOut({ x: 100, y: 300 });
+    g.up();
+    g.down(SLOT[2]!, 0);
+    g.move({ x: 190, y: 415 }, 10);
+    g.move(SLOT[0]!, 30);
+    g.up();
+    for (let t = 30; t < 3000; t += 16) g.animate(t);
+    expect(g.scroll).toBe(1); // Six entries, five on the arc.
   });
 });

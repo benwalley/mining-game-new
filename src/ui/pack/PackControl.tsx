@@ -3,6 +3,7 @@ import { tuning } from '@/content/tuning';
 import { stripPositions } from '@/game/pack/carousel';
 import type { Mode } from '@/game/pack/modes';
 import { fanView, modeView, packView, undoView, type PackView } from '../stores/gameStore';
+import { Fan } from './Fan';
 import type { PackActions } from './packActions';
 
 const RING = 2 * Math.PI * 24;
@@ -23,7 +24,13 @@ function ModeFace({ mode, held }: { mode: Mode; held: PackView['held'] }) {
   }
   if (!held) return <span class="pack-glyph" />;
   return (
-    <span class="swatch" style={{ background: held.color, opacity: held.count === 0 ? 0.3 : 1 }} />
+    <img
+      src={held.icon}
+      class="tile-icon face-icon"
+      style={{ opacity: held.count === 0 ? 0.3 : 1 }}
+      alt=""
+      draggable={false}
+    />
   );
 }
 
@@ -90,36 +97,7 @@ export function PackControl({ actions }: { actions: PackActions }) {
   return (
     <>
       {mode === 'build' && <div class="mode-tag">Build</div>}
-      {fan.open && (
-        <div class="fan-scrim interactive" {...handlers}>
-          <div class="fan">
-            {fan.slots.map((s) => {
-              const item = packView.value.items[s.index];
-              const isHeld = item !== undefined && item.numId === held?.numId;
-              return (
-                <div
-                  key={s.index}
-                  class={`fan-slot${fan.hover === s.index ? ' hover' : ''}${isHeld ? ' held' : ''}`}
-                  style={{
-                    left: `${s.x}px`,
-                    top: `${s.y}px`,
-                    opacity: s.alpha,
-                    width: `${tuning.placing.fanSlotPx}px`,
-                    height: `${tuning.placing.fanSlotPx}px`,
-                  }}
-                  aria-label={item ? item.name : 'Open pack'}
-                >
-                  {item ? (
-                    <span class="swatch" style={{ background: item.color }} />
-                  ) : (
-                    <span class="pack-glyph" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {fan.open && <Fan handlers={handlers} />}
       {scrubbing && <div class="mode-bubble">{MODE_LABEL[shown]}</div>}
       {undo && (
         <button

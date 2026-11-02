@@ -66,6 +66,20 @@ export class AudioService {
     this.sweep(110, 60, 0.1, 0.4);
   }
 
+  /** Time stops: a falling sweep over a deep thump, a rush of air and a cold shimmer. */
+  freeze(): void {
+    this.sweep(900, 110, 0.45, 0.3);
+    this.tone(52, 0.55, 0.35, 'sine');
+    this.noiseBurst(2400, 0.7, 0.3, 0.22);
+    this.noiseBurst(6500, 1.4, 0.6, 0.07, 0.06);
+  }
+
+  /** Time resumes: the same thing rising, shorter. */
+  thaw(): void {
+    this.sweep(140, 780, 0.28, 0.24);
+    this.noiseBurst(1800, 0.8, 0.2, 0.16);
+  }
+
   /** The pack can't take more. */
   packFull(): void {
     this.tone(95, 0.18, 0.3, 'sawtooth');

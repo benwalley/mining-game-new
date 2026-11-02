@@ -75,9 +75,9 @@ messages (`PROTOCOL_VERSION` 9), and the sim accepts them while paused. The mode
   arc, ghost offset, undo time).
 - **The full pack reorders with up and down buttons,** not by dragging. Inspect shows only the
   count and weight; properties come with discovery.
-- **The fan scrolls by dragging along the arc,** with no flick momentum. Swiping down from the
-  button has little room at the bottom of the screen, which is fine with two modes since up
-  wraps.
+- **No haptics are assumed** (the owner's phone has none): every cue also has a sound or a
+  visual. Swiping down from the control button has little room at the bottom of the screen,
+  which is fine with two modes since up wraps.
 - **Build mode doesn't pan,** so building further means leaving it and walking.
 - **Left-handed mirroring** (a Could) isn't built.
 

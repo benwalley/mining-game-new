@@ -33,19 +33,24 @@ Movement is 8-directional. Digging is 4-directional (left, right, up, down) to k
 > | Hold still for 0.4 s                            | Open the full pack.                                                                                                                                                                                      |
 > | With the fan open: tap the button or outside it | Close the fan.                                                                                                                                                                                           |
 > | In the fan: tap an entry                        | Hold that block and close the fan. The last entry opens the full pack.                                                                                                                                   |
-> | In the fan: drag along the arc                  | Scroll.                                                                                                                                                                                                  |
+> | In the fan: drag along the track                | Scroll. A flick coasts, slows and settles exactly on an entry; a finger on it stops it.                                                                                                                  |
 >
 > A swipe is told apart from a hold by movement (more than about 10 px), and an up or down
 > swipe from a left one by which way it mostly goes. A swipe to the right does nothing. While
 > still sliding in the fan, pausing over an entry does nothing; letting go over one picks it.
-> The fan's entries sit between up-left and left of the button, leaving straight up free for
-> the mode scrub. The fan opens in either mode, and closing the full pack returns to the mode
+> The fan is a quarter-circle track curving from straight left of the button round to straight
+> above it, with the pack's blocks (shown as their tiles) sliding along inside it. The fan opens
+> in either mode, and closing the full pack returns to the mode
 > you were in.
 >
 > - **Dig mode:** the old swipe-to-move-and-dig controls. Tapping the world does nothing.
 >   Leaving it stops movement and saves a half-dug tile.
 > - **Build mode:** the sim, player, digging, health and heat all stop, and the camera stays
->   where it is (no panning). The held block is placed on tiles that are on screen, that the
+>   where it is (no panning). Time stopping should feel like a power move: a ring spreads out
+>   from the player, the world behind it drains to a cold grey while the mole stays in colour,
+>   particles hang in the air, and a falling "time stops" sound plays. Leaving build mode
+>   reverses it: the ring closes back in and colour returns from the edges. No cue relies on
+>   haptics. The held block is placed on tiles that are on screen, that the
 >   player could reach through open tiles without breaking a block (up, down, left and right
 >   steps only, so a diagonal gap doesn't count), and that aren't the player's own. Those
 >   tiles are tinted faintly blue.

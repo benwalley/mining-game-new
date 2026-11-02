@@ -14,6 +14,10 @@ export interface GameEvents {
   unplaced: { x: number; y: number; material: number };
   /** A tap or release on a tile that can't take a block. */
   placeDenied: { x: number; y: number };
+  /** Build mode began: the world stops. */
+  timeFrozen: Record<string, never>;
+  /** Build mode ended: the world moves again. */
+  timeResumed: Record<string, never>;
   /** The ghost block moved onto a new tile. */
   ghostStep: Record<string, never>;
   jumped: Record<string, never>;

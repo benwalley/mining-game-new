@@ -41,7 +41,11 @@ No numbers appear in the HUD. Numbers are fine inside the crafting sheet and jou
 > border shows the mode: white for dig, blue for build. A small tag at
 > the bottom left says "Build" while building, and a faint blue tint marks the tiles a block
 > can go on. After a placement, an undo chip with a 1-second ring appears beside the button.
-> The picker fan and the full pack pause the game, and so does build mode. The full pack is a
+> The block picker is a dark quarter-circle track that sweeps open around the button, with
+> round beads carrying each block's tile sliding inside it; the held block glows, and the name
+> of the block under the finger (or the held one) sits in the curve. Build mode greys the world
+> behind a spreading ring, leaving the player in colour. The picker fan and the full pack pause
+> the game, and so does build mode. The full pack is a
 > full-screen, scrollable list where the player rearranges and discards items, and inspects
 > them.
 
