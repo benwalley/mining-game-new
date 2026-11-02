@@ -153,4 +153,14 @@ describe('SolidSim', () => {
     expect(w.chunk.fluidAmount[above]).toBe(8);
     expect(w.sim.drain().touched.length).toBeGreaterThan(0);
   });
+
+  it('holds falling sand in a frozen zone until it runs again', () => {
+    const w = world(['#s#', '#d#', '#.#', '#.#', '###']);
+    w.dig(1, 1);
+    const frozen = { runsNow: () => false, dtScale: () => 1 };
+    for (let i = 0; i < 40; i++) w.sim.tick(DT, frozen);
+    expect(w.at(1, 0)).toBe('sand');
+    w.run(t.looseSeconds + 0.5);
+    expect(w.at(1, 3)).toBe('sand');
+  });
 });

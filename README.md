@@ -167,9 +167,21 @@ tiles down):
 - **Water pocket over lava**, x 124–126: dig down at x 125, then dig the floor under the
   water.
 
-**Phase 1, still to come (reordered):** simulation zones and the 60 fps phone gate (fluids
-and solids run in every loaded chunk for now), then heat (a temperature field from depth
-and lava, warnings only). Melting and igniting at heat limits move to phase 2 with fire,
+**Phase 1, slice 5 (done; needs the phone run):** simulation zones (`src/sim/zones.ts`).
+Chunks within 1 chunk of the mole's chunk run every tick, those out to 3 chunks (about 100
+tiles) run every other tick with double steps, and anything further is frozen until you
+come back, with no catch-up. The worker keeps the near zone loaded itself, so a flood you
+walk away from keeps spreading, and it drops clean chunks once they're frozen and off
+screen. Saving now keeps health and breath, flushes when Chrome freezes a background tab,
+and shows in the debug overlay whether the browser promised to keep storage, plus the last
+save error.
+
+**The 60 fps gate:** tap **bench** in the debug overlay (use the test world: it carves a
+40×12 room around you and floods it with water and some lava). After 20 s it shows PASS or
+MISS, fps, frame-interval percentiles, slow frames, main-thread work, sim tick cost and the
+device. Screenshot that.
+
+**Phase 1, still to come:** heat (a temperature field from depth and lava, warnings only). Melting and igniting at heat limits move to phase 2 with fire,
 torches and furnaces; cave-ins come back there with support beams.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,

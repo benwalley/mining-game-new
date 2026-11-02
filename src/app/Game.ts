@@ -35,12 +35,15 @@ import {
   debugGrid,
   debugInfo,
   debugLighting,
+  benchReport,
+  benchStatus,
   debugPour,
   debugVisible,
   hud,
   hurtPulse,
   toolPower,
 } from '@/ui/stores/gameStore';
+import { Benchmark } from './Benchmark';
 import { GameLoop } from './GameLoop';
 
 const STEP = 1 / 60;
@@ -87,9 +90,11 @@ export class Game {
   private lastPlayerSync = 0;
   private lastSyncedX = NaN;
   private lastSyncedY = NaN;
+  private lastSyncedHealth = NaN;
   private lastSave = 'never';
   private inspected: string | null = null;
   private simStats = '—';
+  private bench: Benchmark | null = null;
 
   /** Connects to the sim, waits for the world, and starts playing. */
   static async start(deps: GameDeps): Promise<Game> {
@@ -190,10 +195,11 @@ export class Game {
       sim.on('simEvents', ({ events }) => {
         for (const e of events) if (this.nearView(e.x, e.y)) this.events.emit(e.kind, e);
       }),
-      sim.on('simStats', ({ tickMs, awakeTiles, solidsActive }) => {
+      sim.on('simStats', (s) => {
         this.simStats =
-          `${tickMs.toFixed(2)} ms/tick · ${awakeTiles} fluid tiles awake` +
-          ` · ${solidsActive} solids moving`;
+          `${s.tickMs.toFixed(2)} ms/tick (worst ${s.tickMsMax.toFixed(1)}) · ` +
+          `${s.awakeTiles} fluid tiles awake · ${s.solidsActive} solids moving · ${s.chunks} chunks`;
+        this.bench?.simStats(s);
       }),
       sim.on('saved', ({ at }) => {
         this.lastSave = new Date(at).toLocaleTimeString();
@@ -221,11 +227,62 @@ export class Game {
     window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onHide);
+    // Chrome may freeze a background tab without hiding it first.
+    document.addEventListener('freeze', onHide);
     this.disposers.push(
+      () => document.removeEventListener('freeze', onHide),
       () => window.removeEventListener('resize', onResize),
       () => document.removeEventListener('visibilitychange', onVisibility),
       () => window.removeEventListener('pagehide', onHide),
     );
+  }
+
+  /**
+   * Debug: the phase 1 performance gate. Carves a room around the player,
+   * floods it with water and a little lava, and reports frame timing after
+   * the run. Changes the world, so it's for test saves.
+   */
+  runBenchmark(seconds = 20): void {
+    if (this.bench) return;
+    const { sim, fluids } = this.deps;
+    const px = Math.floor(this.player.x);
+    const floor = Math.floor(this.player.y - 0.01);
+    const W = 20;
+    const H = 12;
+    for (let y = floor - H + 1; y <= floor; y++) {
+      for (let x = px - W; x < px + W; x++) sim.send({ type: 'digTile', x, y, toolPower: 99 });
+    }
+    const top = floor - H + 1;
+    const water = fluids.require('water').id;
+    const lava = fluids.require('lava').id;
+    for (let y = top; y < top + 3; y++) {
+      for (let x = px - W; x < px + 6; x++) {
+        sim.send({ type: 'pourFluid', x, y, fluid: water, amount: 8 });
+      }
+      for (let x = px + 13; x < px + 17; x++) {
+        sim.send({ type: 'pourFluid', x, y, fluid: lava, amount: 8 });
+      }
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const device = `${screen.width}×${screen.height} @${dpr}x · ${describeBrowser(navigator.userAgent)}`;
+    const bench = new Benchmark(seconds * 1000, device);
+    this.bench = bench;
+    benchReport.value = null;
+    this.loop.onFrame = (interval, work) => bench.frame(interval, work);
+  }
+
+  private updateBenchmark(): void {
+    const bench = this.bench;
+    if (!bench) return;
+    const left = bench.remaining();
+    if (left > 0) {
+      benchStatus.value = `benchmark running… ${Math.ceil(left)} s`;
+      return;
+    }
+    this.loop.onFrame = null;
+    this.bench = null;
+    benchStatus.value = null;
+    benchReport.value = bench.report();
   }
 
   /** Debug: change the pick's dig power (1–10). */
@@ -355,9 +412,13 @@ export class Game {
     if (!force && now - this.lastPlayerSync < this.deps.tuning.save.playerSyncIntervalMs) return;
     this.lastPlayerSync = now;
     const p = this.player;
-    if (p.x === this.lastSyncedX && p.y === this.lastSyncedY) return;
+    const health = Math.ceil(p.health);
+    const same =
+      p.x === this.lastSyncedX && p.y === this.lastSyncedY && health === this.lastSyncedHealth;
+    if (same && !force) return;
     this.lastSyncedX = p.x;
     this.lastSyncedY = p.y;
+    this.lastSyncedHealth = health;
     this.deps.sim.send({ type: 'playerState', player: p.snapshot() });
   }
 
@@ -420,6 +481,7 @@ export class Game {
   }
 
   private updateDebug(): void {
+    this.updateBenchmark();
     const now = performance.now();
     this.fpsFrames++;
     if (now - this.fpsSince >= 1000) {
@@ -484,4 +546,13 @@ export class Game {
     ];
     debugPour.value = order[(order.indexOf(debugPour.value) + 1) % order.length]!;
   }
+}
+
+/** "iPhone; CPU iPhone OS 18_1 like Mac OS X · Version/18.1 Mobile Safari", say. */
+function describeBrowser(ua: string): string {
+  const platform = /\(([^)]+)\)/.exec(ua)?.[1] ?? 'unknown platform';
+  const browser =
+    /(CriOS|FxiOS|EdgiOS|Edg|Chrome|Firefox|Version)\/[\d.]+( Mobile)?( Safari)?/.exec(ua)?.[0] ??
+    'unknown browser';
+  return `${platform} · ${browser}`;
 }

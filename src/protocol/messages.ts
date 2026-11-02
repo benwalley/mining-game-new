@@ -17,6 +17,9 @@ export interface PlayerSnapshot {
   x: number;
   y: number;
   facing: 1 | -1;
+  /** Missing in saves from before slice 5; restore treats them as full. */
+  health?: number;
+  breath?: number;
 }
 
 export interface WorldInfo {
@@ -91,7 +94,16 @@ export type FromSim =
   | { type: 'fluidsChanged'; patches: FluidPatch[] }
   | { type: 'simEvents'; events: SimEvent[] }
   /** About once a second: how much work the simulation is doing. */
-  | { type: 'simStats'; tickMs: number; awakeTiles: number; solidsActive: number }
+  | {
+      type: 'simStats';
+      /** Average and worst time per tick since the last report. */
+      tickMs: number;
+      tickMsMax: number;
+      awakeTiles: number;
+      solidsActive: number;
+      /** Chunks the sim holds in memory. */
+      chunks: number;
+    }
   | { type: 'saved'; at: number; chunks: number }
   | { type: 'worldReset' }
   | { type: 'error'; message: string };

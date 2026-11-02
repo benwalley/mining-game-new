@@ -210,4 +210,14 @@ describe('FluidSim', () => {
     // Terrain is untouched.
     expect(w.cell(3, 0).material).toBe(materials.air.numId);
   });
+
+  it('freezes fluid in far zones and keeps it awake for when the player returns', () => {
+    const w = world(['#w#', '#.#', '#.#', '###']);
+    const frozen = { runsNow: () => false, dtScale: () => 1 };
+    for (let t = 0; t < 5; t++) w.sim.tick(frozen);
+    expect(w.cell(1, 0).amount).toBe(8);
+    expect(w.sim.sleeping).toBe(false);
+    w.run(1);
+    expect(w.cell(1, 1).amount).toBe(8);
+  });
 });

@@ -4,9 +4,8 @@ import testWorldConfig from '@/data/test-world.json';
 import { loadFluids } from '@/content/fluids';
 import { loadMaterials } from '@/content/materials';
 import { tuning } from '@/content/tuning';
-import type { ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE } from '@/core/world/constants';
-import { PROTOCOL_VERSION, type FromSim, type ToSim } from '@/protocol/messages';
+import { PROTOCOL_VERSION, type ChunkCoord, type FromSim, type ToSim } from '@/protocol/messages';
 import { IdbSaveStore } from './persistence/IdbSaveStore';
 import { MemorySaveStore } from './persistence/MemorySaveStore';
 import type { SaveStore } from './persistence/SaveStore';
@@ -127,15 +126,19 @@ describe.each([
     const water = fluids.require('water').id;
     const first = createHost(store);
     await first.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
-    await first.send({ type: 'requestChunks', chunks: [spawnChunk] });
-    const waterIn = (chunk: ChunkData) => {
+    // Poured water may spread into neighboring chunks, which the sim now keeps loaded.
+    const near: ChunkCoord[] = [-1, 0, 1].map((dx) => [spawnChunk[0] + dx, spawnChunk[1]] as const);
+    await first.send({ type: 'requestChunks', chunks: near });
+    const waterIn = (msgs: FromSim[]) => {
       let total = 0;
-      chunk.fluidType.forEach((t, i) => {
-        if (t === water) total += chunk.fluidAmount[i]!;
-      });
+      for (const m of msgs.filter((m) => m.type === 'chunk').slice(-near.length)) {
+        m.chunk.fluidType.forEach((t, i) => {
+          if (t === water) total += m.chunk.fluidAmount[i]!;
+        });
+      }
       return total;
     };
-    const before = waterIn(first.last('chunk')!.chunk);
+    const before = waterIn(first.out);
     await first.send({ type: 'pourFluid', x: spawn.x, y: spawn.y - 4, fluid: water, amount: 8 });
     for (let t = 0; t < 30; t++) first.host.tick();
     const patches = first.out.flatMap((m) => (m.type === 'fluidsChanged' ? m.patches : []));
@@ -144,11 +147,14 @@ describe.each([
 
     const second = createHost(store);
     await second.send({ type: 'init', protocol: PROTOCOL_VERSION, kind: 'test', worldId });
-    await second.send({ type: 'requestChunks', chunks: [spawnChunk] });
-    const chunk = second.last('chunk')!.chunk;
+    await second.send({ type: 'requestChunks', chunks: near });
     // The poured water fell to the ground and was saved there.
-    expect(waterIn(chunk)).toBe(before + 8);
-    expect(chunk.fluidAmount[(spawn.y - 4) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE)]).toBe(0);
+    expect(waterIn(second.out)).toBe(before + 8);
+    const home = second.out.findLast(
+      (m) => m.type === 'chunk' && m.chunk.cx === spawnChunk[0] && m.chunk.cy === spawnChunk[1],
+    );
+    const i = (spawn.y - 4) * CHUNK_SIZE + (spawn.x % CHUNK_SIZE);
+    expect(home?.type === 'chunk' && home.chunk.fluidAmount[i]).toBe(0);
   });
 
   it('leaves an undermined ceiling standing but lets sand fall', async () => {
@@ -168,5 +174,36 @@ describe.each([
     expect(events.map((e) => e.kind)).toEqual(expect.arrayContaining(['loose', 'land']));
     await host.send({ type: 'flush' });
     expect(host.last('saved')?.chunks).toBeGreaterThan(0);
+  });
+
+  it('keeps the area around the player loaded and running, and lets far chunks go', async () => {
+    const store = await makeStore();
+    const host = createHost(store);
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-g`,
+    });
+    // Loading is kicked off in the background; give it a moment.
+    await new Promise((r) => setTimeout(r, 50));
+    const held = () =>
+      (
+        host.host as unknown as {
+          world: { chunks: { size: number; has(cx: number, cy: number): boolean } };
+        }
+      ).world.chunks;
+    const r = tuning.sim.nearRadiusChunks;
+    // The test world is 6 chunks wide, so check toward its middle.
+    expect(held().has(spawnChunk[0] - r, spawnChunk[1] + r)).toBe(true);
+    // None of these were requested by the main thread, so nothing was sent.
+    expect(host.out.filter((m) => m.type === 'chunk')).toHaveLength(0);
+
+    // Walk far away: the old area falls out of every zone and is dropped.
+    await host.send({ type: 'playerState', player: { x: 20, y: 300, facing: 1 } });
+    await new Promise((r) => setTimeout(r, 50));
+    for (let t = 0; t < 40; t++) host.host.tick();
+    expect(held().has(spawnChunk[0] - r + 3, spawnChunk[1] + r)).toBe(false);
+    expect(held().has(0, Math.floor(300 / CHUNK_SIZE))).toBe(true);
   });
 });

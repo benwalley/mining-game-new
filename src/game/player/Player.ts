@@ -72,11 +72,13 @@ export class Player {
   }
 
   snapshot(): PlayerSnapshot {
-    return { x: this.x, y: this.y, facing: this.facing };
+    return { x: this.x, y: this.y, facing: this.facing, health: this.health, breath: this.breath };
   }
 
   restore(s: PlayerSnapshot): void {
     this.placeAt(s.x, s.y);
     this.facing = s.facing;
+    if (s.health !== undefined) this.health = s.health;
+    if (s.breath !== undefined) this.breath = s.breath;
   }
 }

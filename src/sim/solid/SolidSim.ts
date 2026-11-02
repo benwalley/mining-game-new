@@ -4,6 +4,7 @@ import { CHUNK_MASK, CHUNK_SHIFT, UNLOADED, chunkKey } from '@/core/world/consta
 import type { MaterialRegistry } from '@/content/materials';
 import type { SupportTuning } from '@/content/tuning';
 import type { SimEvent, TileChange } from '@/protocol/messages';
+import { ALL_ACTIVE, type ZoneMap } from '../zones';
 import { isUnsupported, type SupportView } from './support';
 
 export interface SolidOutputs {
@@ -117,10 +118,16 @@ export class SolidSim {
     return out;
   }
 
-  tick(dt: number): void {
+  /** One step. Tiles in chunks the zones skip this tick wait, untouched. */
+  tick(dt: number, zones: ZoneMap = ALL_ACTIVE): void {
     const checks = this.checks;
     this.checks = new Map();
     for (const [key, quick] of checks) this.evaluate(key, quick);
+    const step = (key: number): number => {
+      const cx = (key % this.width) >> CHUNK_SHIFT;
+      const cy = Math.floor(key / this.width) >> CHUNK_SHIFT;
+      return zones.runsNow(cx, cy) ? dt * zones.dtScale(cx, cy) : 0;
+    };
 
     for (const [key, f] of this.failing) {
       const x = key % this.width;
@@ -129,8 +136,10 @@ export class SolidSim {
         this.failing.delete(key); // Dug out or replaced meanwhile.
         continue;
       }
-      f.left -= dt;
-      f.dust -= dt;
+      const fdt = step(key);
+      if (fdt === 0) continue;
+      f.left -= fdt;
+      f.dust -= fdt;
       if (f.dust <= 0) {
         f.dust = this.tuning.dustEverySeconds;
         this.out.events.push({ kind: 'creak', x, y, material: f.material });
@@ -155,8 +164,10 @@ export class SolidSim {
     }
 
     for (const [key, left] of this.loose) {
-      if (left - dt > 0) {
-        this.loose.set(key, left - dt);
+      const ldt = step(key);
+      if (ldt === 0) continue;
+      if (left - ldt > 0) {
+        this.loose.set(key, left - ldt);
         continue;
       }
       this.loose.delete(key);
@@ -169,7 +180,10 @@ export class SolidSim {
     // Bottom rows first (larger keys), so a falling column moves as one.
     const order = [...this.falling].sort((a, b) => b - a);
     this.falling = new Set();
-    for (const key of order) this.fall(key);
+    for (const key of order) {
+      if (step(key) === 0) this.falling.add(key);
+      else this.fall(key);
+    }
   }
 
   private check(x: number, y: number, quick: boolean): void {

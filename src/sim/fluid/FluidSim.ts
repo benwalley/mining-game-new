@@ -11,6 +11,7 @@ import {
 } from '@/core/world/constants';
 import { FLUID_MAX, type FluidDef, type FluidRegistry } from '@/content/fluids';
 import type { SimEvent } from '@/protocol/messages';
+import { ALL_ACTIVE, type ZoneMap } from '../zones';
 
 export interface MaterialChange {
   x: number;
@@ -124,7 +125,8 @@ export class FluidSim {
     return out;
   }
 
-  tick(): void {
+  /** One step. Chunks the zones skip this tick keep their awake tiles for later. */
+  tick(zones: ZoneMap = ALL_ACTIVE): void {
     this.tickCount++;
     this.stamp = (this.stamp % 255) + 1;
     const current = this.next;
@@ -142,6 +144,12 @@ export class FluidSim {
       const chunk = this.chunks.get(chunkKeyX(key), chunkKeyY(key));
       if (!chunk) continue;
       const r = current.get(key)!;
+      if (!zones.runsNow(chunk.cx, chunk.cy)) {
+        const keep = rectIn(this.next, key);
+        keep.add(r.minX, r.minY);
+        keep.add(r.maxX, r.maxY);
+        continue;
+      }
       awake += (r.maxX - r.minX + 1) * (r.maxY - r.minY + 1);
       this.stepChunk(chunk, key, r, flip);
     }

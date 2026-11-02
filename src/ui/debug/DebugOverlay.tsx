@@ -1,8 +1,18 @@
-import { debugGrid, debugInfo, debugLighting, debugPour, toolPower } from '../stores/gameStore';
+import {
+  benchReport,
+  benchStatus,
+  debugGrid,
+  debugInfo,
+  debugLighting,
+  debugPour,
+  storageInfo,
+  toolPower,
+} from '../stores/gameStore';
 
 export interface DebugActions {
   setToolPower(power: number): void;
   cyclePour(): void;
+  runBenchmark(): void;
   resetWorld(): void;
 }
 
@@ -49,10 +59,28 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
           <div>inspect: {info.inspected ?? 'long-press a tile'}</div>
           <div>{info.health}</div>
           <div>sim: {info.sim}</div>
-          <div>saved: {info.lastSave}</div>
+          <div>
+            saved: {info.lastSave} · storage{' '}
+            {storageInfo.value.persisted === null
+              ? '…'
+              : storageInfo.value.persisted
+                ? 'kept'
+                : 'may be cleared'}
+          </div>
+          {storageInfo.value.error && (
+            <div style={{ color: '#ff8a3a' }}>error: {storageInfo.value.error}</div>
+          )}
         </>
       )}
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px',
+          alignItems: 'center',
+          marginTop: '4px',
+        }}
+      >
         <span>pick power</span>
         <button style={button} onClick={() => actions.setToolPower(toolPower.value - 1)}>
           −
@@ -73,12 +101,35 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
         <button
           style={button}
           onClick={() => {
+            if (confirm('Benchmark: carve a room here and flood it for 20 s?'))
+              actions.runBenchmark();
+          }}
+        >
+          bench
+        </button>
+        <button
+          style={button}
+          onClick={() => {
             if (confirm('Delete this world and start over?')) actions.resetWorld();
           }}
         >
           reset
         </button>
       </div>
+      {benchStatus.value && <div style={{ marginTop: '4px' }}>{benchStatus.value}</div>}
+      {benchReport.value && (
+        <div style={{ marginTop: '4px', borderTop: '1px solid #4a4550', paddingTop: '4px' }}>
+          {benchReport.value.map((line) => (
+            <div key={line}>{line}</div>
+          ))}
+          <button
+            style={{ ...button, marginTop: '4px' }}
+            onClick={() => (benchReport.value = null)}
+          >
+            close
+          </button>
+        </div>
+      )}
     </div>
   );
 }

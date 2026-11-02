@@ -26,12 +26,15 @@ import {
 } from '@/protocol/messages';
 import { FluidSim } from './fluid/FluidSim';
 import { SolidSim } from './solid/SolidSim';
+import { Zone, Zones } from './zones';
 import type { SaveStore } from './persistence/SaveStore';
 import { SAVE_VERSION, type WorldMeta } from './persistence/saveFormat';
 import type { WorldGenerator } from './worldgen/WorldGenerator';
 
 const PLAYER_ENTITY_ID = 'player';
 const STATS_EVERY_MS = 1000;
+/** How often to drop clean chunks that are out of every zone and not on screen. */
+const EVICT_EVERY_TICKS = 20;
 
 export interface SimHostDeps {
   port: MessagePort<ToSim, FromSim>;
@@ -73,12 +76,16 @@ export class SimHost {
   private tickTimer?: ReturnType<typeof setInterval>;
   private saveTimer?: ReturnType<typeof setInterval>;
   private lastTickAt = 0;
+  private readonly zones: Zones;
+  private ticks = 0;
+  private statsTickMsMax = 0;
   private statsSince = 0;
   private statsTicks = 0;
   private statsTickMs = 0;
 
   constructor(private readonly deps: SimHostDeps) {
     this.now = deps.now ?? (() => Date.now());
+    this.zones = new Zones(deps.tuning.sim);
     this.solidById = new Uint8Array(deps.materials.maxNumId + 1);
     for (const m of deps.materials.all) this.solidById[m.numId] = m.solid ? 1 : 0;
     deps.port.onMessage((msg) => {
@@ -109,6 +116,7 @@ export class SimHost {
       case 'playerState':
         this.player = msg.player;
         this.playerDirty = true;
+        this.recenter(msg.player.x, msg.player.y);
         return;
       case 'setPaused':
         this.paused = msg.paused;
@@ -192,6 +200,45 @@ export class SimHost {
       player: this.player,
       playTimeMs: meta.playTimeMs,
     });
+    const at = this.player ?? generator.spawn;
+    this.recenter(at.x, at.y, true);
+  }
+
+  /**
+   * Moves the zones to the player and keeps everything within the near zone
+   * loaded, so the world off screen keeps moving. Loading happens only when
+   * the player enters a new chunk.
+   */
+  private recenter(x: number, y: number, force = false): void {
+    const before = this.zones.center;
+    this.zones.centerOn(x, y);
+    const { cx, cy } = this.zones.center;
+    if (!force && cx === before.cx && cy === before.cy) return;
+    const world = this.world;
+    if (!world) return;
+    const r = this.deps.tuning.sim.nearRadiusChunks;
+    const toLoad: ChunkCoord[] = [];
+    for (let y0 = cy - r; y0 <= cy + r; y0++) {
+      for (let x0 = cx - r; x0 <= cx + r; x0++) {
+        if (!world.chunks.inBounds(x0 * CHUNK_SIZE, y0 * CHUNK_SIZE)) continue;
+        const key = chunkKey(x0, y0);
+        if (world.chunks.has(x0, y0) || this.loading.has(key)) continue;
+        toLoad.push([x0, y0]);
+      }
+    }
+    if (toLoad.length === 0) return;
+    const job = this.loadOrGenerate(toLoad);
+    for (const [x0, y0] of toLoad) this.loading.set(chunkKey(x0, y0), job);
+    job.catch((err: unknown) => this.post({ type: 'error', message: String(err) }));
+  }
+
+  /** A chunk may leave memory when nothing needs it: off screen, clean, and frozen. */
+  private canEvict(key: number): boolean {
+    return (
+      !this.wanted.has(key) &&
+      !this.dirtyChunks.has(key) &&
+      this.zones.zoneOf(chunkKeyX(key), chunkKeyY(key)) === Zone.Far
+    );
   }
 
   private requireWorld(): NonNullable<SimHost['world']> {
@@ -258,8 +305,8 @@ export class SimHost {
     for (const [cx, cy] of coords) {
       const key = chunkKey(cx, cy);
       this.wanted.delete(key);
-      // Dirty chunks stay in memory until the next save writes them.
-      if (!this.dirtyChunks.has(key)) this.evict(cx, cy);
+      // Dirty chunks stay until the next save writes them; chunks in a zone keep running.
+      if (this.canEvict(key)) this.evict(cx, cy);
     }
   }
 
@@ -329,7 +376,8 @@ export class SimHost {
     world.meta.playTimeMs += dt * 1000;
 
     const started = performance.now();
-    world.solids.tick(1 / this.deps.tuning.sim.ticksPerSecond);
+    this.zones.advance();
+    world.solids.tick(1 / this.deps.tuning.sim.ticksPerSecond, this.zones);
     const solids = world.solids.drain();
     for (let i = 0; i < solids.touched.length; i += 2) {
       world.fluids.touch(solids.touched[i]!, solids.touched[i + 1]!);
@@ -337,20 +385,30 @@ export class SimHost {
     for (const key of solids.chunks) this.dirtyChunks.add(key);
     if (solids.tiles.length > 0) this.post({ type: 'tilesChanged', changes: solids.tiles });
     if (solids.events.length > 0) this.post({ type: 'simEvents', events: solids.events });
-    world.fluids.tick();
+    world.fluids.tick(this.zones);
     this.publish(world.fluids);
-    this.statsTickMs += performance.now() - started;
+    const spent = performance.now() - started;
+    this.statsTickMs += spent;
+    this.statsTickMsMax = Math.max(this.statsTickMsMax, spent);
     this.statsTicks++;
+    if (++this.ticks % EVICT_EVERY_TICKS === 0) {
+      for (const chunk of [...world.chunks.values()]) {
+        if (this.canEvict(chunkKey(chunk.cx, chunk.cy))) this.evict(chunk.cx, chunk.cy);
+      }
+    }
     if (t - this.statsSince >= STATS_EVERY_MS) {
       this.post({
         type: 'simStats',
         tickMs: this.statsTickMs / Math.max(1, this.statsTicks),
+        tickMsMax: this.statsTickMsMax,
         awakeTiles: world.fluids.awakeTiles,
         solidsActive: world.solids.active,
+        chunks: world.chunks.size,
       });
       this.statsSince = t;
       this.statsTicks = 0;
       this.statsTickMs = 0;
+      this.statsTickMsMax = 0;
     }
   }
 
@@ -423,7 +481,7 @@ export class SimHost {
     }
     // Evict chunks that were only kept in memory because they were dirty.
     for (const k of keys) {
-      if (!this.wanted.has(k) && !this.dirtyChunks.has(k)) this.evict(chunkKeyX(k), chunkKeyY(k));
+      if (this.canEvict(k)) this.evict(chunkKeyX(k), chunkKeyY(k));
     }
     this.post({ type: 'saved', at: world.meta.lastSavedAt, chunks: chunks.length });
   }

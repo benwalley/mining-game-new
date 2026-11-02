@@ -63,7 +63,10 @@
     "playerSyncIntervalMs": 1000
   },
   "sim": {
-    "ticksPerSecond": 20
+    "ticksPerSecond": 20,
+    "activeRadiusChunks": 1,
+    "nearRadiusChunks": 3,
+    "nearEvery": 2
   },
   "light": {
     "lampLevel": 8,

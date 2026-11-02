@@ -7,6 +7,8 @@ export class GameLoop {
   private last = 0;
   private acc = 0;
   private running = false;
+  /** Called after each frame with the time since the last frame and the time this one took (ms). */
+  onFrame: ((intervalMs: number, workMs: number) => void) | null = null;
 
   constructor(
     private readonly stepSeconds: number,
@@ -31,8 +33,10 @@ export class GameLoop {
 
   private readonly frame = (now: number): void => {
     if (!this.running) return;
+    const started = performance.now();
+    const intervalMs = now - this.last;
     // Clamp long frames (tab switches, hitches) so the sim doesn't spiral.
-    const frameDt = Math.min(this.maxFrameSeconds, (now - this.last) / 1000);
+    const frameDt = Math.min(this.maxFrameSeconds, intervalMs / 1000);
     this.last = now;
     this.acc += frameDt;
     while (this.acc >= this.stepSeconds) {
@@ -40,6 +44,7 @@ export class GameLoop {
       this.acc -= this.stepSeconds;
     }
     this.render(this.acc / this.stepSeconds, frameDt);
+    this.onFrame?.(intervalMs, performance.now() - started);
     this.rafId = requestAnimationFrame(this.frame);
   };
 }

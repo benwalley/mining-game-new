@@ -30,6 +30,16 @@ export const debugLighting = signal(true);
 export const toolPower = signal(3);
 export const debugInfo = signal<DebugInfo | null>(null);
 
+/** Whether the browser promised to keep our storage, and the last save or sim error. */
+export const storageInfo = signal<{ persisted: boolean | null; error: string | null }>({
+  persisted: null,
+  error: null,
+});
+
+/** Debug benchmark: a countdown while it runs, then the report's lines. */
+export const benchStatus = signal<string | null>(null);
+export const benchReport = signal<string[] | null>(null);
+
 /** Debug: what tapping the world pours: 'off' or a fluid key. */
 export const debugPour = signal<string>('off');
 
