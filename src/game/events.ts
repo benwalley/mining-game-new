@@ -11,6 +11,10 @@ export interface GameEvents {
   inspect: { x: number; y: number };
   splash: { x: number; y: number; fluid: number; speed: number };
   hurt: { cause: 'drowning' | 'fluid' | 'gas' | 'crushed'; fluid: number };
+  /** A drop of sweat leaves the mole (it's hot). */
+  sweat: { x: number; y: number };
+  /** The air crackles (extreme heat); strength 0.5–1. */
+  crackle: { strength: number };
   // From the sim (see SimEventKind):
   quench: SimEvent;
   ignite: SimEvent;

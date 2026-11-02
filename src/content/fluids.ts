@@ -42,6 +42,10 @@ export interface FluidDef {
   flowEvery: number;
   /** Light emitted at full amount, 0–15. */
   light: number;
+  /** How fast heat passes through, 1–10; stands in for the tile's material. */
+  conductivity: number;
+  /** Degrees a full tile holds itself at (a heat source), or null. */
+  temperature: number | null;
   damagePerSecond: number;
   /** Hurts on any contact, or only while the head is inside (breathing it). */
   harm: 'contact' | 'breath';
@@ -101,7 +105,8 @@ export function loadFluids(materials: MaterialRegistry): FluidRegistry {
     return name;
   };
   const defs: FluidDef[] = fluidsData.fluids.map((raw: RawFluid) => {
-    const r = raw as RawFluid & Partial<{ swimSpeedScale: number; moveScale: number }>;
+    const r = raw as RawFluid &
+      Partial<{ swimSpeedScale: number; moveScale: number; temperature: number }>;
     if (raw.kind !== 'liquid' && raw.kind !== 'gas') {
       throw new Error(`Fluid "${raw.key}": unknown kind "${raw.kind}"`);
     }
@@ -115,6 +120,8 @@ export function loadFluids(materials: MaterialRegistry): FluidRegistry {
       kind: raw.kind,
       flowEvery: raw.flowEvery > 0 ? raw.flowEvery : Infinity,
       light: raw.light,
+      conductivity: raw.conductivity,
+      temperature: r.temperature ?? null,
       damagePerSecond: raw.damagePerSecond,
       harm: raw.harm,
       decay: ('decay' in raw ? raw.decay : null) ?? null,

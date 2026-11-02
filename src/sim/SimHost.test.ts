@@ -176,6 +176,31 @@ describe.each([
     expect(host.last('saved')?.chunks).toBeGreaterThan(0);
   });
 
+  it('warms the tiles around lava and streams temperature changes', async () => {
+    const host = createHost(await makeStore());
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-h`,
+    });
+    // The test world's lava pocket (x 105–106, y 29–31) sits behind a wall at x 104.
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk, [3, 0]] });
+    const lavaChunk = host.out.findLast((m) => m.type === 'chunk' && m.chunk.cx === 3);
+    const t = lavaChunk?.type === 'chunk' ? lavaChunk.chunk.temperature : null;
+    const at = (x: number, y: number) => t![y * CHUNK_SIZE + (x - 3 * CHUNK_SIZE)]!;
+    expect(at(105, 30)).toBe(1000);
+    expect(at(104, 30)).toBeGreaterThan(200);
+    expect(at(100, 30)).toBeLessThan(at(103, 30));
+
+    // Lava poured on the surface heats the air around it, and the main thread hears about it.
+    const lava = fluids.require('lava').id;
+    await host.send({ type: 'pourFluid', x: spawn.x, y: spawn.y - 1, fluid: lava, amount: 8 });
+    for (let n = 0; n < 40; n++) host.host.tick();
+    const patches = host.out.flatMap((m) => (m.type === 'heatChanged' ? m.patches : []));
+    expect(patches.some((p) => p.cx === spawnChunk[0] && p.cy === spawnChunk[1])).toBe(true);
+  });
+
   it('keeps the area around the player loaded and running, and lets far chunks go', async () => {
     const store = await makeStore();
     const host = createHost(store);

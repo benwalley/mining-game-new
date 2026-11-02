@@ -56,6 +56,17 @@ describe('LayeredWorldGenerator', () => {
     }
   });
 
+  it('starts every tile at the ambient temperature for its depth', () => {
+    const at = (depth: number) => {
+      const y = config.surfaceY + depth;
+      const chunk = gen.generateChunk(4, Math.floor(y / CHUNK_SIZE));
+      return chunk.temperature[(y % CHUNK_SIZE) * CHUNK_SIZE]!;
+    };
+    expect(at(10)).toBeLessThan(20);
+    expect(at(1900)).toBe(70);
+    expect(at(2900)).toBeGreaterThan(200);
+  });
+
   it('walls the world with bedrock', () => {
     const bedrock = materials.bedrock.numId;
     expect(gen.materialAt(0, 500)).toBe(bedrock);

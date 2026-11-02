@@ -313,5 +313,15 @@
     "enabled": false,
     "reinforce": ["stone", "flowstone"],
     "column": "flowstone"
+  },
+  "heat": {
+    "notes": "Ambient temperature in degrees by depth below the surface, linear between points. Heat limit N melts or burns at N×100°.",
+    "ambient": [
+      [0, 15],
+      [1200, 35],
+      [1900, 70],
+      [2600, 160],
+      [3000, 220]
+    ]
   }
 }

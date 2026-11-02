@@ -18,6 +18,7 @@ import {
   type DamageChange,
   type FluidPatch,
   type FromSim,
+  type HeatPatch,
   type MessagePort,
   type PlayerSnapshot,
   type ToSim,
@@ -25,6 +26,7 @@ import {
   type WorldInfo,
 } from '@/protocol/messages';
 import { FluidSim } from './fluid/FluidSim';
+import { HeatSim } from './heat/HeatSim';
 import { SolidSim } from './solid/SolidSim';
 import { Zone, Zones } from './zones';
 import type { SaveStore } from './persistence/SaveStore';
@@ -62,6 +64,7 @@ export class SimHost {
     chunks: ChunkStore;
     fluids: FluidSim;
     solids: SolidSim;
+    heat: HeatSim;
   };
   private player: PlayerSnapshot | null = null;
   private playerDirty = false;
@@ -185,6 +188,12 @@ export class SimHost {
       chunks,
       fluids: new FluidSim(chunks, this.solidById, this.deps.fluids),
       solids: new SolidSim(chunks, this.deps.materials, this.deps.tuning.support),
+      heat: new HeatSim(
+        this.deps.materials,
+        this.deps.fluids,
+        generator.ambient,
+        this.deps.tuning.heat,
+      ),
       info: {
         worldId,
         seed: meta.seed,
@@ -274,15 +283,13 @@ export class SimHost {
     try {
       const saved = await this.deps.store.loadChunks(world.info.worldId, coords);
       const savedKeys = new Set(saved.map((c) => chunkKey(c.cx, c.cy)));
-      const chunks = [
-        ...saved,
-        ...coords
-          .filter(([cx, cy]) => !savedKeys.has(chunkKey(cx, cy)))
-          .map(([cx, cy]) => world.generator.generateChunk(cx, cy)),
-      ];
-      for (const chunk of chunks) {
+      const generated = coords
+        .filter(([cx, cy]) => !savedKeys.has(chunkKey(cx, cy)))
+        .map(([cx, cy]) => world.generator.generateChunk(cx, cy));
+      for (const chunk of [...saved, ...generated]) {
         world.chunks.set(chunk);
         world.fluids.wakeChunk(chunk.cx, chunk.cy);
+        world.heat.addChunk(chunk, !savedKeys.has(chunkKey(chunk.cx, chunk.cy)));
         if (this.wanted.has(chunkKey(chunk.cx, chunk.cy))) this.sendChunk(chunk);
       }
     } finally {
@@ -327,6 +334,7 @@ export class SimHost {
       // An opening can let neighboring fluid in, loosen sand, or undermine a ceiling.
       world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
       world.solids.removed(x, y);
+      world.heat.tileChanged(x, y);
       if (this.gasNextTo(world.chunks, x, y)) {
         this.post({ type: 'simEvents', events: [{ kind: 'vent', x, y }] });
       }
@@ -383,10 +391,13 @@ export class SimHost {
       world.fluids.touch(solids.touched[i]!, solids.touched[i + 1]!);
     }
     for (const key of solids.chunks) this.dirtyChunks.add(key);
+    for (const c of solids.tiles) world.heat.tileChanged(c.x, c.y);
     if (solids.tiles.length > 0) this.post({ type: 'tilesChanged', changes: solids.tiles });
     if (solids.events.length > 0) this.post({ type: 'simEvents', events: solids.events });
     world.fluids.tick(this.zones);
-    this.publish(world.fluids);
+    this.publish(world.fluids, world.heat);
+    world.heat.tick(this.zones);
+    if (this.ticks % this.deps.tuning.heat.publishEveryTicks === 0) this.publishHeat(world.heat);
     const spent = performance.now() - started;
     this.statsTickMs += spent;
     this.statsTickMsMax = Math.max(this.statsTickMsMax, spent);
@@ -403,6 +414,7 @@ export class SimHost {
         tickMsMax: this.statsTickMsMax,
         awakeTiles: world.fluids.awakeTiles,
         solidsActive: world.solids.active,
+        heatChunks: world.heat.awakeChunks,
         chunks: world.chunks.size,
       });
       this.statsSince = t;
@@ -413,7 +425,7 @@ export class SimHost {
   }
 
   /** Marks what the fluids changed for saving and sends it to the main thread. */
-  private publish(fluids: FluidSim): void {
+  private publish(fluids: FluidSim, heat: HeatSim): void {
     const out = fluids.drain();
     if (out.materials.length > 0) this.post({ type: 'tilesChanged', changes: out.materials });
     if (out.changed.size > 0) {
@@ -421,6 +433,8 @@ export class SimHost {
       const transfer: ArrayBuffer[] = [];
       for (const [key, rect] of out.changed) {
         this.dirtyChunks.add(key);
+        // Moving fluid carries or blocks heat (lava is a source).
+        heat.chunkChanged(chunkKeyX(key), chunkKeyY(key));
         if (!this.wanted.has(key)) continue;
         const chunk = this.world?.chunks.get(chunkKeyX(key), chunkKeyY(key));
         if (!chunk) continue;
@@ -433,10 +447,29 @@ export class SimHost {
     if (out.events.length > 0) this.post({ type: 'simEvents', events: out.events });
   }
 
+  /** Marks chunks whose temperatures changed for saving and sends them on. */
+  private publishHeat(heat: HeatSim): void {
+    const changed = heat.drain();
+    if (changed.size === 0) return;
+    const patches: HeatPatch[] = [];
+    const transfer: ArrayBuffer[] = [];
+    for (const [key, rect] of changed) {
+      this.dirtyChunks.add(key);
+      if (!this.wanted.has(key)) continue;
+      const chunk = this.world?.chunks.get(chunkKeyX(key), chunkKeyY(key));
+      if (!chunk) continue;
+      const patch = heatPatch(chunk, rect.minX, rect.minY, rect.maxX, rect.maxY);
+      patches.push(patch);
+      transfer.push(patch.temperature.buffer as ArrayBuffer);
+    }
+    if (patches.length > 0) this.post({ type: 'heatChanged', patches }, transfer);
+  }
+
   private evict(cx: number, cy: number): void {
     this.world?.chunks.delete(cx, cy);
     this.world?.fluids.forgetChunk(cx, cy);
     this.world?.solids.forgetChunk(cx, cy);
+    this.world?.heat.forgetChunk(cx, cy);
   }
 
   /** Writes dirty chunks, the player and world meta. Serialized: never two saves at once. */
@@ -510,4 +543,15 @@ function fluidPatch(chunk: ChunkData, x0: number, y0: number, x1: number, y1: nu
     amount.set(chunk.fluidAmount.subarray(from, from + w), y * w);
   }
   return { cx: chunk.cx, cy: chunk.cy, x0, y0, w, h, type, amount };
+}
+
+function heatPatch(chunk: ChunkData, x0: number, y0: number, x1: number, y1: number): HeatPatch {
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const temperature = new Int16Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const from = (y0 + y) * CHUNK_SIZE + x0;
+    temperature.set(chunk.temperature.subarray(from, from + w), y * w);
+  }
+  return { cx: chunk.cx, cy: chunk.cy, x0, y0, w, h, temperature };
 }

@@ -32,8 +32,10 @@ export interface MaterialDef {
   hardness: number;
   toughness: number;
   weight: number;
+  /** Melts, burns or cracks at heatLimit × 100°. */
   heatLimit: number;
-  conductivity: number | null;
+  /** How fast heat passes through, 1–10. */
+  conductivity: number;
   supportSpan: number;
   fuel: number;
   trait: string | null;
@@ -132,22 +134,27 @@ function parseVisual(raw: RawMaterial): MaterialVisual | null {
 
 /** Parses and validates the bundled material data. */
 export function loadMaterials(): MaterialRegistry {
-  const defs = materialsData.materials.map((raw): MaterialDef => ({
-    numId: raw.numId,
-    key: raw.key,
-    name: raw.name,
-    solid: raw.solid,
-    indestructible: 'indestructible' in raw ? Boolean(raw.indestructible) : false,
-    hardness: raw.hardness,
-    toughness: raw.toughness,
-    weight: raw.weight,
-    heatLimit: raw.heatLimit,
-    conductivity: raw.conductivity,
-    supportSpan: raw.supportSpan,
-    fuel: raw.fuel,
-    trait: raw.trait,
-    light: 'light' in raw ? Number(raw.light) : 0,
-    visual: parseVisual(raw),
-  }));
+  const defs = materialsData.materials.map((raw): MaterialDef => {
+    if (!(raw.conductivity >= 1 && raw.conductivity <= 10)) {
+      throw new Error(`Material "${raw.key}": conductivity must be 1–10`);
+    }
+    return {
+      numId: raw.numId,
+      key: raw.key,
+      name: raw.name,
+      solid: raw.solid,
+      indestructible: 'indestructible' in raw ? Boolean(raw.indestructible) : false,
+      hardness: raw.hardness,
+      toughness: raw.toughness,
+      weight: raw.weight,
+      heatLimit: raw.heatLimit,
+      conductivity: raw.conductivity,
+      supportSpan: raw.supportSpan,
+      fuel: raw.fuel,
+      trait: raw.trait,
+      light: 'light' in raw ? Number(raw.light) : 0,
+      visual: parseVisual(raw),
+    };
+  });
   return new MaterialRegistry(defs);
 }

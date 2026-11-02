@@ -9,6 +9,16 @@
     "y": 24
   },
   "wallThickness": 2,
+  "heat": {
+    "notes": "The real ramp squeezed into this short world: warm below about 190, hot below about 230, extreme near the bottom.",
+    "ambient": [
+      [0, 15],
+      [120, 35],
+      [200, 70],
+      [260, 160],
+      [296, 220]
+    ]
+  },
   "bands": [
     {
       "material": "dirt",

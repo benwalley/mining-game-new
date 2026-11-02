@@ -2,7 +2,7 @@ import { CHUNK_SIZE, TILE_PX, chunkCountX, chunkCountY } from '@/core/world/cons
 import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
 import { palette } from '@/content/palette';
-import type { CameraTuning, LightTuning } from '@/content/tuning';
+import type { CameraTuning, HeatTuning, LightTuning } from '@/content/tuning';
 import type { LightView } from '@/game/light/LightField';
 import { fluidAmount, fluidType, type ChunkMirror } from '@/game/world/ChunkMirror';
 import type { RenderFrame, Renderer } from '../Renderer';
@@ -17,6 +17,12 @@ const SPRITE_PX = 64;
 const SPRITE_FEET = 48;
 /** How strongly fluid shows over a submerged player, relative to its normal opacity. */
 const OVER_PLAYER_ALPHA = 0.55;
+/** Heat shimmer: strength buckets (one stroke each), and how fast streaks rise (tiles/s). */
+const SHIMMER_BUCKETS = 4;
+const SHIMMER_RISE = 0.7;
+/** Debug heat map: degrees per color step, and the hottest step. */
+const HEATMAP_STEP = 20;
+const HEATMAP_TOP = 600;
 
 interface FluidStyle {
   color: string;
@@ -43,6 +49,11 @@ export class CanvasRenderer implements Renderer {
   /** Gas haze by packed fluid (type << 4 | amount), since its strength sets its alpha. */
   private gasPaths = new Map<number, Path2D>();
   private sprite: { canvas: Surface; ctx: Ctx2D; scale: number } | null = null;
+  private readonly shimmerPaths: Path2D[] = [];
+  private readonly heatmapStyles: string[] = [];
+  /** 1 for solid material ids; 1 for liquid fluid ids. */
+  private readonly solidById: Uint8Array;
+  private readonly liquidById = new Uint8Array(16);
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -52,7 +63,15 @@ export class CanvasRenderer implements Renderer {
     private readonly tuning: CameraTuning,
     crackStages: number,
     light: LightTuning,
+    private readonly heat: HeatTuning,
   ) {
+    this.solidById = new Uint8Array(materials.maxNumId + 1);
+    for (const m of materials.all) this.solidById[m.numId] = m.solid ? 1 : 0;
+    for (const f of fluids.all) this.liquidById[f.id] = f.kind === 'liquid' ? 1 : 0;
+    for (let t = 0; t <= HEATMAP_TOP; t += HEATMAP_STEP) {
+      // Blue when cold, through yellow, to red at the top.
+      this.heatmapStyles.push(`hsl(${Math.round(240 * (1 - t / HEATMAP_TOP))} 90% 50%)`);
+    }
     for (const f of fluids.all) {
       this.fluidStyles[f.id] = {
         color: palette[f.visual.color],
@@ -135,19 +154,16 @@ export class CanvasRenderer implements Renderer {
       }
     }
 
-    this.drawFluids(
-      ctx,
-      Math.floor(-ox / tile),
-      Math.floor(-oy / tile),
-      Math.floor((canvas.width - ox) / tile),
-      Math.floor((canvas.height - oy) / tile),
-      ox,
-      oy,
-      1,
-    );
+    const tx0 = Math.floor(-ox / tile);
+    const ty0 = Math.floor(-oy / tile);
+    const tx1 = Math.floor((canvas.width - ox) / tile);
+    const ty1 = Math.floor((canvas.height - oy) / tile);
+    this.drawFluids(ctx, tx0, ty0, tx1, ty1, ox, oy, 1);
+    this.drawShimmer(tx0, ty0, tx1, ty1, ox, oy, frame.time);
     this.drawParticles(frame, ox, oy, tile);
     // Darkness goes over the world but under the player, who carries the lamp.
     if (frame.light) this.drawDarkness(frame.light, ox, oy, tile);
+    if (frame.debug.heat) this.drawHeatmap(tx0, ty0, tx1, ty1, ox, oy);
 
     // Player, with feet snapped to the source-pixel grid.
     const p = frame.player;
@@ -230,6 +246,93 @@ export class CanvasRenderer implements Renderer {
       ctx.fillStyle = style.color;
       ctx.fill(haze);
     }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Faint wavy streaks rising through hot air, so heat shows where it comes
+   * from. More streaks, and brighter ones, the hotter the tile. Not drawn in
+   * solid tiles or liquids.
+   */
+  private drawShimmer(
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    ox: number,
+    oy: number,
+    time: number,
+  ): void {
+    const { ctx, scale } = this;
+    const { shimmerFrom, shimmerFull } = this.heat;
+    const tile = TILE_PX * scale;
+    const temperatureAt = this.mirror.temperatureAt;
+    const store = this.mirror.store;
+    const fluidAt = this.mirror.fluidAt;
+    const paths = this.shimmerPaths;
+    for (let b = 0; b < SHIMMER_BUCKETS; b++) paths[b] = new Path2D();
+    let any = false;
+    const wiggle = 1.5 * scale;
+    for (let y = ty0; y <= ty1; y++) {
+      for (let x = tx0; x <= tx1; x++) {
+        const t = temperatureAt(x, y);
+        if (!(t > shimmerFrom)) continue;
+        const m = store.materialAt(x, y);
+        if (m < 0 || this.solidById[m] || this.liquidById[fluidType(fluidAt(x, y))]) continue;
+        const strength = Math.min(1, (t - shimmerFrom) / (shimmerFull - shimmerFrom));
+        const h = tileHash(x, y);
+        if (h > 0.2 + 0.6 * strength) continue;
+        any = true;
+        // One streak per tile, rising and wrapping, at a column and phase fixed per tile.
+        const rise = (time * SHIMMER_RISE + h * 7.3) % 1;
+        const sx = ox + (x + 0.2 + 0.6 * ((h * 13.7) % 1)) * tile;
+        const sy = oy + (y + 1 - rise) * tile;
+        const path = paths[Math.min(SHIMMER_BUCKETS - 1, Math.floor(strength * SHIMMER_BUCKETS))]!;
+        const len = tile * 0.45;
+        for (let k = 0; k <= 3; k++) {
+          const px = sx + Math.sin(time * 5 + h * 40 + k * 1.6) * wiggle;
+          const py = sy - (len * k) / 3;
+          if (k === 0) path.moveTo(px, py);
+          else path.lineTo(px, py);
+        }
+      }
+    }
+    if (!any) return;
+    ctx.lineWidth = scale;
+    ctx.strokeStyle = palette.bone;
+    for (let b = 0; b < SHIMMER_BUCKETS; b++) {
+      ctx.globalAlpha = 0.07 + 0.06 * b;
+      ctx.stroke(paths[b]!);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Debug: every tile tinted by temperature. */
+  private drawHeatmap(
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    ox: number,
+    oy: number,
+  ): void {
+    const { ctx } = this;
+    const tile = TILE_PX * this.scale;
+    const temperatureAt = this.mirror.temperatureAt;
+    const paths = this.heatmapStyles.map(() => new Path2D());
+    for (let y = ty0; y <= ty1; y++) {
+      for (let x = tx0; x <= tx1; x++) {
+        const t = temperatureAt(x, y);
+        if (Number.isNaN(t)) continue;
+        const step = Math.max(0, Math.min(paths.length - 1, Math.round(t / HEATMAP_STEP)));
+        paths[step]!.rect(ox + x * tile, oy + y * tile, tile, tile);
+      }
+    }
+    ctx.globalAlpha = 0.4;
+    paths.forEach((path, i) => {
+      ctx.fillStyle = this.heatmapStyles[i]!;
+      ctx.fill(path);
+    });
     ctx.globalAlpha = 1;
   }
 
@@ -352,4 +455,11 @@ export class CanvasRenderer implements Renderer {
     }
     ctx.globalAlpha = 1;
   }
+}
+
+/** A stable pseudo-random value in [0, 1) for a tile. */
+function tileHash(x: number, y: number): number {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }

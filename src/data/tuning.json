@@ -100,5 +100,20 @@
     "looseSeconds": 0.4,
     "dustEverySeconds": 0.35,
     "fallHitDamage": 15
+  },
+  "heat": {
+    "rate": 0.25,
+    "loss": 0.025,
+    "sleepBelow": 0.05,
+    "publishEveryTicks": 5,
+    "settleSweeps": 40,
+    "warm": 55,
+    "hot": 80,
+    "extreme": 150,
+    "senseSeconds": 0.6,
+    "sweatEverySeconds": 0.7,
+    "crackleEverySeconds": [1.2, 0.3],
+    "shimmerFrom": 80,
+    "shimmerFull": 320
   }
 }

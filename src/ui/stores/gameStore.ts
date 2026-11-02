@@ -21,12 +21,15 @@ export interface DebugInfo {
   haptics: string;
   sim: string;
   health: string;
+  heat: string;
 }
 
 export const debugVisible = signal(false);
 export const debugGrid = signal(false);
 /** Debug: turn darkness off to see the whole world. */
 export const debugLighting = signal(true);
+/** Debug: color every tile by its temperature. */
+export const debugHeat = signal(false);
 export const toolPower = signal(3);
 export const debugInfo = signal<DebugInfo | null>(null);
 
@@ -48,8 +51,10 @@ export interface HudState {
   maxHealth: number;
   /** Fraction of breath left, 0–1, in tenths. */
   breath: number;
+  /** How hot the mole feels, 0–1, in twentieths. */
+  heat: number;
 }
 
-export const hud = signal<HudState>({ health: 100, maxHealth: 100, breath: 1 });
+export const hud = signal<HudState>({ health: 100, maxHealth: 100, breath: 1, heat: 0 });
 /** Increments each time the player is hurt, to retrigger the damage flash. */
 export const hurtPulse = signal(0);

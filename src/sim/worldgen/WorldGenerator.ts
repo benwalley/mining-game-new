@@ -11,5 +11,7 @@ export interface WorldGenerator {
   readonly id: string;
   readonly dims: WorldDims;
   readonly spawn: { x: number; y: number };
+  /** Ambient temperature (degrees) for each world row; chunks start at it. */
+  readonly ambient: Float32Array;
   generateChunk(cx: number, cy: number): ChunkData;
 }

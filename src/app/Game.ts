@@ -14,6 +14,7 @@ import { DigSystem } from '@/game/dig/DigSystem';
 import type { GameEvents } from '@/game/events';
 import { Player } from '@/game/player/Player';
 import { PlayerController, type MoveIntent } from '@/game/player/PlayerController';
+import { HeatSense } from '@/game/player/HeatSense';
 import { Vitals } from '@/game/player/Vitals';
 import { LightField } from '@/game/light/LightField';
 import { ChunkMirror, fluidAmount, fluidType } from '@/game/world/ChunkMirror';
@@ -33,6 +34,7 @@ import { orientationFor } from '@/render/canvas2d/playerSprite';
 import type { Renderer } from '@/render/Renderer';
 import {
   debugGrid,
+  debugHeat,
   debugInfo,
   debugLighting,
   benchReport,
@@ -72,6 +74,7 @@ export class Game {
   private readonly player: Player;
   private readonly controller: PlayerController;
   private readonly vitals: Vitals;
+  private readonly heat: HeatSense;
   private readonly dig: DigSystem;
   private readonly camera: Camera;
   private readonly particles: Particles;
@@ -129,6 +132,7 @@ export class Game {
       tuning.camera,
       tuning.dig.crackStages,
       tuning.light,
+      tuning.heat,
     );
     this.light = new LightField(this.mirror, materials, fluids);
     this.mirror.addListener(this.light);
@@ -144,6 +148,7 @@ export class Game {
       fluids,
     });
     this.vitals = new Vitals(tuning.vitals, fluids, this.events);
+    this.heat = new HeatSense(tuning.heat, this.events, createRng(`heat/${world.seed}`));
     this.events.on('hurt', () => (hurtPulse.value += 1));
     this.dig = new DigSystem(tuning.dig, tuning.input, materials, this.mirror, sim, this.events);
     toolPower.value = this.dig.toolPower;
@@ -192,13 +197,15 @@ export class Game {
         this.checkCrushed(changes);
       }),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
+      sim.on('heatChanged', ({ patches }) => this.mirror.applyHeat(patches)),
       sim.on('simEvents', ({ events }) => {
         for (const e of events) if (this.nearView(e.x, e.y)) this.events.emit(e.kind, e);
       }),
       sim.on('simStats', (s) => {
         this.simStats =
           `${s.tickMs.toFixed(2)} ms/tick (worst ${s.tickMsMax.toFixed(1)}) · ` +
-          `${s.awakeTiles} fluid tiles awake · ${s.solidsActive} solids moving · ${s.chunks} chunks`;
+          `${s.awakeTiles} fluid tiles awake · ${s.solidsActive} solids moving · ` +
+          `${s.heatChunks} heat chunks · ${s.chunks} chunks`;
         this.bench?.simStats(s);
       }),
       sim.on('saved', ({ at }) => {
@@ -334,6 +341,7 @@ export class Game {
       this.dig.update(this.player, intent, contact, dt);
       this.controller.step(this.player, intent, contact, solid, dt, this.dig.isDigging);
       this.vitals.update(this.player, contact.fluid, dt);
+      this.heat.update(this.player, this.mirror.temperatureAt, dt);
     }
     this.particles.update(dt, solid);
     this.syncPlayer(false);
@@ -346,9 +354,10 @@ export class Game {
     const t = this.deps.tuning.vitals;
     const health = Math.ceil(p.health);
     const breath = Math.ceil((p.breath / t.breathSeconds) * 10) / 10;
+    const heat = Math.round(this.heat.level * 20) / 20;
     const cur = hud.value;
-    if (cur.health === health && cur.breath === breath) return;
-    hud.value = { health, maxHealth: t.maxHealth, breath };
+    if (cur.health === health && cur.breath === breath && cur.heat === heat) return;
+    hud.value = { health, maxHealth: t.maxHealth, breath, heat };
   }
 
   /** Something solid landed inside the mole: it hurts, and the mole pops out on top. */
@@ -475,7 +484,8 @@ export class Game {
       },
       particles: this.particles,
       light: debugLighting.value ? this.light.view : null,
-      debug: { grid: debugGrid.value },
+      time: performance.now() / 1000,
+      debug: { grid: debugGrid.value, heat: debugHeat.value },
     });
     this.updateDebug();
   }
@@ -510,6 +520,7 @@ export class Game {
       haptics: this.haptics.kind,
       sim: this.simStats,
       health: `${Math.ceil(p.health)} hp · breath ${p.breath.toFixed(1)}s · in fluid ${p.submersion.toFixed(2)}`,
+      heat: `${this.mirror.temperatureAt(Math.floor(p.x), Math.floor(p.y - p.h / 2))}° here · feels ${Math.round(this.heat.felt)}° (${this.heat.band})`,
     };
   }
 
@@ -521,9 +532,10 @@ export class Game {
     const origin = this.deps.materials.get(this.mirror.originAt(x, y));
     const f = this.mirror.fluidAt(x, y);
     const fluid = f ? ` + ${this.deps.fluids.get(fluidType(f))?.name} ${fluidAmount(f)}/8` : '';
+    const temp = this.mirror.temperatureAt(x, y);
     this.inspected = m
-      ? `${m.name}${origin ? ` of ${origin.name.toLowerCase()}` : ''}${fluid} @${x},${y}: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
-        ` heat ${m.heatLimit} span ${m.supportSpan} fuel ${m.fuel}${m.trait ? ` [${m.trait}]` : ''}`
+      ? `${m.name}${origin ? ` of ${origin.name.toLowerCase()}` : ''}${fluid} @${x},${y} ${temp}°: hard ${m.hardness} tough ${m.toughness} wt ${m.weight}` +
+        ` heat ${m.heatLimit} (${m.heatLimit * 100}°) cond ${m.conductivity} span ${m.supportSpan} fuel ${m.fuel}${m.trait ? ` [${m.trait}]` : ''}`
       : `unloaded @${x},${y}`;
     this.haptics.tick();
     this.events.emit('inspect', { x, y });
@@ -533,6 +545,7 @@ export class Game {
     if (code === 'Backquote') debugVisible.value = !debugVisible.value;
     if (code === 'KeyG') debugGrid.value = !debugGrid.value;
     if (code === 'KeyL') debugLighting.value = !debugLighting.value;
+    if (code === 'KeyH') debugHeat.value = !debugHeat.value;
     if (code === 'BracketRight') this.setToolPower(this.dig.toolPower + 1);
     if (code === 'BracketLeft') this.setToolPower(this.dig.toolPower - 1);
     if (code === 'KeyP') this.cyclePour();

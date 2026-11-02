@@ -10,7 +10,9 @@ export interface RenderFrame {
   particles: Particles;
   /** Null draws everything fully lit (debug). */
   light: LightView | null;
-  debug: { grid: boolean };
+  /** Seconds, for animated effects (heat shimmer). */
+  time: number;
+  debug: { grid: boolean; heat: boolean };
 }
 
 /** Rendering backend. Canvas 2D today; a WebGL renderer can implement the same contract. */

@@ -2,6 +2,7 @@ import {
   benchReport,
   benchStatus,
   debugGrid,
+  debugHeat,
   debugInfo,
   debugLighting,
   debugPour,
@@ -58,6 +59,7 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
           <div>dig: {info.target ?? '—'}</div>
           <div>inspect: {info.inspected ?? 'long-press a tile'}</div>
           <div>{info.health}</div>
+          <div>heat: {info.heat}</div>
           <div>sim: {info.sim}</div>
           <div>
             saved: {info.lastSave} · storage{' '}
@@ -94,6 +96,9 @@ export function DebugOverlay({ actions }: { actions: DebugActions }) {
         </button>
         <button style={button} onClick={() => (debugLighting.value = !debugLighting.value)}>
           {debugLighting.value ? 'dark' : 'lit'}
+        </button>
+        <button style={button} onClick={() => (debugHeat.value = !debugHeat.value)}>
+          {debugHeat.value ? 'heat on' : 'heat'}
         </button>
         <button style={button} onClick={() => actions.cyclePour()}>
           tap: {debugPour.value}

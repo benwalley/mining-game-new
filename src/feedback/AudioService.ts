@@ -120,6 +120,20 @@ export class AudioService {
     this.sweep(220, 140, 0.1, 0.25);
   }
 
+  /** Air crackling in extreme heat: a few tiny dry pops. */
+  crackle(strength: number): void {
+    const pops = 1 + this.rng.int(0, 3);
+    for (let n = 0; n < pops; n++) {
+      this.noiseBurst(
+        this.rng.range(2500, 5000),
+        3,
+        0.02,
+        0.12 + 0.18 * strength,
+        n * this.rng.range(0.03, 0.09),
+      );
+    }
+  }
+
   hurt(): void {
     this.sweep(260, 110, 0.18, 0.35);
     this.noiseBurst(420, 1, 0.08, 0.3);
@@ -139,16 +153,16 @@ export class AudioService {
     return { ctx: this.ctx, out: this.master };
   }
 
-  private envelope(ctx: AudioContext, peak: number, decay: number): GainNode {
+  private envelope(ctx: AudioContext, peak: number, decay: number, delay = 0): GainNode {
     const g = ctx.createGain();
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delay;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
     return g;
   }
 
-  private noiseBurst(hz: number, q: number, decay: number, gain: number): void {
+  private noiseBurst(hz: number, q: number, decay: number, gain: number, delay = 0): void {
     const r = this.ready();
     if (!r || !this.noise) return;
     const src = r.ctx.createBufferSource();
@@ -157,10 +171,10 @@ export class AudioService {
     filter.type = 'bandpass';
     filter.frequency.value = hz;
     filter.Q.value = q;
-    const env = this.envelope(r.ctx, gain, decay);
+    const env = this.envelope(r.ctx, gain, decay, delay);
     src.connect(filter).connect(env).connect(r.out);
     const offset = this.rng.range(0, 0.3);
-    src.start(r.ctx.currentTime, offset, decay + 0.02);
+    src.start(r.ctx.currentTime + delay, offset, decay + 0.02);
   }
 
   private tone(hz: number, decay: number, gain: number, type: OscillatorType): void {

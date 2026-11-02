@@ -5,13 +5,14 @@ const BUBBLES = 5;
 /**
  * Health and breath. Both hide while full, so the screen stays clear until
  * something is wrong. A red vignette deepens as health drops and flashes on
- * each hit.
+ * each hit; an orange haze creeps in from the edges as it gets hot.
  */
 export function Hud() {
-  const { health, maxHealth, breath } = hud.value;
+  const { health, maxHealth, breath, heat } = hud.value;
   const missing = 1 - health / maxHealth;
   return (
     <>
+      {heat > 0 && <div class="heat-tint" style={{ opacity: heat }} />}
       <div class="vignette" style={{ opacity: Math.min(0.85, missing * 1.1) }} />
       {hurtPulse.value > 0 && <div key={hurtPulse.value} class="vignette flash" />}
       <div class="vitals">

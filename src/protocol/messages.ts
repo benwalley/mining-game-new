@@ -8,7 +8,7 @@ import type { SimEventKind } from '@/content/fluids';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -61,6 +61,17 @@ export interface FluidPatch {
   amount: Uint8Array;
 }
 
+/** A rectangle of one chunk's temperatures (whole degrees), like `FluidPatch`. */
+export interface HeatPatch {
+  cx: number;
+  cy: number;
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  temperature: Int16Array;
+}
+
 /** Something that happened in the world that the main thread may want to show or play. */
 export interface SimEvent {
   kind: SimEventKind;
@@ -92,6 +103,8 @@ export type FromSim =
   | { type: 'tilesChanged'; changes: TileChange[] }
   /** Fluid that moved this tick, for chunks the main thread holds. */
   | { type: 'fluidsChanged'; patches: FluidPatch[] }
+  /** Temperatures that changed, a few times a second, for chunks the main thread holds. */
+  | { type: 'heatChanged'; patches: HeatPatch[] }
   | { type: 'simEvents'; events: SimEvent[] }
   /** About once a second: how much work the simulation is doing. */
   | {
@@ -101,6 +114,8 @@ export type FromSim =
       tickMsMax: number;
       awakeTiles: number;
       solidsActive: number;
+      /** Chunks whose heat is still changing. */
+      heatChunks: number;
       /** Chunks the sim holds in memory. */
       chunks: number;
     }

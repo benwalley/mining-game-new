@@ -81,6 +81,14 @@ export class FeedbackDirector {
       else this.audio.hurt();
       this.haptics.tick();
     });
+    events.on('sweat', (e) => {
+      this.particles.burst(e.x, e.y, 1, [palette.sky, palette.bone], {
+        speed: 1.5,
+        life: 0.5,
+        dirY: -0.3,
+      });
+    });
+    events.on('crackle', (e) => this.audio.crackle(e.strength));
     events.on('ignite', (e) => {
       this.throttled('whoomph', () => {
         this.audio.whoomph();

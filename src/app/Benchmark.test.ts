@@ -11,6 +11,7 @@ describe('Benchmark', () => {
       tickMsMax: 1.2,
       awakeTiles: 900,
       solidsActive: 0,
+      heatChunks: 0,
       chunks: 40,
     });
     const lines = b.report();

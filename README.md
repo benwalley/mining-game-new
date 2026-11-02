@@ -51,7 +51,8 @@ flat test world instead (each keeps its own save).
   Anything landing on the mole hurts and pops it out on top. Ceilings don't collapse for
   now (see Status).
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
-  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `[` and `]`
+  touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `H` the heat
+  map (every tile colored by temperature; the overlay's "heat" button on phones), `[` and `]`
   change pick power, and `P` cycles what a tap pours (nothing, then each fluid: water, lava,
   spore gas, firedamp). The overlay's "tap" button does the same on phones; each tap pours a
   3×3 block.
@@ -181,8 +182,21 @@ save error.
 MISS, fps, frame-interval percentiles, slow frames, main-thread work, sim tick cost and the
 device. Screenshot that.
 
-**Phase 1, still to come:** heat (a temperature field from depth and lava, warnings only). Melting and igniting at heat limits move to phase 2 with fire,
-torches and furnaces; cave-ins come back there with support beams.
+**Phase 1, slice 6 (done):** heat (`src/sim/heat/`). Every tile has a temperature in
+degrees, and a heat limit of N means melting or burning at N×100°. Ambient temperature
+rises with depth (`worldgen.json` `heat.ambient`): about 15–35° down to 1,200 tiles, 70° at
+the bottom of the Fungal deep, 160° at the bottom of the Magma belt and 220° at the bottom
+of The Deep. Lava (1,000°) and flame (500°) hold their tiles hot. Heat spreads between
+tiles at a rate set by both tiles' conductivity (`materials.json`; obsidian insulates,
+metals conduct) and slowly leaks back toward ambient, so the air right next to lava sits
+around 350–400° and is back near ambient about 6 tiles away. Lava pockets are already hot
+when generated. Heat only warns for now: an orange haze from 55°, sweat drops from 80°, a
+crackle from 150°, and faint wavy streaks rising through hot air (80° and up) that show
+where the heat comes from. Long-press shows a tile's temperature; the overlay shows the
+temperature where you stand and what the mole feels. The test world squeezes the same ramp
+into its 300 rows (warm below about 190, hot below about 230), and its lava pocket at x
+105–106 warms the rock around it. Heat damage, suits, melting and igniting come in phase 2
+with fire, torches and furnaces; cave-ins come back there with support beams.
 
 Not built yet (later phases): inventory, crafting, creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

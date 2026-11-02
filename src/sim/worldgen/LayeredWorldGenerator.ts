@@ -4,10 +4,11 @@ import { createChunk, tileIndex, type ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE, type WorldDims } from '@/core/world/constants';
 import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
+import { ambientRows, fillAmbient, type AmbientPoints } from '../heat/ambient';
 import type { WorldGenerator } from './WorldGenerator';
 
 /** Bump when the generation code changes in a way that alters output. */
-const CODE_VERSION = 3;
+const CODE_VERSION = 4;
 
 /** How far the support pass looks along a ceiling row for something to rest on. */
 const SUPPORT_SCAN = 48;
@@ -55,6 +56,7 @@ export interface LayeredWorldConfig {
   /** Surface line; hills rise above it, sky fills the rest. */
   surfaceY: number;
   wallThickness: number;
+  heat: { ambient: AmbientPoints };
   surface: { hillHeight: number; hillScale: number };
   boundary: { waveAmplitude: number; waveScale: number; blendTiles: number };
   spawn: { safeRadius: number; safeDepth: number };
@@ -151,6 +153,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
   readonly id: string;
   readonly dims: WorldDims;
   readonly spawn: { x: number; y: number };
+  readonly ambient: Float32Array;
 
   private readonly seedNum: number;
   private readonly bedrock: number;
@@ -179,6 +182,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
       height: config.surfaceY + config.depth,
       surfaceY: config.surfaceY,
     };
+    this.ambient = ambientRows(config.heat.ambient, config.surfaceY, this.dims.height);
     this.seedNum = seedFromString(seed);
     this.bedrock = materials.bedrock.numId;
     this.air = materials.air.numId;
@@ -243,6 +247,7 @@ export class LayeredWorldGenerator implements WorldGenerator {
         }
       }
     }
+    fillAmbient(chunk.temperature, this.ambient, y0, CHUNK_SIZE);
     return chunk;
   }
 

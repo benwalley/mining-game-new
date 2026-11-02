@@ -4,10 +4,11 @@ import { createChunk, tileIndex, type ChunkData } from '@/core/world/chunk';
 import { CHUNK_SIZE, type WorldDims } from '@/core/world/constants';
 import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
+import { ambientRows, fillAmbient, type AmbientPoints } from '../heat/ambient';
 import type { WorldGenerator } from './WorldGenerator';
 
 /** Bump when the generation code changes in a way that alters output. */
-const CODE_VERSION = 2;
+const CODE_VERSION = 3;
 
 export interface TestWorldConfig {
   width: number;
@@ -15,6 +16,7 @@ export interface TestWorldConfig {
   surfaceY: number;
   spawn: { x: number; y: number };
   wallThickness: number;
+  heat: { ambient: AmbientPoints };
   bands: { material: string; toDepth: number }[];
   pockets: {
     material: string;
@@ -60,6 +62,7 @@ export class TestWorldGenerator implements WorldGenerator {
   readonly id: string;
   readonly dims: WorldDims;
   readonly spawn: { x: number; y: number };
+  readonly ambient: Float32Array;
 
   private readonly seedNum: number;
   private readonly bedrock: number;
@@ -85,6 +88,7 @@ export class TestWorldGenerator implements WorldGenerator {
     this.id = `test-flat@${CODE_VERSION}:${seedFromString(JSON.stringify(config)).toString(36)}`;
     this.dims = { width: config.width, height: config.height, surfaceY: config.surfaceY };
     this.spawn = config.spawn;
+    this.ambient = ambientRows(config.heat.ambient, config.surfaceY, config.height);
     this.seedNum = seedFromString(seed);
     this.bedrock = materials.bedrock.numId;
     this.air = materials.air.numId;
@@ -129,6 +133,7 @@ export class TestWorldGenerator implements WorldGenerator {
         }
       }
     }
+    fillAmbient(chunk.temperature, this.ambient, y0, CHUNK_SIZE);
     return chunk;
   }
 

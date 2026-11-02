@@ -8,7 +8,7 @@ import {
   type WorldDims,
 } from '@/core/world/constants';
 import type { MaterialRegistry } from '@/content/materials';
-import type { FluidPatch, TileChange } from '@/protocol/messages';
+import type { FluidPatch, HeatPatch, TileChange } from '@/protocol/messages';
 
 export interface MirrorListener {
   chunkLoaded(chunk: ChunkData): void;
@@ -62,6 +62,13 @@ export class ChunkMirror {
     if (!chunk) return 0;
     const i = tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
     return (chunk.fluidType[i]! << 4) | chunk.fluidAmount[i]!;
+  };
+
+  /** Temperature in degrees; NaN if unloaded. */
+  readonly temperatureAt = (x: number, y: number): number => {
+    if (!this.store.inBounds(x, y)) return NaN;
+    const chunk = this.store.get(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT);
+    return chunk ? chunk.temperature[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)]! : NaN;
   };
 
   isLoaded(x: number, y: number): boolean {
@@ -120,6 +127,17 @@ export class ChunkMirror {
         chunk.fluidAmount.set(p.amount.subarray(row * p.w, (row + 1) * p.w), to);
       }
       for (const l of this.listeners) l.fluidsChanged?.(p.cx, p.cy);
+    }
+  }
+
+  applyHeat(patches: readonly HeatPatch[]): void {
+    for (const p of patches) {
+      const chunk = this.store.get(p.cx, p.cy);
+      if (!chunk) continue;
+      for (let row = 0; row < p.h; row++) {
+        const to = (p.y0 + row) * CHUNK_SIZE + p.x0;
+        chunk.temperature.set(p.temperature.subarray(row * p.w, (row + 1) * p.w), to);
+      }
     }
   }
 
