@@ -27,7 +27,7 @@ describe('torches', () => {
     const i = tileIndex(3, 4);
     chunk.material[i] = TORCH;
     chunk.damage[i] = 2;
-    expect(burnTorches(chunks, TORCH, liquid, false)).toEqual({ out: [], touched: [] });
+    expect(burnTorches(chunks, TORCH, liquid, false)).toEqual({ out: [], touched: [], dim: [] });
     expect(burnTorches(chunks, TORCH, liquid, true).out).toEqual([]);
     expect(chunk.damage[i]).toBe(1);
     const last = burnTorches(chunks, TORCH, liquid, true);

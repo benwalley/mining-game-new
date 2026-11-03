@@ -19,6 +19,11 @@ Each tile stores: material id, damage (crack stage), fluid type and amount (0–
 | Light              | Light spreads tile by tile from sources and fades with distance; solid tiles block it.                                                                       | Darkness hides hazards. Some creatures avoid light; fungi grow in the dark.               |
 | Ecology            | Fungus spreads on damp dark tiles. Critters wander, eat, breed and are eaten by predators.                                                                   | The world is alive and renews common resources. Colonies depend on it for food.           |
 
+> **Decided since (owner, 2026-11-02):** things with fuel catch fire past their heat limit
+> and spread very slowly; metals melt into molten metal that sets back into blocks when it
+> cools; rock does nothing at its limit for now, so lava doesn't eat its walls. Hot air hurts
+> from 100°, worse the hotter it is.
+
 ### Simulation zones
 
 The world is too big to simulate fully everywhere. Use three zones around the player:

@@ -12,23 +12,22 @@ Crafting is the center of the game. Every item is a **template** (the shape of t
 
 ### Templates
 
-The player starts knowing the four templates marked Start. The rest come from discovery (below).
+The player starts knowing the three templates marked Start. The rest come from discovery (below).
 
-| Template       | Parts                 | What it does                                                 | Source    |
-| -------------- | --------------------- | ------------------------------------------------------------ | --------- |
-| Pick           | Head, handle, binding | Digging                                                      | Start     |
-| Torch          | Shaft, fuel           | Light that burns out                                         | Start     |
-| Ladder         | Rails, rungs          | Climbing                                                     | Start     |
-| Support beam   | Beam                  | Holds ceilings up                                            | Start     |
-| Pack           | Body, straps          | Carry capacity                                               | Discovery |
-| Lantern        | Housing, lens, fuel   | Lasting light; lens widens the beam                          | Discovery |
-| Suit           | Shell, lining         | Resistance to heat, cold or gas, by material                 | Discovery |
-| Rope and winch | Line, drum            | Fast vertical travel; first elevator                         | Discovery |
-| Pump and pipe  | Body, seal            | Moves water and lava                                         | Discovery |
-| Rail and cart  | Rail, wheels, bed     | Hauls heavy loads over distance                              | Discovery |
-| Drill          | Bit, housing, fuel    | Fast digging, burns fuel                                     | Discovery |
-| Charge         | Casing, filler        | Blasts rock (volatile filler only)                           | Discovery |
-| Gift box       | Box, contents         | Wraps a gift; presentation raises its value to some cultures | Teaching  |
+| Template      | Parts                 | What it does                                                 | Source    |
+| ------------- | --------------------- | ------------------------------------------------------------ | --------- |
+| Pick          | Head, handle, binding | Digging                                                      | Start     |
+| Torch         | Shaft, fuel           | Light that burns out                                         | Start     |
+| Support beam  | Beam                  | Holds ceilings up                                            | Start     |
+| Pack          | Body, straps          | Carry capacity                                               | Discovery |
+| Lantern       | Housing, lens, fuel   | Lasting light; lens widens the beam                          | Discovery |
+| Suit          | Shell, lining         | Resistance to heat, cold or gas, by material                 | Discovery |
+| Winch         | Line, drum            | Fast vertical travel; first elevator                         | Discovery |
+| Pump and pipe | Body, seal            | Moves water and lava                                         | Discovery |
+| Rail and cart | Rail, wheels, bed     | Hauls heavy loads over distance                              | Discovery |
+| Drill         | Bit, housing, fuel    | Fast digging, burns fuel                                     | Discovery |
+| Charge        | Casing, filler        | Blasts rock (volatile filler only)                           | Discovery |
+| Gift box      | Box, contents         | Wraps a gift; presentation raises its value to some cultures | Teaching  |
 
 ### Stat formulas (example: the pick)
 
@@ -101,3 +100,8 @@ Crafting from nearby storage chests (within about 8 tiles) is required. Making p
 > there is always one, it dulls with digging (slower digging, up to a limit), and in craft
 > mode it can be sharpened for a little stone or have a part swapped for a new material.
 > Details and numbers are in [`docs/status.md`](../status.md).
+>
+> **Decided since (owner, 2026-11-02):** there are no ladders or ropes; the mole's own shaft
+> climbing and wall clinging cover them. Vertical travel gear will be **rocket boots** and a
+> **parachute** instead (templates not yet designed). The winch elevator stays as a later
+> build.

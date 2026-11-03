@@ -23,9 +23,11 @@ export interface FluidReaction {
 
 /**
  * World events the sim reports for feedback: lava quenched; firedamp ignited;
- * gas hissing out of a dug-open pocket; a torch burning out or drowned.
+ * gas hissing out of a dug-open pocket; a torch burning out or drowned; a tile
+ * catching fire, burning away or being put out; metal melting or setting.
  */
-export type SimEventKind = 'quench' | 'ignite' | 'vent' | 'torchOut';
+export type SimEventKind =
+  'quench' | 'ignite' | 'vent' | 'torchOut' | 'catchFire' | 'burnOut' | 'douse' | 'melt' | 'set';
 
 export type FluidKind = 'liquid' | 'gas';
 
@@ -53,12 +55,18 @@ export interface FluidDef {
   moveScale: number;
   visual: FluidVisual;
   reactions: FluidReaction[];
+  /**
+   * A molten metal: the material it sets back into below that material's heat
+   * limit, and the least amount that makes a whole block (less cools to nothing).
+   */
+  sets: { material: number; below: number; minAmount: number } | null;
 }
 
 /** Lookup of fluids by id and key. */
 export class FluidRegistry {
   private readonly byId: FluidDef[] = [];
   private readonly byKey = new Map<string, FluidDef>();
+  private readonly moltenByMaterial = new Map<number, FluidDef>();
 
   constructor(defs: readonly FluidDef[]) {
     for (const def of defs) {
@@ -66,7 +74,13 @@ export class FluidRegistry {
       if (this.byId[def.id]) throw new Error(`Duplicate fluid id ${def.id}`);
       this.byId[def.id] = def;
       this.byKey.set(def.key, def);
+      if (def.sets) this.moltenByMaterial.set(def.sets.material, def);
     }
+  }
+
+  /** The fluid a material melts into, if it melts. */
+  moltenOf(material: number): FluidDef | undefined {
+    return this.moltenByMaterial.get(material);
   }
 
   get all(): readonly FluidDef[] {
@@ -104,7 +118,13 @@ export function loadFluids(materials: MaterialRegistry): FluidRegistry {
   };
   const defs: FluidDef[] = fluidsData.fluids.map((raw: RawFluid) => {
     const r = raw as RawFluid &
-      Partial<{ swimSpeedScale: number; moveScale: number; temperature: number }>;
+      Partial<{
+        swimSpeedScale: number;
+        moveScale: number;
+        temperature: number;
+        sets: string;
+        setMinAmount: number;
+      }>;
     if (raw.kind !== 'liquid' && raw.kind !== 'gas') {
       throw new Error(`Fluid "${raw.key}": unknown kind "${raw.kind}"`);
     }
@@ -131,6 +151,7 @@ export function loadFluids(materials: MaterialRegistry): FluidRegistry {
         opacity: raw.visual.opacity,
       },
       reactions: [],
+      sets: r.sets === undefined ? null : moltenSets(materials, raw.key, r.sets, r.setMinAmount),
     };
   });
   const registry = new FluidRegistry(defs);
@@ -155,4 +176,15 @@ export function loadFluids(materials: MaterialRegistry): FluidRegistry {
     });
   }
   return registry;
+}
+
+function moltenSets(
+  materials: MaterialRegistry,
+  key: string,
+  into: string,
+  minAmount = FLUID_MAX,
+): NonNullable<FluidDef['sets']> {
+  const m = materials.require(into);
+  if (!m.solid) throw new Error(`Fluid "${key}": sets into "${into}", which must be solid`);
+  return { material: m.numId, below: m.heatLimit * 100, minAmount };
 }

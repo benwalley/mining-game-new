@@ -8,8 +8,11 @@ import type { Player } from './Player';
 /**
  * Health and breath. Breath drains while the head is under a liquid and
  * refills otherwise; at zero the player starts drowning. Harmful fluids hurt
- * on contact (lava, flame) or when breathed (spore gas). Health regenerates after a while out of danger and never drops
- * below `minHealth`: hazards can't kill until rescue exists (phase 3).
+ * on contact (lava, flame) or when breathed (spore gas), and hot air hurts
+ * from `heatDamageFrom` degrees, more the hotter it is. The heat warnings
+ * (haze, sweat) start below that, so the mole feels it before it hurts.
+ * Health regenerates after a while out of danger and never drops below
+ * `minHealth`: hazards can't kill until rescue exists (phase 3).
  */
 export class Vitals {
   private sinceHurtEvent = Infinity;
@@ -20,7 +23,8 @@ export class Vitals {
     private readonly events: EventBus<GameEvents>,
   ) {}
 
-  update(player: Player, fluid: FluidContact, dt: number): void {
+  /** `felt` is the temperature the mole feels, in degrees (NaN if unknown). */
+  update(player: Player, fluid: FluidContact, dt: number, felt = NaN): void {
     const t = this.tuning;
     const head = this.fluids.get(fluid.headFluid);
     if (head?.kind === 'liquid') {
@@ -34,10 +38,12 @@ export class Vitals {
       body?.harm === 'contact' && body.damagePerSecond > 0 && fluid.submersion > 0.05;
     const breathing = head?.harm === 'breath' && head.damagePerSecond > 0;
     const drowning = player.breath === 0;
+    const scorch = felt > t.heatDamageFrom ? (felt - t.heatDamageFrom) * t.heatDamagePerDegree : 0;
     const damage =
       (touching ? body.damagePerSecond : 0) +
       (breathing ? head.damagePerSecond : 0) +
-      (drowning ? t.drownDamagePerSecond : 0);
+      (drowning ? t.drownDamagePerSecond : 0) +
+      scorch;
 
     this.sinceHurtEvent += dt;
     if (damage > 0) {
@@ -46,7 +52,7 @@ export class Vitals {
       if (this.sinceHurtEvent >= t.hurtEventInterval) {
         this.sinceHurtEvent = 0;
         this.events.emit('hurt', {
-          cause: touching ? 'fluid' : breathing ? 'gas' : 'drowning',
+          cause: touching ? 'fluid' : breathing ? 'gas' : drowning ? 'drowning' : 'heat',
           fluid: touching ? fluid.fluid : fluid.headFluid,
         });
       }

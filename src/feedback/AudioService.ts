@@ -191,6 +191,36 @@ export class AudioService {
     this.noiseBurst(this.rng.range(3500, 4500), 0.8, 0.4, 0.18);
   }
 
+  /** Something catching fire: a soft rush and a few pops. */
+  catchFire(): void {
+    this.noiseBurst(500, 0.6, 0.6, 0.35);
+    this.crackle(0.6);
+  }
+
+  /** A burnt tile giving way: a dry crumble. */
+  burnOut(): void {
+    this.noiseBurst(800, 1, 0.25, 0.3);
+    this.crackle(0.8);
+  }
+
+  /** Metal slumping into a melt: a low glug and a sizzle. */
+  melt(): void {
+    this.sweep(180, 70, 0.35, 0.35);
+    this.noiseBurst(5000, 0.8, 0.3, 0.2, 0.05);
+  }
+
+  /** Molten metal setting hard: a hiss and a ring. */
+  setHard(): void {
+    this.noiseBurst(5500, 0.7, 0.25, 0.2);
+    this.tone(1400, 0.35, 0.08, 'sine', 0.08);
+  }
+
+  /** A torch lifted off the wall; a spent one fizzles out in the hand. */
+  torchTaken(spent: boolean): void {
+    this.sweep(500, 260, 0.12, 0.18);
+    if (spent) this.torchOut();
+  }
+
   hurt(): void {
     this.sweep(260, 110, 0.18, 0.35);
     this.noiseBurst(420, 1, 0.08, 0.3);

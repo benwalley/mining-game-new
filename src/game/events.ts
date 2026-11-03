@@ -36,7 +36,9 @@ export interface GameEvents {
   landed: { speed: number };
   inspect: { x: number; y: number };
   splash: { x: number; y: number; fluid: number; speed: number };
-  hurt: { cause: 'drowning' | 'fluid' | 'gas'; fluid: number };
+  hurt: { cause: 'drowning' | 'fluid' | 'gas' | 'heat'; fluid: number };
+  /** A torch came off the wall: back into the pack, or `spent` if it had burned down. */
+  torchTaken: { x: number; y: number; variant: number; spent: boolean };
   /** A drop of sweat leaves the mole (it's hot). */
   sweat: { x: number; y: number };
   /** The air crackles (extreme heat); strength 0.5–1. */
@@ -46,4 +48,9 @@ export interface GameEvents {
   ignite: SimEvent;
   vent: SimEvent;
   torchOut: SimEvent;
+  catchFire: SimEvent;
+  burnOut: SimEvent;
+  douse: SimEvent;
+  melt: SimEvent;
+  set: SimEvent;
 }

@@ -120,7 +120,9 @@
     "breathSeconds": 10,
     "breathRefillRate": 4,
     "drownDamagePerSecond": 12,
-    "hurtEventInterval": 0.4
+    "hurtEventInterval": 0.4,
+    "heatDamageFrom": 100,
+    "heatDamagePerDegree": 0.15
   },
   "heat": {
     "rate": 0.25,
@@ -154,7 +156,11 @@
   "torch": {
     "secondsPerFuel": 60,
     "secondsPerStep": 4,
-    "lowFraction": 0.2
+    "dimSeconds": 60
+  },
+  "fire": {
+    "catchChancePerSecond": 0.04,
+    "secondsPerFuel": 15
   },
   "chest": {
     "capacityTimesPack": 5,

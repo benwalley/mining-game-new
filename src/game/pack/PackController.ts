@@ -187,8 +187,9 @@ export class PackController {
 
   /**
    * A tap on the world. In build mode it places whatever is held, or flashes where
-   * it can't. In dig mode it opens a chest in reach, or places a held torch or
-   * chest; with a block held it does nothing, since blocks go down in build mode.
+   * it can't. In dig mode it opens a chest in reach, takes back a torch in reach,
+   * or places a held torch or chest; with a block held it does nothing, since
+   * blocks go down in build mode.
    */
   tapWorld(cssX: number, cssY: number): void {
     if (this.isPaused && !this.building) return;
@@ -196,6 +197,12 @@ export class PackController {
     if (this.building) return this.tryPlace(t.x, t.y);
     if (this.d.chests.get(t.x, t.y) && this.isChestTile(t.x, t.y)) {
       if (this.chestInRange(t.x, t.y)) return this.openChest(t.x, t.y);
+      this.flash = { x: t.x, y: t.y, until: this.now() + FLASH_MS };
+      this.d.events.emit('placeDenied', t);
+      return;
+    }
+    if (this.kindOf(this.d.mirror.materialAt(t.x, t.y)) === 'torch') {
+      if (this.chestInRange(t.x, t.y)) return this.d.sim.send({ type: 'takeTorch', ...t });
       this.flash = { x: t.x, y: t.y, until: this.now() + FLASH_MS };
       this.d.events.emit('placeDenied', t);
       return;
@@ -269,6 +276,14 @@ export class PackController {
     this.reachStale = true;
   }
 
+  /** The sim took a torch off the wall: it goes back in the pack unless it was spent. */
+  torchTaken(x: number, y: number, variant: number, spent: boolean): void {
+    if (!spent) this.d.pack.add(itemKey(this.d.materials.require('torch').numId, variant));
+    this.d.events.emit('torchTaken', { x, y, variant, spent });
+    this.reachStale = true;
+    this.publish();
+  }
+
   get chestOpen(): boolean {
     return this.chest !== null;
   }
@@ -338,6 +353,7 @@ export class PackController {
     return this.kindOf(this.d.mirror.materialAt(x, y)) === 'chest';
   }
 
+  /** Within reach to open a chest or take a torch. */
   private chestInRange(x: number, y: number): boolean {
     const b = bodyTile(this.d.player.box);
     const r = this.d.chestRange;

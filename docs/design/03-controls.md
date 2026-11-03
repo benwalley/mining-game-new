@@ -9,7 +9,7 @@ The player swipes anywhere on screen to move, and moving into solid ground digs.
 | Touch and drag, then hold             | Move in the drag direction. Direction is the vector from where the finger first landed to where it is now. |
 | Drag distance                         | Sets speed. Dead zone about 12 px; full speed at about 60 px.                                              |
 | Push into a solid tile                | Dig it. Holding keeps digging; the character continues into the hole.                                      |
-| Drag up                               | Jump when standing; climb on ladders, ropes and dug shaft walls.                                           |
+| Drag up                               | Jump when standing; climb dug shaft walls.                                                                 |
 | Lift finger                           | Stop. Quick, with a few frames of easing so it doesn't feel robotic.                                       |
 | Tap a nearby tile, object or creature | Context action: talk, use, open, pick up. On an empty tile in reach, place the selected hotbar item.       |
 | Long-press anything                   | Inspect: name, and every property the player has discovered about it.                                      |

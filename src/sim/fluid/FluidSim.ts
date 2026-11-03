@@ -185,7 +185,16 @@ export class FluidSim {
       this.changedAt(x, y);
       return;
     }
+    // Flame on a solid tile is that tile burning (src/sim/fire); it doesn't flow.
+    if (this.solid[chunk.material[i]!]) return;
     if (def.reactions.length > 0 && this.react(chunk, i, x, y, def)) return;
+    if (def.sets) {
+      if (chunk.temperature[i]! < def.sets.below) {
+        this.setSolid(chunk, i, x, y, def.sets);
+        return;
+      }
+      this.wake(x, y, x, y); // Keep checking while it's hot enough to stay molten.
+    }
     const gas = def.kind === 'gas';
     if (gas && y < this.chunks.dims.surfaceY) {
       // Gas reaching open sky blows away.
@@ -259,6 +268,30 @@ export class FluidSim {
         this.move(chunk, i, x, y, n2, x + d2, y, 1, type);
       }
     }
+  }
+
+  /**
+   * Molten metal that has cooled below its melting point sets: into a block if
+   * there's enough of it, or else into nothing (a thin film can't make a block).
+   */
+  private setSolid(
+    chunk: ChunkData,
+    i: number,
+    x: number,
+    y: number,
+    sets: NonNullable<FluidDef['sets']>,
+  ): void {
+    const whole = chunk.fluidAmount[i]! >= sets.minAmount;
+    chunk.fluidType[i] = 0;
+    chunk.fluidAmount[i] = 0;
+    if (whole) {
+      chunk.material[i] = sets.material;
+      chunk.damage[i] = 0;
+      this.out.materials.push({ x, y, material: sets.material });
+      this.out.events.push({ kind: 'set', x, y });
+    }
+    this.changedAt(x, y);
+    this.wake(x - 1, y - 1, x + 1, y + 1);
   }
 
   /** Removes `amount` from a tile and wakes its neighbors, which may flow into the space. */

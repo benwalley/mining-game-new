@@ -230,5 +230,24 @@ the pick and known recipes are saved with the player (`SAVE_VERSION` 5); `placeT
 `variant` (the torch's fuel, `PROTOCOL_VERSION` 10). Pack keys for crafted items are in
 `src/game/craft/itemKey.ts`.
 
+**Phase 2, slice 4 (done; slice 3, ladders, was dropped):** fire, melting and heat damage
+(`src/sim/fire/`). Each second, a tile with fuel (rootwood, coal, glowcap, spore-silk, ember
+crystal) that is past its heat limit, or touches a torch, flame or lava, catches fire with a 4%
+chance (`tuning.json` `fire`), so fire creeps slowly through a seam. A burning tile is a solid
+tile with flame in its fluid layer: that makes it a 500° heat source and a light through the
+existing heat and light systems, and it saves with the chunk. It cracks as it burns (the damage
+byte) and goes after `fuel × 15` s, leaving a last puff of flame; water beside it puts it out,
+and digging it smothers it. Metals (copper, tin, iron, gold, starsilver) past their heat limit
+melt into molten metal fluids (ids 6–10), which glow, flow like thick lava and set back into a
+block of that metal as soon as their tile is cooler than the melting point; a film thinner than
+half a tile cools to nothing. Rock does nothing at its limit. Hot air hurts from 100°, 0.15 hp a
+second per degree over (`vitals`), after the haze and sweat warnings; health still stops at its
+floor. A burning tile draws as a flickering ember glow with flame tongues that reach into the
+open tile above. Tap a torch within 3 tiles in dig mode to take it back: one with at least half
+its burn left returns as a fresh torch of its fuel (the fuel is kept in the tile's unused light
+byte), a burnt-down one is spent. Torches fade over their last 60 s (`torch.dimSeconds`).
+`takeTorch`/`torchTaken` and a `damage` field on tile changes are `PROTOCOL_VERSION` 11; the
+save format didn't change.
+
 Not built yet (later phases): creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

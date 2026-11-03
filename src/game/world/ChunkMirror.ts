@@ -105,7 +105,12 @@ export class ChunkMirror {
   }
 
   applyChanges(changes: readonly TileChange[]): void {
-    for (const c of changes) this.setMaterial(c.x, c.y, c.material);
+    for (const c of changes) {
+      this.setMaterial(c.x, c.y, c.material);
+      if (c.damage !== undefined && this.damageAt(c.x, c.y) !== c.damage) {
+        this.setDamage(c.x, c.y, c.damage, true);
+      }
+    }
   }
 
   applyFluids(patches: readonly FluidPatch[]): void {

@@ -24,13 +24,33 @@ function setup() {
   const run = (seconds: number, contact: FluidContact) => {
     for (let i = 0; i < seconds * 60; i++) vitals.update(player, contact, 1 / 60);
   };
-  return { player, run, hurts };
+  const bake = (seconds: number, felt: number) => {
+    for (let i = 0; i < seconds * 60; i++) vitals.update(player, air, 1 / 60, felt);
+  };
+  return { player, run, bake, hurts };
 }
 
 const underwater: FluidContact = { fluid: WATER, submersion: 1, headFluid: WATER };
 const air: FluidContact = { fluid: 0, submersion: 0, headFluid: 0 };
 
 describe('Vitals', () => {
+  it('lets warm air pass and hurts from heatDamageFrom, faster the hotter it is', () => {
+    const warm = setup();
+    warm.bake(10, t.heatDamageFrom - 5);
+    expect(warm.player.health).toBe(t.maxHealth);
+    expect(warm.hurts).toHaveLength(0);
+
+    const hot = setup();
+    hot.bake(1, t.heatDamageFrom + 50);
+    const scorched = setup();
+    scorched.bake(1, t.heatDamageFrom + 150);
+    expect(hot.player.health).toBeLessThan(t.maxHealth);
+    expect(scorched.player.health).toBeLessThan(hot.player.health);
+    expect(hot.hurts[0]?.cause).toBe('heat');
+    scorched.bake(60, t.heatDamageFrom + 150);
+    expect(scorched.player.health).toBe(t.minHealth);
+  });
+
   it('drains breath underwater, then drowns, but never kills', () => {
     const { player, run, hurts } = setup();
     run(t.breathSeconds - 1, underwater);

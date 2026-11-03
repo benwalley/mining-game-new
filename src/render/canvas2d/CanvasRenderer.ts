@@ -55,6 +55,7 @@ export class CanvasRenderer implements Renderer {
   /** 1 for solid material ids; 1 for liquid fluid ids. */
   private readonly solidById: Uint8Array;
   private readonly liquidById = new Uint8Array(16);
+  private readonly flame: number;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -69,6 +70,7 @@ export class CanvasRenderer implements Renderer {
     this.solidById = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.solidById[m.numId] = m.solid ? 1 : 0;
     for (const f of fluids.all) this.liquidById[f.id] = f.kind === 'liquid' ? 1 : 0;
+    this.flame = fluids.require('flame').id;
     for (let t = 0; t <= HEATMAP_TOP; t += HEATMAP_STEP) {
       // Blue when cold, through yellow, to red at the top.
       this.heatmapStyles.push(`hsl(${Math.round(240 * (1 - t / HEATMAP_TOP))} 90% 50%)`);
@@ -160,6 +162,7 @@ export class CanvasRenderer implements Renderer {
     const tx1 = Math.floor((canvas.width - ox) / tile);
     const ty1 = Math.floor((canvas.height - oy) / tile);
     this.drawFluids(ctx, tx0, ty0, tx1, ty1, ox, oy, 1);
+    this.drawBurning(tx0, ty0, tx1, ty1, ox, oy, frame.time);
     this.drawShimmer(tx0, ty0, tx1, ty1, ox, oy, frame.time);
     this.drawParticles(frame, ox, oy, tile);
     // Darkness goes over the world but under the player, who carries the lamp.
@@ -315,6 +318,8 @@ export class CanvasRenderer implements Renderer {
       for (let x = tx0; x <= tx1; x++) {
         const f = fluidAt(x, y);
         if (f === 0) continue;
+        // Fluid in a solid tile is flame on a burning tile, drawn by drawBurning.
+        if (this.solidById[this.mirror.materialAt(x, y)]) continue;
         const type = fluidType(f);
         const path = paths[type];
         if (!path) continue;
@@ -351,6 +356,57 @@ export class CanvasRenderer implements Renderer {
       ctx.globalAlpha = style.opacity * alphaScale * (0.25 + (0.75 * fluidAmount(f)) / FLUID_MAX);
       ctx.fillStyle = style.color;
       ctx.fill(haze);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Burning tiles: the face glows and flickers, and tongues of flame lick up
+   * from it, reaching on into the tile above when that's open.
+   */
+  private drawBurning(
+    tx0: number,
+    ty0: number,
+    tx1: number,
+    ty1: number,
+    ox: number,
+    oy: number,
+    time: number,
+  ): void {
+    const { ctx, scale, mirror } = this;
+    const tile = TILE_PX * scale;
+    const snap = (v: number): number => Math.round(v / scale) * scale;
+    const w = 2 * scale;
+    for (let y = ty0; y <= ty1; y++) {
+      for (let x = tx0; x <= tx1; x++) {
+        const f = mirror.fluidAt(x, y);
+        if (f === 0 || fluidType(f) !== this.flame) continue;
+        const m = mirror.materialAt(x, y);
+        if (m < 0 || !this.solidById[m]) continue;
+        const sx = ox + x * tile;
+        const sy = oy + y * tile;
+        const flicker = 0.5 + 0.5 * Math.sin(time * 9 + x * 1.7 + y * 2.3);
+        ctx.globalAlpha = 0.3 + 0.15 * flicker;
+        ctx.fillStyle = palette.ember;
+        ctx.fillRect(sx, sy, tile, tile);
+        const open = !mirror.isSolid(x, y - 1);
+        const base = sy + tile;
+        ctx.globalAlpha = 0.95;
+        for (let n = 0; n < 3; n++) {
+          const phase = time * (7 + n * 1.9) + x * 3.1 + y * 5.3 + n * 2.1;
+          const lick = 0.5 + 0.5 * Math.sin(phase);
+          const h =
+            tile * (0.4 + 0.4 * lick) +
+            (open ? tile * 0.6 * (0.5 + 0.5 * Math.sin(phase * 1.3)) : 0);
+          const cx = snap(sx + tile * (0.2 + 0.3 * n) + scale * Math.sin(phase * 0.7));
+          ctx.fillStyle = palette.lava;
+          ctx.fillRect(cx - w, snap(base - h * 0.55), 2 * w, snap(h * 0.55));
+          ctx.fillStyle = palette.ember;
+          ctx.fillRect(cx - w / 2, snap(base - h), w, snap(h * 0.9));
+          ctx.fillStyle = palette.gold;
+          ctx.fillRect(cx - w / 2, snap(base - h * 0.45), w, snap(h * 0.35));
+        }
+      }
     }
     ctx.globalAlpha = 1;
   }

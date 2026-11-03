@@ -22,7 +22,7 @@ Values are starting points for tuning. The "Best at" column is the balance rule 
 | Dirt          | 1    | 1     | 3      | 9          | 2    | 0    | —          | Filling holes, farming fungus           |
 | Sand          | 1    | 1     | 4      | 6          | 0    | 0    | Falls      | Glass, filling, traps                   |
 | Clay          | 2    | 2     | 4      | 8          | 3    | 0    | —          | Bricks, kilns, molds                    |
-| Rootwood      | 2    | 4     | 2      | 3          | 4    | 5    | Flexible   | Handles, ladders, early fuel            |
+| Rootwood      | 2    | 4     | 2      | 3          | 4    | 5    | Flexible   | Handles, shafts, early fuel             |
 | Stone         | 4    | 5     | 6      | 8          | 5    | 0    | —          | Walls, supports, cheap tools            |
 | Coal          | 3    | 2     | 3      | 2          | 3    | 9    | —          | Fuel                                    |
 | Copper        | 4    | 5     | 6      | 5          | 6    | 0    | Conductive | First metal tools, pipes, heat transfer |
@@ -30,7 +30,7 @@ Values are starting points for tuning. The "Best at" column is the balance rule 
 | Quartz        | 6    | 2     | 3      | 8          | 3    | 0    | Clear      | Lenses, lanterns, glass                 |
 | Iron          | 6    | 7     | 8      | 7          | 8    | 0    | —          | Strong tools, supports, rails           |
 | Glowcap       | 1    | 1     | 1      | 2          | 0    | 3    | Glows      | Light without fire, gifts               |
-| Spore-silk    | 1    | 6     | 1      | 3          | 0    | 2    | Flexible   | Rope, light packs, suits                |
+| Spore-silk    | 1    | 6     | 1      | 3          | 0    | 2    | Flexible   | Parachutes, light packs, suits          |
 | Obsidian      | 8    | 3     | 7      | 10         | 6    | 0    | Insulating | Heat shields, sharp but brittle heads   |
 | Ember crystal | 5    | 3     | 2      | 10         | 2    | 10   | Volatile   | Long-burning fuel, explosives           |
 | Gold          | 2    | 3     | 9      | 4          | 3    | 0    | —          | Trade and gifts (many species love it)  |

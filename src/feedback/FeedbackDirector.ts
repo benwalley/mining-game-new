@@ -17,6 +17,8 @@ const SOUND_GAP_MS = {
   whoomph: 250,
   vent: 400,
   packFull: 500,
+  fire: 300,
+  melt: 250,
 };
 
 const DIR_VECTORS = {
@@ -126,6 +128,7 @@ export class FeedbackDirector {
     events.on('hurt', (e) => {
       if (e.cause === 'gas') this.audio.cough();
       else this.audio.hurt();
+      if (e.cause === 'heat') this.audio.crackle(1);
       this.haptics.tick();
     });
     events.on('sweat', (e) => {
@@ -143,6 +146,54 @@ export class FeedbackDirector {
       });
       this.particles.burst(e.x + 0.5, e.y + 0.5, 6, [palette.ember, palette.gold], {
         speed: 4,
+        life: 0.4,
+        dirY: -1,
+      });
+    });
+    events.on('catchFire', (e) => {
+      this.throttled('fire', () => this.audio.catchFire());
+      this.particles.burst(e.x + 0.5, e.y + 0.5, 8, [palette.ember, palette.gold, palette.lava], {
+        speed: 3,
+        life: 0.6,
+        dirY: -1,
+      });
+    });
+    events.on('burnOut', (e) => {
+      this.throttled('fire', () => this.audio.burnOut());
+      this.particles.burst(e.x + 0.5, e.y + 0.5, 10, [palette.ember, palette.slate, palette.coal], {
+        speed: 2.5,
+        life: 0.9,
+        dirY: -1,
+      });
+    });
+    events.on('douse', (e) => {
+      this.throttled('hiss', () => this.audio.hiss());
+      this.particles.burst(e.x + 0.5, e.y + 0.3, 6, [palette.fog, palette.bone], {
+        speed: 1.5,
+        life: 0.9,
+        dirY: -1,
+      });
+    });
+    events.on('melt', (e) => {
+      this.throttled('melt', () => this.audio.melt());
+      this.particles.burst(e.x + 0.5, e.y + 0.8, 6, [palette.ember, palette.gold], {
+        speed: 2,
+        life: 0.5,
+        dirY: 1,
+      });
+    });
+    events.on('set', (e) => {
+      this.throttled('melt', () => this.audio.setHard());
+      this.particles.burst(e.x + 0.5, e.y + 0.2, 5, [palette.fog, palette.bone], {
+        speed: 1.2,
+        life: 0.8,
+        dirY: -1,
+      });
+    });
+    events.on('torchTaken', (e) => {
+      this.audio.torchTaken(e.spent);
+      this.particles.burst(e.x + 0.5, e.y + 0.4, 3, [palette.ember, palette.gold], {
+        speed: 1.5,
         life: 0.4,
         dirY: -1,
       });

@@ -17,5 +17,6 @@ export type HeatTuning = Tuning['heat'];
 export type PickTuning = Tuning['pick'];
 export type TorchTuning = Tuning['torch'];
 export type ChestTuning = Tuning['chest'];
+export type FireTuning = Tuning['fire'];
 
 export const tuning: Tuning = tuningData;

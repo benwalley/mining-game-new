@@ -2,6 +2,7 @@ import { MAX_LIGHT, computeLight, type LightRegion, type LightSources } from '@/
 import type { ChunkData } from '@/core/world/chunk';
 import { FLUID_MAX, type FluidRegistry } from '@/content/fluids';
 import type { MaterialRegistry } from '@/content/materials';
+import type { TorchTuning } from '@/content/tuning';
 import {
   fluidAmount,
   fluidType,
@@ -31,7 +32,15 @@ export class LightField implements MirrorListener {
   private readonly lamps = [{ x: 0, y: 0, level: 0 }];
   private readonly sources: LightSources;
 
-  constructor(mirror: ChunkMirror, materials: MaterialRegistry, fluids: FluidRegistry) {
+  constructor(
+    mirror: ChunkMirror,
+    materials: MaterialRegistry,
+    fluids: FluidRegistry,
+    torchTuning: TorchTuning,
+  ) {
+    const torch = materials.require('torch').numId;
+    // A torch's damage byte counts its burn steps left; it fades over the last few.
+    const dimSteps = Math.ceil(torchTuning.dimSeconds / torchTuning.secondsPerStep);
     this.emission = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.emission[m.numId] = m.light;
     this.fluidEmission = new Uint8Array(fluids.maxId + 1);
@@ -43,6 +52,14 @@ export class LightField implements MirrorListener {
         const m = mirror.materialAt(x, y);
         if (m < 0) return 0;
         const fluid = mirror.fluidAt(x, y);
+        if (m === torch) {
+          // 0 means not reported yet: a torch placed this session, so a fresh one.
+          const left = mirror.damageAt(x, y);
+          const full = this.emission[m]!;
+          return left > 0 && left < dimSteps
+            ? Math.max(2, Math.round((full * left) / dimSteps))
+            : full;
+        }
         if (fluid === 0) return this.emission[m]!;
         // A thin film of a glowing fluid glows less than a full tile.
         const full = this.fluidEmission[fluidType(fluid)]!;

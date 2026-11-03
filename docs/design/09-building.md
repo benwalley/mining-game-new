@@ -8,7 +8,6 @@ Anything solid the player carries can be placed as a tile. Crafted structures ad
 | --------------- | --------------------------------- | ------------------------------------------------------------------------ |
 | Material blocks | Walls, floors, plugs for leaks    | Any solid material; inherits its properties (an obsidian wall insulates) |
 | Support beam    | Extends ceiling span              | Span bonus depends on the beam's material                                |
-| Ladder, rope    | Vertical movement                 | Ropes can be thrown down a shaft                                         |
 | Platform        | One-way floor                     | Drop through by swiping down                                             |
 | Door            | Blocks fluids and gas when closed | Creatures can open doors to their own homes                              |
 | Torch, lantern  | Light                             | Torches burn out; lanterns need refueling slowly                         |
@@ -32,3 +31,9 @@ Colonies ask for help by showing an icon of what they need (a wall, a pump, ligh
 > out after a time set by their fuel. A chest holds a few times the pack's weight, opens with
 > a tap into a two-list sheet beside the pack, and can be dug up only when empty. Crafting
 > doesn't read from chests. There's no camp yet, and a new world starts with nothing placed.
+>
+> **Decided since (owner, 2026-11-02):** no ladders or ropes. Climbing shafts and clinging to
+> walls already cover them; rocket boots and a parachute will add vertical movement later.
+>
+> **Decided since (owner, 2026-11-02):** a torch can be taken back with a tap; it fades over
+> the end of its burn.

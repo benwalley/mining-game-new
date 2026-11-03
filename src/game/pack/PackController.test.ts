@@ -429,6 +429,20 @@ describe('PackController items in dig mode', () => {
     expect(ctl.chestOpen).toBe(false);
   });
 
+  it('takes a torch in reach back with a tap; a spent one is gone', () => {
+    const { ctl, pack, mirror, sent } = setup();
+    mirror.setMaterial(4, 9, torch);
+    mirror.setMaterial(20, 9, torch);
+    ctl.tapWorld(at(20), at(9));
+    expect(sent.some((m) => m.type === 'takeTorch')).toBe(false);
+    ctl.tapWorld(at(4), at(9));
+    expect(sent.at(-1)).toEqual({ type: 'takeTorch', x: 4, y: 9 });
+    ctl.torchTaken(4, 9, coal, false);
+    expect(pack.count(itemKey(torch, coal))).toBe(1);
+    ctl.torchTaken(4, 9, coal, true);
+    expect(pack.count(itemKey(torch, coal))).toBe(1);
+  });
+
   it('freezes the world in craft mode', () => {
     const { ctl, pauses } = setup();
     ctl.setMode('craft');

@@ -13,7 +13,7 @@ Every hazard is telegraphed at least 2 seconds before it can hurt, and every haz
 | Cave-in                  | Dust, creaking, cracks                              | Support beams, tougher materials                                      |
 | Gas                      | Haze, hiss, coughing                                | Suits, sealing doors, venting, lighting it from far away if flammable |
 | Drowning                 | Rising water sound, air indicator by breath bubbles | Pumps, walls, air teachings                                           |
-| Falls                    | Long drops are visible                              | Ladders, ropes, platforms                                             |
+| Falls                    | Long drops are visible                              | Platforms, parachutes, rocket boots                                   |
 | Predators                | Growls, tracks, scattered critters                  | Light, walls, avoiding their territory (combat is an open question)   |
 
 Health regenerates slowly when the player is out of danger. Lethal outcomes need sustained exposure. A player who notices the warnings and retreats should almost always survive.

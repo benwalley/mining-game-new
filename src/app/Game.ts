@@ -160,7 +160,7 @@ export class Game {
       tuning.light,
       tuning.heat,
     );
-    this.light = new LightField(this.mirror, materials, fluids);
+    this.light = new LightField(this.mirror, materials, fluids, tuning.torch);
     this.mirror.addListener(this.light);
     this.streamer = new ChunkStreamer(
       this.mirror,
@@ -308,6 +308,7 @@ export class Game {
       sim.on('placeRejected', ({ x, y, material, variant }) =>
         this.packCtl.refund(x, y, material, variant),
       ),
+      sim.on('torchTaken', (t) => this.packCtl.torchTaken(t.x, t.y, t.variant, t.spent)),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
       sim.on('heatChanged', ({ patches }) => this.mirror.applyHeat(patches)),
       sim.on('simEvents', ({ events }) => {
@@ -541,8 +542,8 @@ export class Game {
       const contact = this.controller.sense(this.player, solid, this.mirror.fluidAt);
       this.dig.update(this.player, intent, contact, dt);
       this.controller.step(this.player, intent, contact, solid, dt, this.dig.isDigging);
-      this.vitals.update(this.player, contact.fluid, dt);
       this.heat.update(this.player, this.mirror.temperatureAt, dt);
+      this.vitals.update(this.player, contact.fluid, dt, this.heat.felt);
     }
     this.particles.update(dt, solid);
     this.syncPlayer(false);

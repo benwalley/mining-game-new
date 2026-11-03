@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Fluids live in a tile's fluid layer (amount 0-8) on top of a non-solid material. ids are persisted in saves: never change or reuse them; 0 means no fluid. kind: liquids fall and fill tiles from the bottom; gases rise, fill the whole tile (amount is concentration) and vanish in open sky. Liquids push gases out of their way. flowEvery: moves on one tick in N (0: never moves). light: emitted at full amount. damagePerSecond applies on 'contact' (any part of the body) or 'breath' (head inside). decay: tiles at or below maxAmount lose one unit every everyTicks ticks (thin gas fades; flames burn out). swimSpeedScale and moveScale scale the player's swim and walk speeds in liquids. Reactions: a tile of `fluid` touching `touching` turns into the material `becomes` or the fluid `becomesFluid`, and removes `consumes` from the touching tile. conductivity (1-10) replaces the tile's material conductivity while fluid is there. temperature makes the fluid a heat source: the tile is held at that many degrees (scaled by amount).",
+  "notes": "Fluids live in a tile's fluid layer (amount 0-8) on top of a non-solid material. ids are persisted in saves: never change or reuse them; 0 means no fluid. kind: liquids fall and fill tiles from the bottom; gases rise, fill the whole tile (amount is concentration) and vanish in open sky. Liquids push gases out of their way. flowEvery: moves on one tick in N (0: never moves). light: emitted at full amount. damagePerSecond applies on 'contact' (any part of the body) or 'breath' (head inside). decay: tiles at or below maxAmount lose one unit every everyTicks ticks (thin gas fades; flames burn out). swimSpeedScale and moveScale scale the player's swim and walk speeds in liquids. Reactions: a tile of `fluid` touching `touching` turns into the material `becomes` or the fluid `becomesFluid`, and removes `consumes` from the touching tile. conductivity (1-10) replaces the tile's material conductivity while fluid is there. temperature makes the fluid a heat source: the tile is held at that many degrees (scaled by amount). sets: a molten metal sets back into that material when its tile is below the material's heat limit (heatLimit × 100°); a tile of at least setMinAmount becomes a block and a thinner film cools to nothing. Metals melt into the fluid that sets into them. A solid tile with flame in its fluid layer is burning (src/sim/fire).",
   "fluids": [
     {
       "id": 1,
@@ -98,6 +98,106 @@
         "color": "ember",
         "surface": "gold",
         "opacity": 0.85
+      }
+    },
+    {
+      "id": 6,
+      "key": "molten-copper",
+      "name": "Molten copper",
+      "kind": "liquid",
+      "flowEvery": 3,
+      "light": 10,
+      "conductivity": 9,
+      "damagePerSecond": 40,
+      "harm": "contact",
+      "swimSpeedScale": 0.4,
+      "moveScale": 0.35,
+      "sets": "copper",
+      "setMinAmount": 4,
+      "visual": {
+        "color": "copper",
+        "surface": "copperLight",
+        "opacity": 0.95
+      }
+    },
+    {
+      "id": 7,
+      "key": "molten-tin",
+      "name": "Molten tin",
+      "kind": "liquid",
+      "flowEvery": 3,
+      "light": 10,
+      "conductivity": 7,
+      "damagePerSecond": 40,
+      "harm": "contact",
+      "swimSpeedScale": 0.4,
+      "moveScale": 0.35,
+      "sets": "tin",
+      "setMinAmount": 4,
+      "visual": {
+        "color": "fog",
+        "surface": "bone",
+        "opacity": 0.95
+      }
+    },
+    {
+      "id": 8,
+      "key": "molten-iron",
+      "name": "Molten iron",
+      "kind": "liquid",
+      "flowEvery": 3,
+      "light": 10,
+      "conductivity": 7,
+      "damagePerSecond": 40,
+      "harm": "contact",
+      "swimSpeedScale": 0.4,
+      "moveScale": 0.35,
+      "sets": "iron",
+      "setMinAmount": 4,
+      "visual": {
+        "color": "ember",
+        "surface": "sandLight",
+        "opacity": 0.95
+      }
+    },
+    {
+      "id": 9,
+      "key": "molten-gold",
+      "name": "Molten gold",
+      "kind": "liquid",
+      "flowEvery": 3,
+      "light": 10,
+      "conductivity": 8,
+      "damagePerSecond": 40,
+      "harm": "contact",
+      "swimSpeedScale": 0.4,
+      "moveScale": 0.35,
+      "sets": "gold",
+      "setMinAmount": 4,
+      "visual": {
+        "color": "gold",
+        "surface": "sandLight",
+        "opacity": 0.95
+      }
+    },
+    {
+      "id": 10,
+      "key": "molten-starsilver",
+      "name": "Molten starsilver",
+      "kind": "liquid",
+      "flowEvery": 3,
+      "light": 10,
+      "conductivity": 6,
+      "damagePerSecond": 40,
+      "harm": "contact",
+      "swimSpeedScale": 0.4,
+      "moveScale": 0.35,
+      "sets": "starsilver",
+      "setMinAmount": 4,
+      "visual": {
+        "color": "sky",
+        "surface": "quartz",
+        "opacity": 0.95
       }
     }
   ],

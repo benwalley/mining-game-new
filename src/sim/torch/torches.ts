@@ -14,17 +14,24 @@ export function burnSteps(fuel: number, t: TorchTuning): number {
 /**
  * Burns every torch the sim holds down by one step (when `step` is set), and
  * puts out any standing in liquid. Returns the torches that went out, for the
- * caller to clear, and the chunks whose torches changed, for saving. Scanning
- * every tile once a second is cheap next to a fluid tick.
+ * caller to clear; the chunks whose torches changed, for saving; and torches
+ * that burned a step while down to their last `dimSteps`, whose light fades.
+ * Scanning every tile once a second is cheap next to a fluid tick.
  */
 export function burnTorches(
   chunks: ChunkStore,
   torch: number,
   isLiquid: (fluidType: number, amount: number) => boolean,
   step: boolean,
-): { out: { x: number; y: number }[]; touched: number[] } {
+  dimSteps = 0,
+): {
+  out: { x: number; y: number }[];
+  touched: number[];
+  dim: { x: number; y: number; steps: number }[];
+} {
   const out: { x: number; y: number }[] = [];
   const touched: number[] = [];
+  const dim: { x: number; y: number; steps: number }[] = [];
   for (const chunk of chunks.values()) {
     const { material, damage, fluidType, fluidAmount } = chunk;
     let any = false;
@@ -33,14 +40,12 @@ export function burnTorches(
       const drowned = isLiquid(fluidType[i]!, fluidAmount[i]!);
       if (step || drowned) any = true;
       if (!drowned && step) damage[i] = Math.max(0, damage[i]! - 1);
-      if (drowned || damage[i] === 0) {
-        out.push({
-          x: (chunk.cx << CHUNK_SHIFT) + (i % CHUNK_SIZE),
-          y: (chunk.cy << CHUNK_SHIFT) + Math.floor(i / CHUNK_SIZE),
-        });
-      }
+      const x = (chunk.cx << CHUNK_SHIFT) + (i % CHUNK_SIZE);
+      const y = (chunk.cy << CHUNK_SHIFT) + Math.floor(i / CHUNK_SIZE);
+      if (drowned || damage[i] === 0) out.push({ x, y });
+      else if (step && damage[i]! <= dimSteps) dim.push({ x, y, steps: damage[i]! });
     }
     if (any) touched.push(chunkKey(chunk.cx, chunk.cy));
   }
-  return { out, touched };
+  return { out, touched, dim };
 }

@@ -16,7 +16,7 @@ built.
 - **The 60 fps phone run.** The owner still needs to run **bench** in the debug overlay on a
   phone (test world) and send the screenshot. Phase 1's gate isn't formally passed until then.
 
-## Phase 2, Hands (slices 1 and 2 done; wait for the owner's go-ahead on slice 3)
+## Phase 2, Hands (slices 1 and 2 done; slice 3 dropped; slice 4 built, waiting for the owner's check)
 
 Planned slices, in order:
 
@@ -24,10 +24,30 @@ Planned slices, in order:
    fan replaces the hotbar, and blocks can be placed. Decisions are below.
 2. **Crafting, chests and torches (done):** a craft mode, the pick (upgrade and sharpen), chests and
    torches. No workbench and no camp yet. Decisions are below.
-3. **Ladders:** the next placeable thing.
-4. **Fire and melting:** tiles burn or melt at their heat limit (N×100°), and heat starts to
-   do damage. Suits may come here too.
-5. **Furnace, kiln and quenching:** processing stations and process quality.
+3. **Ladders (dropped):** see "Decided before slice 4" below.
+4. **Fire and melting (built, not yet checked):** tiles burn or melt at their heat limit (N×100°), and heat starts to
+   do damage. Torches can be dug back up and dim near the end.
+5. **Gear:** rocket boots, a parachute and the heat suit, with a place to wear them.
+6. **Furnace, kiln and quenching:** processing stations and process quality.
+
+### Decided before slice 4 (owner, 2026-11-02)
+
+- **No ladders and no ropes.** The mole already climbs one-wide shafts and clings to any wall
+  or ceiling, so they would add little. Vertical movement should come from cooler gear instead:
+  **rocket boots and parachutes**, in a later slice (not yet placed in the plan). The ladder
+  and rope templates are gone from the design.
+- **Burning:** things that burn (fuel above 0: rootwood, coal, glowcap, spore-silk, ember
+  crystal) catch fire past their heat limit and spread **very slowly**.
+- **Melting:** metals past their heat limit become **molten metal**, a glowing liquid that
+  flows and sets back into a block of that metal when it cools.
+- **Rock** does nothing at its heat limit in this slice, so lava doesn't eat its walls.
+- **Heat damage** starts at 100° and gets worse the hotter it is; touching flame or lava
+  hurts a lot. Health still stops at its floor (no dying yet). The warnings come first.
+- **Suits wait** for slice 5, the gear slice, with rocket boots and a parachute. The furnace
+  slice moves to 6.
+- **Torches** can be dug back up (into the pack, keeping the burn time left) and dim over
+  the last part of their burn. No flicker.
+- **The slice 2 numbers are fine** (recipes, pick dulling, sharpening, torch burn times).
 
 Design sections to read: [02](design/02-core-loop.md) (pack weight sets the trip),
 [03](design/03-controls.md) (placing, the corner fan),
@@ -147,10 +167,38 @@ it from the fan with a tap, opening it, "store all", and the locked-dig message 
 The torch sprite and its light were not seen in the browser (no coal turned up); tests cover
 placing and burning out. No flicker animation on torches yet.
 
-### Questions to ask before slice 3
+### What slice 4 built, and choices made for the owner to check
 
-- Ladders: what they're made of, how they're placed (tap in dig mode like torches?), and
-  whether a ladder can be climbed sideways or only up and down.
-- The slice 2 numbers above: recipes, pick dulling and sharpening cost, torch burn times.
-- Should torches be picked back up (dig them), and should they flicker or dim as they burn
-  down?
+The README's Status section has the detail. Choices made without asking, to overrule freely:
+
+- **How fire starts and spreads:** a tile with fuel catches when it's past its heat limit **or
+  touches** a torch, flame or lava, with a 4% chance each second. Touch counts because lava
+  barely conducts: a lava tile only warms its neighbour to about 225°, so wood (300°) beside
+  lava would otherwise never light. A coal seam burns along at roughly a tile every 25 s. A
+  torch hung on coal will set it alight; a torch isn't a heat source itself (the mole can stand
+  in a torch tile, and a hot torch would burn it).
+- **Burn times:** `fuel × 15` s (coal about 2 minutes, rootwood about 1.5). Water next to a
+  burning tile puts it out; digging a burning tile smothers it and gives you the material.
+- **Molten metal** sets the moment its tile is below the melting point, so it drips a tile or
+  two out of the heat and hardens there. Less than half a tile of it cools to nothing. It hurts
+  like lava (40 hp/s) and glows.
+- **Heat damage:** 0.15 hp per second for each degree over 100°: about 9/s at the bottom of
+  the Magma belt (160°) and 18/s in The Deep (220°). Those depths are now hostile until suits.
+- **Taking a torch back:** a tap in dig mode within 3 tiles. With at least half its burn left
+  it comes back as a fresh torch of its fuel; otherwise it's spent and gone. The pack can't
+  hold a part-burnt torch, so this rounds instead of keeping the exact time left.
+- **Dimming:** a torch's light fades over its last 60 s, whatever its fuel.
+
+Not checked: none of it on a phone, and **not seen in the browser either**: the burning-tile
+art (flickering glow and flame tongues), the molten-metal colours and the new sounds were only
+type-checked. Tests cover catching, spreading slowly, burning out, dousing, melting and
+setting, thin films, rock staying put, heat damage, and taking torches back.
+
+### Questions to ask before slice 5 (gear)
+
+- Rocket boots: what powers them (fuel from the pack, a recharge, unlimited?), how they're
+  worn and switched on with one thumb, and how strong they are.
+- The parachute: does it open by itself on a long fall, or with a gesture? Does it wear out?
+- The heat suit: shell and lining from design 08, and how much it cuts heat damage.
+- Where gear is worn: a gear row in the full pack, or a fourth mode?
+- The slice 4 choices above: fire spread speed, heat damage numbers, torch take-back rule.

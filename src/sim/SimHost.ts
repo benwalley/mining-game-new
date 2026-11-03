@@ -27,6 +27,7 @@ import {
 } from '@/protocol/messages';
 import { FluidSim } from './fluid/FluidSim';
 import { HeatSim } from './heat/HeatSim';
+import { fireRules, stepFire, type FireRules } from './fire/fire';
 import { burnSteps, burnTorches } from './torch/torches';
 import { Zone, Zones } from './zones';
 import type { SaveStore } from './persistence/SaveStore';
@@ -87,12 +88,15 @@ export class SimHost {
   /** Seconds since torches were last checked, and since they last burned a step. */
   private torchCheck = 0;
   private torchStep = 0;
+  private fireSeconds = 0;
+  private readonly fire: FireRules;
 
   constructor(private readonly deps: SimHostDeps) {
     this.now = deps.now ?? (() => Date.now());
     this.zones = new Zones(deps.tuning.sim);
     this.solidById = new Uint8Array(deps.materials.maxNumId + 1);
     for (const m of deps.materials.all) this.solidById[m.numId] = m.solid ? 1 : 0;
+    this.fire = fireRules(deps.materials, deps.fluids, deps.tuning.fire);
     deps.port.onMessage((msg) => {
       this.handle(msg).catch((err: unknown) => this.post({ type: 'error', message: String(err) }));
     });
@@ -123,6 +127,9 @@ export class SimHost {
         return;
       case 'unplaceTile':
         this.unplaceTile(msg.x, msg.y, msg.material, msg.fluidType, msg.fluidAmount);
+        return;
+      case 'takeTorch':
+        this.takeTorch(msg.x, msg.y);
         return;
       case 'playerState':
         this.player = msg.player;
@@ -336,7 +343,12 @@ export class SimHost {
       toolPower >= def.hardness - this.deps.tuning.dig.gateOffset;
 
     if (canDig) {
+      const burning = world.chunks.get(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT)!.fluidAmount[
+        tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)
+      ]!;
       world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
+      // Digging out a burning tile smothers it rather than leaving the flame behind.
+      if (burning > 0) world.fluids.setFluid(x, y, 0, 0);
       this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
       // An opening can let neighboring fluid in.
       world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
@@ -377,14 +389,20 @@ export class SimHost {
     }
     if (!torch) world.fluids.setFluid(x, y, 0, 0);
     world.chunks.setMaterial(x, y, material);
+    let damage: number | undefined;
     if (torch) {
       const fuel = materials.get(variant)?.fuel ?? 1;
-      world.chunks.setDamage(x, y, burnSteps(fuel, tuning.torch));
+      damage = burnSteps(fuel, tuning.torch);
+      world.chunks.setDamage(x, y, damage);
+      // The light byte isn't used by the sim (light is worked out on the main
+      // thread), so a torch keeps its fuel there, to give it back when taken.
+      const chunk = world.chunks.get(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT)!;
+      chunk.light[tileIndex(x & CHUNK_MASK, y & CHUNK_MASK)] = variant;
     }
     this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
     world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
     world.heat.tileChanged(x, y);
-    this.post({ type: 'tilesChanged', changes: [{ x, y, material }] });
+    this.post({ type: 'tilesChanged', changes: [{ x, y, material, damage }] });
   }
 
   private liquidAt(x: number, y: number): boolean {
@@ -406,13 +424,21 @@ export class SimHost {
     const step = this.torchStep >= t.secondsPerStep;
     if (step) this.torchStep -= t.secondsPerStep;
     const torch = this.deps.materials.require('torch').numId;
-    const { out, touched } = burnTorches(
+    const dimSteps = Math.ceil(t.dimSeconds / t.secondsPerStep);
+    const { out, touched, dim } = burnTorches(
       world.chunks,
       torch,
       (type, amount) => amount > 0 && !this.deps.fluids.isGas(type),
       step,
+      dimSteps,
     );
     for (const key of touched) this.dirtyChunks.add(key);
+    if (dim.length > 0) {
+      this.post({
+        type: 'tilesChanged',
+        changes: dim.map(({ x, y, steps }) => ({ x, y, material: torch, damage: steps })),
+      });
+    }
     if (out.length === 0) return;
     for (const { x, y } of out) {
       world.chunks.setMaterial(x, y, this.deps.materials.air.numId);
@@ -423,6 +449,48 @@ export class SimHost {
       changes: out.map(({ x, y }) => ({ x, y, material: this.deps.materials.air.numId })),
     });
     this.post({ type: 'simEvents', events: out.map(({ x, y }) => ({ kind: 'torchOut', x, y })) });
+  }
+
+  /**
+   * Takes a torch back off the wall. One with at least half its burn left goes
+   * back in the pack as a fresh torch of its fuel; a burnt-down one is spent.
+   */
+  private takeTorch(x: number, y: number): void {
+    const world = this.requireWorld();
+    const { materials, tuning } = this.deps;
+    const torch = materials.require('torch').numId;
+    if (world.chunks.materialAt(x, y) !== torch) return;
+    const chunk = world.chunks.get(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT)!;
+    const i = tileIndex(x & CHUNK_MASK, y & CHUNK_MASK);
+    // Torches placed before they remembered their fuel come back as rootwood ones.
+    const variant = chunk.light[i]! || materials.require('rootwood').numId;
+    const full = burnSteps(materials.get(variant)?.fuel ?? 1, tuning.torch);
+    const spent = chunk.damage[i]! * 2 < full;
+    chunk.light[i] = 0;
+    world.chunks.setMaterial(x, y, materials.air.numId);
+    this.dirtyChunks.add(chunkKey(x >> CHUNK_SHIFT, y >> CHUNK_SHIFT));
+    world.fluids.wake(x - 1, y - 1, x + 1, y + 1);
+    this.post({ type: 'tilesChanged', changes: [{ x, y, material: materials.air.numId }] });
+    this.post({ type: 'torchTaken', x, y, variant, spent });
+  }
+
+  /** Once a second: things catch fire, burn, go out and melt. */
+  private tickFire(dt: number): void {
+    const world = this.world;
+    if (!world) return;
+    const before = Math.floor(this.fireSeconds);
+    this.fireSeconds += dt;
+    const second = Math.floor(this.fireSeconds);
+    if (second === before) return;
+    const out = stepFire(world.chunks, this.fire, second);
+    for (const key of out.touched) this.dirtyChunks.add(key);
+    for (const { x, y } of out.fluids) {
+      world.fluids.touch(x, y);
+      world.heat.tileChanged(x, y);
+    }
+    const changes = [...out.materials, ...out.damage];
+    if (changes.length > 0) this.post({ type: 'tilesChanged', changes });
+    if (out.events.length > 0) this.post({ type: 'simEvents', events: out.events });
   }
 
   /**
@@ -496,6 +564,7 @@ export class SimHost {
     this.publish(world.fluids, world.heat);
     world.heat.tick(this.zones);
     this.tickTorches(dt);
+    this.tickFire(dt);
     if (this.ticks % this.deps.tuning.heat.publishEveryTicks === 0) this.publishHeat(world.heat);
     const spent = performance.now() - started;
     this.statsTickMs += spent;

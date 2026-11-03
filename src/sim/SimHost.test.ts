@@ -10,6 +10,7 @@ import { IdbSaveStore } from './persistence/IdbSaveStore';
 import { MemorySaveStore } from './persistence/MemorySaveStore';
 import type { SaveStore } from './persistence/SaveStore';
 import { SimHost } from './SimHost';
+import { burnSteps } from './torch/torches';
 import { TestWorldGenerator, type TestWorldConfig } from './worldgen/TestWorldGenerator';
 
 const materials = loadMaterials();
@@ -128,7 +129,7 @@ describe.each([
       variant: rootwood.numId,
     });
     expect(host.last('tilesChanged')?.changes).toEqual([
-      { x: spawn.x, y: spawn.y, material: torch },
+      { x: spawn.x, y: spawn.y, material: torch, damage: burnSteps(rootwood.fuel, tuning.torch) },
     ]);
 
     const burnMs = rootwood.fuel * tuning.torch.secondsPerFuel * 1000;
@@ -146,6 +147,44 @@ describe.each([
     expect(host.last('tilesChanged')?.changes).toEqual([
       { x: spawn.x, y: spawn.y, material: materials.air.numId },
     ]);
+  });
+
+  it('gives a torch back with its fuel, or spent once it has burned down', async () => {
+    const clock = { ms: 1000 };
+    const host = createHost(await makeStore(), clock);
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-take-torch`,
+    });
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const torch = materials.require('torch').numId;
+    const coal = materials.require('coal');
+    await host.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+    const place = { type: 'placeTile', x: spawn.x, y: spawn.y, material: torch } as const;
+    await host.send({ ...place, variant: coal.numId });
+    await host.send({ type: 'takeTorch', x: spawn.x, y: spawn.y });
+    expect(host.last('torchTaken')).toEqual({
+      type: 'torchTaken',
+      x: spawn.x,
+      y: spawn.y,
+      variant: coal.numId,
+      spent: false,
+    });
+    expect(host.last('tilesChanged')?.changes).toEqual([
+      { x: spawn.x, y: spawn.y, material: materials.air.numId },
+    ]);
+
+    await host.send({ ...place, variant: coal.numId });
+    const burnMs = coal.fuel * tuning.torch.secondsPerFuel * 1000;
+    host.host.tick();
+    for (let t = 0; t < burnMs * 0.6; t += 500) {
+      clock.ms += 500;
+      host.host.tick();
+    }
+    await host.send({ type: 'takeTorch', x: spawn.x, y: spawn.y });
+    expect(host.last('torchTaken')?.spent).toBe(true);
   });
 
   it("won't put a torch into water", async () => {

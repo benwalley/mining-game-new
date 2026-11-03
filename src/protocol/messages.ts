@@ -10,7 +10,7 @@ import type { ChestsSnapshot } from '@/game/pack/Chests';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -50,6 +50,8 @@ export interface TileChange {
   x: number;
   y: number;
   material: number;
+  /** Set when the damage byte matters too: a burning tile's cracks, a torch's burn left. */
+  damage?: number;
 }
 
 export interface DamageChange {
@@ -111,6 +113,8 @@ export type ToSim =
       fluidType: number;
       fluidAmount: number;
     }
+  /** Take a placed torch back. Answered with `torchTaken` and `tilesChanged`. */
+  | { type: 'takeTorch'; x: number; y: number }
   | { type: 'playerState'; player: PlayerSnapshot }
   | { type: 'setPaused'; paused: boolean }
   /** Save everything dirty right now (page is hiding or closing). */
@@ -126,6 +130,11 @@ export type FromSim =
   | { type: 'tilesChanged'; changes: TileChange[] }
   /** A `placeTile` the sim refused (solid or unloaded tile); the block goes back in the pack. */
   | { type: 'placeRejected'; x: number; y: number; material: number; variant: number }
+  /**
+   * A torch was taken back. `variant` is its fuel. A torch with less than half its
+   * burn left is `spent` and doesn't go back in the pack.
+   */
+  | { type: 'torchTaken'; x: number; y: number; variant: number; spent: boolean }
   /** Fluid that moved this tick, for chunks the main thread holds. */
   | { type: 'fluidsChanged'; patches: FluidPatch[] }
   /** Temperatures that changed, a few times a second, for chunks the main thread holds. */
