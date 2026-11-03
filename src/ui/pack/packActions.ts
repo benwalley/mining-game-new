@@ -1,3 +1,4 @@
+import type { GearSlotKind } from '@/content/materials';
 import type { PickPart } from '@/game/craft/Pick';
 import type { Point } from '@/game/pack/fanLayout';
 import type { Mode } from '@/game/pack/modes';
@@ -19,6 +20,9 @@ export interface PackActions {
   select(numId: number): void;
   moveItem(from: number, to: number): void;
   discard(numId: number, count: number): void;
+  /** Put on gear from the pack, or take it off back into the pack. */
+  wear(key: number): void;
+  takeOff(slot: GearSlotKind): void;
   setMode(mode: Mode): void;
   closeChest(): void;
   /** Moves up to `n` of a stack between the pack and the open chest. */

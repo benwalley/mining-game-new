@@ -44,6 +44,8 @@ export interface RenderFrame {
   /** Where a block could go, in build mode. */
   tint: TileTint | null;
   freeze: FreezeFx | null;
+  /** The rocket boots' meter, shown by the mole while it isn't full; null without boots. */
+  boots: { meter: number; firing: boolean } | null;
   /** Null draws everything fully lit (debug). */
   light: LightView | null;
   /** Seconds, for animated effects (heat shimmer). */

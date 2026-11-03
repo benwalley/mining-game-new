@@ -127,7 +127,7 @@ export class FeedbackDirector {
     });
     events.on('hurt', (e) => {
       if (e.cause === 'gas') this.audio.cough();
-      else this.audio.hurt();
+      else if (e.cause !== 'fall') this.audio.hurt();
       if (e.cause === 'heat') this.audio.crackle(1);
       this.haptics.tick();
     });
@@ -139,6 +139,40 @@ export class FeedbackDirector {
       });
     });
     events.on('crackle', (e) => this.audio.crackle(e.strength));
+    events.on('bootsFired', (e) => {
+      this.audio.bootsIgnite();
+      this.audio.roarStart();
+      this.particles.burst(e.x, e.y, 8, [palette.bone, palette.gold, palette.ember], {
+        speed: 6,
+        life: 0.3,
+        dirY: 1.4,
+      });
+    });
+    events.on('thrust', (e) => {
+      // Exhaust from both heels, thrown down and trailing behind the way the mole moves.
+      this.particles.burst(e.x, e.y, 2, [palette.gold, palette.ember, palette.bone], {
+        speed: 7,
+        life: 0.28,
+        dirX: -e.vx * 0.04,
+        dirY: 1.6,
+      });
+    });
+    events.on('bootsStopped', (e) => {
+      this.audio.roarStop();
+      if (e.empty) this.audio.bootsSputter();
+    });
+    events.on('bootsReady', () => this.audio.bootsReady());
+    events.on('gearWorn', () => this.audio.gearOn());
+    events.on('gearRemoved', () => this.audio.stow());
+    events.on('hardLanding', (e) => {
+      this.audio.heavyLanding(e.damage);
+      this.haptics.pulse();
+      this.particles.burst(e.x, e.y, 14, [palette.soil, palette.pebble, palette.fog], {
+        speed: 5,
+        life: 0.5,
+        dirY: -0.4,
+      });
+    });
     events.on('ignite', (e) => {
       this.throttled('whoomph', () => {
         this.audio.whoomph();

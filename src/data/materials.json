@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "numId is persisted in saves and must never change or be reused. conductivity (1-10) is how fast heat passes through a tile; the design doc gives no values, so these are proposals (metals high, loose or fibrous stuff low, obsidian insulates). light (0-15) is how much a tile glows; omitted means 0. slate, mudstone, basalt and elderstone are proposed base rocks for the deeper layers (not in the design doc). Retired numIds, never to be reused: 22 (rubble) and 23 (flowstone), from cave-ins, which were dropped. kind says how a material is placed: block (the default) goes in build mode; torch and chest are items placed with a tap and drawn as sprites. torch (24) and chest (25) are made by crafting, never generated.",
+  "notes": "numId is persisted in saves and must never change or be reused. conductivity (1-10) is how fast heat passes through a tile; the design doc gives no values, so these are proposals (metals high, loose or fibrous stuff low, obsidian insulates). light (0-15) is how much a tile glows; omitted means 0. slate, mudstone, basalt and elderstone are proposed base rocks for the deeper layers (not in the design doc). Retired numIds, never to be reused: 22 (rubble) and 23 (flowstone), from cave-ins, which were dropped. kind says how a material is placed: block (the default) goes in build mode; torch and chest are items placed with a tap and drawn as sprites. torch (24) and chest (25) are made by crafting, never generated. rocket-boots (26) and heat-suit (27) are gear: made by crafting, worn from the full pack, never placed. gearSlot says where gear is worn: air (tools fired by tapping in the air) or body.",
   "materials": [
     {
       "numId": 0,
@@ -477,6 +477,52 @@
         "accent": "iron",
         "accentLight": "gold",
         "pattern": "chest"
+      }
+    },
+    {
+      "numId": 26,
+      "key": "rocket-boots",
+      "name": "Rocket boots",
+      "solid": false,
+      "hardness": 0,
+      "toughness": 5,
+      "weight": 5,
+      "heatLimit": 5,
+      "conductivity": 5,
+      "fuel": 0,
+      "trait": null,
+      "kind": "gear",
+      "gearSlot": "air",
+      "visual": {
+        "base": "iron",
+        "dark": "ink",
+        "light": "fog",
+        "accent": "ember",
+        "accentLight": "gold",
+        "pattern": "boots"
+      }
+    },
+    {
+      "numId": 27,
+      "key": "heat-suit",
+      "name": "Heat suit",
+      "solid": false,
+      "hardness": 0,
+      "toughness": 5,
+      "weight": 8,
+      "heatLimit": 8,
+      "conductivity": 1,
+      "fuel": 0,
+      "trait": null,
+      "kind": "gear",
+      "gearSlot": "body",
+      "visual": {
+        "base": "pebble",
+        "dark": "ink",
+        "light": "fog",
+        "accent": "ember",
+        "accentLight": "sandLight",
+        "pattern": "suit"
       }
     }
   ]

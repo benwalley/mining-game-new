@@ -12,11 +12,20 @@ export type TilePattern =
   | 'crystal'
   | 'spots'
   | 'torch'
-  | 'chest';
+  | 'chest'
+  | 'boots'
+  | 'suit';
 
-/** How a material is placed: blocks in build mode; torches and chests with a tap. */
-export type MaterialKind = 'block' | 'torch' | 'chest';
-const KINDS: readonly MaterialKind[] = ['block', 'torch', 'chest'];
+/**
+ * How a material is used: blocks are placed in build mode, torches and chests
+ * with a tap, and gear is worn, never placed.
+ */
+export type MaterialKind = 'block' | 'torch' | 'chest' | 'gear';
+const KINDS: readonly MaterialKind[] = ['block', 'torch', 'chest', 'gear'];
+
+/** Where gear is worn: `air` holds the tool a tap in the air fires (rocket boots). */
+export type GearSlotKind = 'air' | 'body';
+const GEAR_SLOTS: readonly GearSlotKind[] = ['air', 'body'];
 
 export interface MaterialVisual {
   base: ColorName;
@@ -46,6 +55,8 @@ export interface MaterialDef {
   /** Light emitted by the tile itself, 0–15. */
   light: number;
   kind: MaterialKind;
+  /** Set for gear only. */
+  gearSlot: GearSlotKind | null;
   visual: MaterialVisual | null;
 }
 
@@ -61,6 +72,8 @@ const PATTERNS: readonly TilePattern[] = [
   'spots',
   'torch',
   'chest',
+  'boots',
+  'suit',
 ];
 
 /** Lookup of all materials by numeric id and by key. */
@@ -138,6 +151,10 @@ export function loadMaterials(): MaterialRegistry {
     }
     const kind = ('kind' in raw ? raw.kind : 'block') as MaterialKind;
     if (!KINDS.includes(kind)) throw new Error(`Material "${raw.key}": unknown kind "${kind}"`);
+    const gearSlot = ('gearSlot' in raw ? raw.gearSlot : null) as GearSlotKind | null;
+    if ((kind === 'gear') !== (gearSlot !== null) || (gearSlot && !GEAR_SLOTS.includes(gearSlot))) {
+      throw new Error(`Material "${raw.key}": gear needs a gearSlot (air or body), and only gear`);
+    }
     return {
       numId: raw.numId,
       key: raw.key,
@@ -153,6 +170,7 @@ export function loadMaterials(): MaterialRegistry {
       trait: raw.trait,
       light: 'light' in raw ? Number(raw.light) : 0,
       kind,
+      gearSlot,
       visual: parseVisual(raw),
     };
   });

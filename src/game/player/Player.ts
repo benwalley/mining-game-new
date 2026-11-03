@@ -41,6 +41,16 @@ export class Player {
   /** Seconds since the player last took damage. */
   sinceHurt = Infinity;
 
+  /** Upward acceleration from the rocket boots this step, tiles/s²; 0 when they're off. */
+  thrust = 0;
+  /** Where the current fall started: the last point the mole was held up or moving slowly. */
+  fallFromY = 0;
+  /** Tiles dropped by a fall that just ended on solid ground; Vitals takes it and zeroes it. */
+  landedDrop = 0;
+  /** From the worn heat suit: degrees added to where heat hurts, and the fraction of damage cut. */
+  heatRaise = 0;
+  heatCut = 0;
+
   /** Set from the pack each frame: 1 unless overloaded. */
   speedScale = 1;
   jumpScale = 1;
@@ -73,6 +83,8 @@ export class Player {
     this.x = this.prevX = x;
     this.y = this.prevY = y;
     this.vx = this.vy = 0;
+    this.fallFromY = y;
+    this.landedDrop = 0;
   }
 
   snapshot(): PlayerSnapshot {

@@ -81,6 +81,12 @@ Movement is 8-directional. Digging is 4-directional (left, right, up, down) to k
 > - **On desktop:** B toggles build mode, U undoes, Esc returns to dig mode, and click and
 >   click-and-hold work as tap and hold.
 > - **Could:** an option to mirror the button to the bottom-left for left-handed players.
+>
+> **Decided since (owner, 2026-11-02):** with rocket boots worn, a touch that lands while the
+> mole is in the air (in dig mode) fires them instead of being a tap: a quick tap gives a short
+> burst, and holding keeps them at full power while the thrust lasts. The drag still steers,
+> and a second finger works too. A thrust bar beside the mole shows what's left; it refills
+> when the mole stands or holds on.
 
 ### Feel requirements
 

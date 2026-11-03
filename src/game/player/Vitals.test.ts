@@ -94,4 +94,35 @@ describe('Vitals', () => {
     run(2, { fluid: FIREDAMP, submersion: 1, headFluid: FIREDAMP });
     expect(player.health).toBe(t.maxHealth);
   });
+
+  it('wearing a heat suit moves where heat starts to hurt and cuts what hurts past it', () => {
+    const bare = setup();
+    bare.bake(2, t.heatDamageFrom + 50);
+    const suited = setup();
+    suited.player.heatRaise = 60;
+    suited.player.heatCut = 0.5;
+    suited.bake(2, t.heatDamageFrom + 50);
+    expect(suited.player.health).toBe(t.maxHealth);
+    suited.bake(2, t.heatDamageFrom + 110);
+    const lostSuited = t.maxHealth - suited.player.health;
+    expect(lostSuited).toBeCloseTo(50 * t.heatDamagePerDegree * 0.5 * 2, 0);
+    expect(lostSuited).toBeLessThan(t.maxHealth - bare.player.health);
+  });
+
+  it('a suit dulls lava but not spore gas', () => {
+    const bare = setup();
+    bare.run(0.5, { fluid: LAVA, submersion: 0.2, headFluid: 0 });
+    const suited = setup();
+    suited.player.heatCut = 0.8;
+    suited.run(0.5, { fluid: LAVA, submersion: 0.2, headFluid: 0 });
+    expect(t.maxHealth - suited.player.health).toBeCloseTo(
+      (t.maxHealth - bare.player.health) * 0.2,
+    );
+    const gas = setup();
+    gas.player.heatCut = 0.8;
+    gas.run(1, { fluid: SPORES, submersion: 1, headFluid: SPORES });
+    const bareGas = setup();
+    bareGas.run(1, { fluid: SPORES, submersion: 1, headFluid: SPORES });
+    expect(gas.player.health).toBe(bareGas.player.health);
+  });
 });

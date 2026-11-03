@@ -16,6 +16,11 @@ Every hazard is telegraphed at least 2 seconds before it can hurt, and every haz
 | Falls                    | Long drops are visible                              | Platforms, parachutes, rocket boots                                   |
 | Predators                | Growls, tracks, scattered critters                  | Light, walls, avoiding their territory (combat is an open question)   |
 
+> **Decided since (owner, 2026-11-02):** falls of more than 5 tiles hurt on landing, more for
+> every tile, measured from the last moment the mole was held up or moving slowly. Rocket boots
+> brake a fall; the parachute is left for later. Heat damage starts at 100°, and a heat suit
+> raises that start and cuts the damage past it. Health still has a floor until rescue exists.
+
 Health regenerates slowly when the player is out of danger. Lethal outcomes need sustained exposure. A player who notices the warnings and retreats should almost always survive.
 
 ### What happens on death

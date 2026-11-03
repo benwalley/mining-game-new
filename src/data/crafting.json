@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Templates the player can make, by part. A slot takes one material; count is how many of it the part uses. place is where a template can be made: anywhere for now, later creature cities, forges and so on. variantFrom names the part whose material is kept on the item (a torch remembers its fuel). The pick isn't crafted here: there's always one, upgraded part by part. Its parts list which materials fit.",
+  "notes": "Templates the player can make, by part. A slot takes one material; count is how many of it the part uses. place is where a template can be made: anywhere for now, later creature cities, forges and so on. keeps names up to two parts whose materials stay on the item (a torch remembers its fuel; boots and suits remember both parts, which set their stats). The pick isn't crafted here: there's always one, upgraded part by part. Its parts list which materials fit.",
   "slots": 3,
   "templates": [
     {
@@ -9,9 +9,14 @@
       "makes": "torch",
       "yield": 4,
       "place": "anywhere",
-      "variantFrom": "fuel",
+      "keeps": ["fuel"],
       "parts": [
-        { "key": "shaft", "name": "Shaft", "count": 1, "accepts": ["rootwood"] },
+        {
+          "key": "shaft",
+          "name": "Shaft",
+          "count": 1,
+          "accepts": ["rootwood"]
+        },
         {
           "key": "fuel",
           "name": "Fuel",
@@ -32,6 +37,60 @@
           "name": "Body",
           "count": 6,
           "accepts": ["rootwood", "stone", "clay", "slate", "mudstone", "copper", "iron"]
+        }
+      ]
+    },
+    {
+      "key": "rocket-boots",
+      "name": "Rocket boots",
+      "makes": "rocket-boots",
+      "yield": 1,
+      "place": "anywhere",
+      "keeps": ["casing", "core"],
+      "parts": [
+        {
+          "key": "casing",
+          "name": "Casing",
+          "count": 3,
+          "accepts": ["copper", "tin", "iron", "gold", "starsilver"]
+        },
+        {
+          "key": "core",
+          "name": "Core",
+          "count": 2,
+          "accepts": ["coal", "ember-crystal"]
+        }
+      ]
+    },
+    {
+      "key": "heat-suit",
+      "name": "Heat suit",
+      "makes": "heat-suit",
+      "yield": 1,
+      "place": "anywhere",
+      "keeps": ["shell", "lining"],
+      "parts": [
+        {
+          "key": "shell",
+          "name": "Shell",
+          "count": 4,
+          "accepts": [
+            "clay",
+            "stone",
+            "slate",
+            "mudstone",
+            "basalt",
+            "obsidian",
+            "elderstone",
+            "copper",
+            "iron"
+          ]
+        },
+        {
+          "key": "lining",
+          "name": "Lining",
+          "count": 2,
+          "accepts": ["spore-silk", "rootwood", "glowcap", "clay"]
         }
       ]
     }

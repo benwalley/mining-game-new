@@ -17,8 +17,8 @@ export interface TemplateDef {
   yield: number;
   /** Where it can be made. Only "anywhere" exists so far. */
   place: string;
-  /** Index of the part whose material the item keeps, if any. */
-  variantPart: number | null;
+  /** Indexes of the parts whose materials the item keeps (at most two), in order. */
+  variantParts: readonly number[];
   parts: readonly PartDef[];
 }
 
@@ -33,18 +33,20 @@ export function loadCrafting(materials: MaterialRegistry): CraftingData {
   const ids = (keys: readonly string[]) => keys.map((k) => materials.require(k).numId);
   const templates = craftingData.templates.map((raw): TemplateDef => {
     const parts = raw.parts.map((p) => ({ ...p, accepts: ids(p.accepts) }));
-    const variantFrom = 'variantFrom' in raw ? raw.variantFrom : null;
-    const variantPart = variantFrom ? parts.findIndex((p) => p.key === variantFrom) : -1;
-    if (variantFrom && variantPart < 0) {
-      throw new Error(`Template "${raw.key}": no part "${variantFrom}"`);
-    }
+    const keeps: readonly string[] = ('keeps' in raw ? raw.keeps : undefined) ?? [];
+    if (keeps.length > 2) throw new Error(`Template "${raw.key}": keeps at most two parts`);
+    const variantParts = keeps.map((key) => {
+      const i = parts.findIndex((p) => p.key === key);
+      if (i < 0) throw new Error(`Template "${raw.key}": no part "${key}"`);
+      return i;
+    });
     return {
       key: raw.key,
       name: raw.name,
       makes: materials.require(raw.makes).numId,
       yield: raw.yield,
       place: raw.place,
-      variantPart: variantPart < 0 ? null : variantPart,
+      variantParts,
       parts,
     };
   });

@@ -16,7 +16,11 @@ import { keyMaterial } from '@/game/craft/itemKey';
 import { Pick } from '@/game/craft/Pick';
 import { Recipes } from '@/game/craft/recipes';
 import { DigSystem } from '@/game/dig/DigSystem';
+import { Boots } from '@/game/gear/Boots';
+import { Gear } from '@/game/gear/Gear';
+import { gearParts } from '@/game/gear/gearStats';
 import type { GameEvents } from '@/game/events';
+import { DEFAULT_APPEARANCE } from '@/game/player/appearance';
 import { Player } from '@/game/player/Player';
 import { PlayerController, type MoveIntent } from '@/game/player/PlayerController';
 import { HeatSense } from '@/game/player/HeatSense';
@@ -32,7 +36,7 @@ import { PointerGestureInput } from '@/input/PointerGestureInput';
 import { PROTOCOL_VERSION, type WorldInfo, type WorldKind } from '@/protocol/messages';
 import type { SimClient } from '@/protocol/SimClient';
 import { CanvasRenderer } from '@/render/canvas2d/CanvasRenderer';
-import { orientationFor } from '@/render/canvas2d/playerSprite';
+import { orientationFor, type GearTints } from '@/render/canvas2d/playerSprite';
 import type { FreezeFx, Renderer } from '@/render/Renderer';
 import {
   debugGrid,
@@ -85,6 +89,10 @@ export class Game {
   private readonly pick: Pick;
   private readonly recipes = new Recipes();
   private readonly chests: Chests;
+  private readonly gear: Gear;
+  private readonly boots: Boots;
+  private gearShown = -1;
+  private gearTints: GearTints = {};
   private readonly packCtl: PackController;
   private readonly craftCtl: CraftController;
   private readonly camera: Camera;
@@ -136,6 +144,7 @@ export class Game {
       if (player.pick) game.pick.restore(player.pick);
       if (player.recipes) game.recipes.restore(player.recipes);
       if (player.chests) game.chests.restore(player.chests);
+      if (player.gear) game.gear.restore(player.gear);
       game.wasDull = game.pick.dull;
     } else game.player.placeAt(world.spawn.x + 0.5, world.spawn.y);
     game.camera.snapTo(game.player.x, game.player.y - game.player.h / 2);
@@ -172,13 +181,17 @@ export class Game {
     this.controller = new PlayerController(tuning.player, tuning.input, this.events, {
       swim: tuning.swim,
       fluids,
+      boots: tuning.boots,
     });
     this.vitals = new Vitals(tuning.vitals, fluids, this.events);
     this.heat = new HeatSense(tuning.heat, this.events, createRng(`heat/${world.seed}`));
     this.events.on('hurt', () => (hurtPulse.value += 1));
     const weightOf = (key: number) => materials.get(keyMaterial(key))?.weight ?? 0;
     const crafting = loadCrafting(materials);
-    this.pack = new Pack(tuning.pack, weightOf);
+    const holdable = (key: number) => materials.get(keyMaterial(key))?.kind !== 'gear';
+    this.pack = new Pack(tuning.pack, weightOf, holdable);
+    this.gear = new Gear(materials, { ...tuning, heatDamageFrom: tuning.vitals.heatDamageFrom });
+    this.boots = new Boots(tuning.boots, this.events);
     this.pick = new Pick(tuning.pick, materials, crafting.pick);
     this.chests = new Chests(
       {
@@ -214,6 +227,7 @@ export class Game {
       player: this.player,
       pack: this.pack,
       chests: this.chests,
+      gear: this.gear,
       chestRange: tuning.chest.openRangeTiles,
       liquidAt: (x, y) => {
         const f = this.mirror.fluidAt(x, y);
@@ -234,7 +248,11 @@ export class Game {
       },
       tilePx: () => canvas.clientWidth / this.renderer.viewTiles.w,
       iconOf: (numId) => this.renderer.tileIcon(numId),
-      onPausedChange: () => this.syncSimPause(),
+      onPausedChange: (paused) => {
+        // Time stopping mid-boost cuts the boots; the next touch in the air relights them.
+        if (paused) this.boots.stop();
+        this.syncSimPause();
+      },
       onModeChange: (mode, from) => {
         // Leaving dig mode saves a half-dug tile; build mode turns touches on the world into placing.
         // Build and craft both stop time, so only going to or from dig mode plays the ring.
@@ -277,6 +295,8 @@ export class Game {
     this.pointer = new PointerGestureInput(canvas, tuning.input, {
       onGesture: () => this.audio.unlock(),
       onTap: (x, y) => this.onTap(x, y),
+      onPress: () => this.pressBoots(),
+      onRelease: () => this.boots.release(),
       onLongPress: (x, y) => this.inspectAt(x, y),
       onHold: (x, y) => this.packCtl.holdStart(x, y),
       onHoldMove: (x, y) => this.packCtl.holdMove(x, y),
@@ -498,6 +518,8 @@ export class Game {
       stowAll: () => this.packCtl.stowAll(),
       craftPut: (key) => this.craftCtl.put(key),
       craftClearSlot: (i) => this.craftCtl.clearSlot(i),
+      wear: (key) => this.packCtl.wear(key),
+      takeOff: (slot) => this.packCtl.takeOff(slot),
       craftFill: (template) => this.craftCtl.fill(template),
       craftMake: () => this.craftCtl.make(),
       sharpen: () => this.craftCtl.sharpen(),
@@ -528,6 +550,7 @@ export class Game {
     this.packCtl.update();
     if (this.packCtl.mode === 'craft') this.craftCtl.update();
     if (this.pick.revision !== this.pickShown) this.publishPick();
+    if (this.gear.revision !== this.gearShown) this.applyGear();
     // The fan and the full pack freeze the world; only the ghost and the UI keep moving.
     // Particles hang in the air too.
     if (this.packCtl.isPaused) {
@@ -541,6 +564,9 @@ export class Game {
       this.player.jumpScale = this.pack.jumpFactor;
       const contact = this.controller.sense(this.player, solid, this.mirror.fluidAt);
       this.dig.update(this.player, intent, contact, dt);
+      const p = this.player;
+      const held = contact.grounded || p.climbing || p.cling !== 'none';
+      this.boots.update(p, this.gear.boots, this.airborne(), held, dt);
       this.controller.step(this.player, intent, contact, solid, dt, this.dig.isDigging);
       this.heat.update(this.player, this.mirror.temperatureAt, dt);
       this.vitals.update(this.player, contact.fluid, dt, this.heat.felt);
@@ -568,6 +594,46 @@ export class Game {
     return (
       Math.abs(x - this.camera.x) <= view.w / 2 + m && Math.abs(y - this.camera.y) <= view.h / 2 + m
     );
+  }
+
+  /** Free in the air: not standing, holding on, climbing or swimming. */
+  private airborne(): boolean {
+    const p = this.player;
+    const swimming = p.submersion >= this.deps.tuning.swim.minSubmersion;
+    return !p.grounded && !p.climbing && p.cling === 'none' && !swimming;
+  }
+
+  /** A finger landing in the air lights the boots, in dig mode with the world running. */
+  private pressBoots(): boolean {
+    if (this.packCtl.mode !== 'dig' || this.packCtl.isPaused) return false;
+    return this.boots.press(this.player, this.gear.boots, this.airborne());
+  }
+
+  /** What the worn gear looks like on the mole, and what the suit does for heat. */
+  private applyGear(): void {
+    this.gearShown = this.gear.revision;
+    const { materials } = this.deps;
+    const p = this.player;
+    const look = { ...DEFAULT_APPEARANCE };
+    const tints: GearTints = {};
+    for (const [slot, key] of [
+      ['feet', this.gear.get('air')],
+      ['body', this.gear.get('body')],
+    ] as const) {
+      const parts = key === null ? null : gearParts(key, materials);
+      if (!parts?.a.visual || !parts.b.visual) continue;
+      look[slot] = parts.item.key;
+      tints[slot] = {
+        main: parts.a.visual.base,
+        edge: parts.a.visual.light,
+        trim: parts.b.visual.light,
+      };
+    }
+    p.appearance = look;
+    this.gearTints = tints;
+    const suit = this.gear.suit;
+    p.heatRaise = suit?.raise ?? 0;
+    p.heatCut = suit?.cut ?? 0;
   }
 
   private onTap(cssX: number, cssY: number): void {
@@ -617,12 +683,13 @@ export class Game {
         pick: this.pick.snapshot(),
         recipes: this.recipes.snapshot(),
         chests: this.chests.snapshot(),
+        gear: this.gear.snapshot(),
       },
     });
   }
 
   private stuffStamp(): string {
-    return `${this.pack.revision}/${this.pick.revision}/${this.recipes.revision}/${this.chests.version}`;
+    return `${this.pack.revision}/${this.pick.revision}/${this.recipes.revision}/${this.chests.version}/${this.gear.revision}`;
   }
 
   private streamTick(): void {
@@ -675,7 +742,10 @@ export class Game {
         gripLoss: p.cling === 'none' ? 0 : p.gripTimer / this.deps.tuning.player.gripTime,
         time: performance.now() / 1000,
         appearance: p.appearance,
+        tints: this.gearTints,
+        thrust: this.boots.firing,
       },
+      boots: this.gear.boots ? { meter: this.boots.meter, firing: this.boots.firing } : null,
       particles: this.particles,
       ghost: this.packCtl.ghost,
       tint: this.packCtl.tint,

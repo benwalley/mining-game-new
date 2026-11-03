@@ -10,7 +10,7 @@ import type { ChestsSnapshot } from '@/game/pack/Chests';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -19,6 +19,12 @@ export type WorldKind = 'layered' | 'test';
 export interface PackSnapshot {
   items: [numId: number, count: number][];
   held: number | null;
+}
+
+/** Worn gear by slot, as pack keys. */
+export interface GearSnapshot {
+  air: number | null;
+  body: number | null;
 }
 
 export interface PlayerSnapshot {
@@ -34,6 +40,8 @@ export interface PlayerSnapshot {
   pick?: PickSnapshot;
   recipes?: [template: string, materials: number[]][];
   chests?: ChestsSnapshot;
+  /** Missing in saves from before gear (v6 adds it): nothing worn. */
+  gear?: GearSnapshot;
 }
 
 export interface WorldInfo {

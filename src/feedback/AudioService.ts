@@ -13,6 +13,8 @@ export class AudioService {
   private noise: AudioBuffer | null = null;
   private readonly profiles = new Map<number, SoundProfile>();
   private readonly rng = createRng('audio');
+  /** The rocket boots' roar while they fire. */
+  private roar: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
 
   /** Must be called from a user gesture; browsers block audio until then. */
   unlock(): void {
@@ -219,6 +221,67 @@ export class AudioService {
   torchTaken(spent: boolean): void {
     this.sweep(500, 260, 0.12, 0.18);
     if (spent) this.torchOut();
+  }
+
+  /** The boots lighting: a sharp pop and a rising rush. */
+  bootsIgnite(): void {
+    this.noiseBurst(1800, 0.7, 0.12, 0.45);
+    this.sweep(90, 220, 0.15, 0.35);
+  }
+
+  /** A low, rough roar that holds while the boots fire. */
+  roarStart(): void {
+    const r = this.ready();
+    if (!r || !this.noise || this.roar) return;
+    const src = r.ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const filter = r.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    filter.Q.value = 2;
+    const gain = r.ctx.createGain();
+    const t = r.ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.03);
+    src.connect(filter).connect(gain).connect(r.out);
+    src.start();
+    this.roar = { src, gain };
+  }
+
+  roarStop(): void {
+    const roar = this.roar;
+    this.roar = null;
+    if (!roar || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    roar.gain.gain.cancelScheduledValues(t);
+    roar.gain.gain.setValueAtTime(roar.gain.gain.value, t);
+    roar.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    roar.src.stop(t + 0.15);
+  }
+
+  /** Out of thrust: a few dry coughs from the nozzles. */
+  bootsSputter(): void {
+    for (let n = 0; n < 3; n++) this.noiseBurst(600, 2, 0.05, 0.3, n * 0.07);
+  }
+
+  /** The meter is full again: a quick bright double click. */
+  bootsReady(): void {
+    this.tone(1400, 0.04, 0.12, 'square');
+    this.tone(2100, 0.05, 0.1, 'square', 0.05);
+  }
+
+  /** Gear going on: a solid clank and a buckle. */
+  gearOn(): void {
+    this.noiseBurst(1200, 3, 0.1, 0.35);
+    this.tone(520, 0.08, 0.18, 'triangle', 0.06);
+  }
+
+  /** A fall that hurt: a deep, heavy thump, heavier the harder it was. */
+  heavyLanding(damage: number): void {
+    const gain = Math.min(0.9, 0.4 + damage / 60);
+    this.sweep(140, 35, 0.3, gain);
+    this.noiseBurst(220, 0.8, 0.25, gain * 0.8);
   }
 
   hurt(): void {

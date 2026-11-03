@@ -23,7 +23,16 @@ export interface PlayerPose {
   /** Seconds since start, for idle animation (blinks, nose wiggles). */
   time: number;
   appearance: Appearance;
+  /** Colours for crafted gear, from what it was made of. */
+  tints?: GearTints;
+  /** The rocket boots are firing. */
+  thrust?: boolean;
 }
+
+/** A crafted piece's colours: its main material, that material's highlight, and the second part's. */
+export type GearTints = Partial<
+  Record<GearSlot, { main: ColorName; edge: ColorName; trim: ColorName }>
+>;
 
 /** Draws in source pixels, origin at the feet, facing right (+x). */
 interface Painter {
@@ -56,11 +65,49 @@ const GEAR: Record<string, GearDrawer> = {
     p.px('bone', x + 4, y - 3, 2, 2);
     if (Math.floor(pose.time * 6) % 5 !== 0) p.px('ember', x + 6, y - 2);
   },
+  // Chunky boots over the claws, with a nozzle under each heel. Firing, each
+  // nozzle throws a flickering white-gold flame with an ember tail.
+  'rocket-boots': (p, pose) => {
+    const t = pose.tints?.feet ?? { main: 'iron', edge: 'fog', trim: 'ember' };
+    for (const x of [-6, 2]) {
+      p.px(t.main, x, -3, 4, 3);
+      p.px(t.edge, x, -3, 4, 1);
+      p.px('ink', x, 0, 4, 1);
+      p.px('ink', x + 1, 0, 2, 2);
+      p.px(t.trim, x + 3, -2);
+    }
+    if (!pose.thrust) return;
+    const f = Math.floor(pose.time * 30) % 3;
+    for (const x of [-5, 3]) {
+      p.px('bone', x, 2, 2, 1);
+      p.px('gold', x, 3, 2, 2 + (f % 2));
+      p.px('ember', x, 5 + (f % 2), 2, 1 + f);
+      if (f === 2) p.px('ember', x + (x < 0 ? -1 : 2), 6);
+    }
+  },
+  // A heavy apron over the lower body that leaves the face clear: a highlight
+  // on top, a stripe of the lining showing through, and a riveted hem.
+  'heat-suit': (p, pose) => {
+    const t = pose.tints?.body ?? { main: 'pebble', edge: 'fog', trim: 'sandLight' };
+    const { x: cx, y: cy } = ANCHORS.bodyCenter;
+    p.px(t.main, cx - 7, cy + 1, 14, 4);
+    p.px(t.main, cx - 6, cy + 5, 12, 1);
+    p.px(t.edge, cx - 7, cy + 1, 14, 1);
+    p.px(t.trim, cx - 7, cy + 3, 14, 1);
+    p.px('ink', cx - 4, cy + 4);
+    p.px('ink', cx, cy + 4);
+    p.px('ink', cx + 4, cy + 4);
+    // A shoulder pad behind the face.
+    p.px(t.main, cx - 7, cy - 3, 4, 4);
+    p.px(t.edge, cx - 7, cy - 3, 4, 1);
+  },
 };
 
 /** Draw order: back gear sits behind the body, head gear on top of it. */
 const BEHIND_BODY: readonly GearSlot[] = ['back'];
 const OVER_BODY: readonly GearSlot[] = ['body', 'head'];
+/** Boots cover the claws, so they go on last. */
+const OVER_CLAWS: readonly GearSlot[] = ['feet'];
 
 const DIG_VECTOR: Record<DigDirection, [number, number]> = {
   left: [-1, 0],
@@ -149,6 +196,7 @@ export function drawPlayer(ctx: Ctx2D, pose: PlayerPose): void {
   // Front claw.
   p.px('bone', 2 + step, -1, 3, 1);
   p.px('bone', 4 + step, -2);
+  for (const slot of OVER_CLAWS) drawGear(p, pose, slot);
 
   drawPick(ctx, p, pose);
   ctx.restore();

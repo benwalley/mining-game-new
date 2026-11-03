@@ -36,6 +36,8 @@ function setup() {
       numId: key,
       name: materials.get(keyMaterial(key))?.name ?? '?',
       color: '',
+      wearable: false,
+      stats: null,
       icon: '',
       count,
       unitWeight: 0,

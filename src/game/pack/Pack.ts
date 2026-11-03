@@ -20,6 +20,8 @@ export class Pack {
   constructor(
     private readonly tuning: PackTuning,
     private readonly weightOf: (numId: number) => number,
+    /** Whether a stack can be the held block; gear is worn, never held. */
+    private readonly canHold: (numId: number) => boolean = () => true,
   ) {}
 
   get items(): readonly { numId: number; count: number }[] {
@@ -71,7 +73,8 @@ export class Pack {
     if (have === undefined) this.order.push(numId);
     this.counts.set(numId, (have ?? 0) + n);
     // Nothing to place yet, or the held stack ran out: what was just picked up is ready to go.
-    if (this.held === null || (this.held !== numId && !this.counts.has(this.held))) {
+    const free = this.held === null || (this.held !== numId && !this.counts.has(this.held));
+    if (free && this.canHold(numId)) {
       this.held = numId;
     }
     this.revision++;
@@ -93,7 +96,7 @@ export class Pack {
   }
 
   select(numId: number | null): void {
-    if (numId !== null && !this.counts.has(numId)) return;
+    if (numId !== null && (!this.counts.has(numId) || !this.canHold(numId))) return;
     if (this.held === numId) return;
     this.held = numId;
     this.revision++;

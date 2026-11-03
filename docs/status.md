@@ -16,7 +16,7 @@ built.
 - **The 60 fps phone run.** The owner still needs to run **bench** in the debug overlay on a
   phone (test world) and send the screenshot. Phase 1's gate isn't formally passed until then.
 
-## Phase 2, Hands (slices 1 and 2 done; slice 3 dropped; slice 4 built, waiting for the owner's check)
+## Phase 2, Hands (slices 1, 2, 4 and 5 done; slice 3 dropped; slice 6 next)
 
 Planned slices, in order:
 
@@ -25,9 +25,10 @@ Planned slices, in order:
 2. **Crafting, chests and torches (done):** a craft mode, the pick (upgrade and sharpen), chests and
    torches. No workbench and no camp yet. Decisions are below.
 3. **Ladders (dropped):** see "Decided before slice 4" below.
-4. **Fire and melting (built, not yet checked):** tiles burn or melt at their heat limit (N×100°), and heat starts to
+4. **Fire and melting (done):** tiles burn or melt at their heat limit (N×100°), and heat starts to
    do damage. Torches can be dug back up and dim near the end.
-5. **Gear:** rocket boots, a parachute and the heat suit, with a place to wear them.
+5. **Gear (done):** rocket boots and the heat suit, worn from a gear row.
+   The parachute was left for later. Long falls now hurt.
 6. **Furnace, kiln and quenching:** processing stations and process quality.
 
 ### Decided before slice 4 (owner, 2026-11-02)
@@ -194,11 +195,71 @@ art (flickering glow and flame tongues), the molten-metal colours and the new so
 type-checked. Tests cover catching, spreading slowly, burning out, dousing, melting and
 setting, thin films, rock staying put, heat damage, and taking torches back.
 
-### Questions to ask before slice 5 (gear)
+### Decided for slice 5, gear (owner, 2026-11-02)
 
-- Rocket boots: what powers them (fuel from the pack, a recharge, unlimited?), how they're
-  worn and switched on with one thumb, and how strong they are.
-- The parachute: does it open by itself on a long fall, or with a gesture? Does it wear out?
-- The heat suit: shell and lining from design 08, and how much it cuts heat damage.
-- Where gear is worn: a gear row in the full pack, or a fourth mode?
-- The slice 4 choices above: fire spread speed, heat damage numbers, torch take-back rule.
+- **No parachute for now.** The slice is rocket boots and the heat suit.
+- **Rocket boots** run on a thrust meter that drains while firing and **refills on the
+  ground**. In the air, a **tap** on the screen gives a short burst and **holding** after the
+  touch fires at full power, so taps give control and a hold gives height. The drag still
+  steers.
+- **One air-tool slot.** Boots go in a slot for tools fired by tapping in the air; later
+  air tools (a parachute, a glider) would swap into the same slot.
+- **Long falls hurt** (health still has its floor). Boots are how you stop a fall.
+- **Gear is worn from a gear row** at the top of the full pack.
+- **The heat suit** (shell + lining) both **raises the temperature** where heat damage
+  starts and **cuts the damage** above it, by material.
+- **The slice 4 choices stay** (fire spread, heat damage numbers, torch take-back).
+
+### What slice 5 built, and choices made for the owner to check
+
+The README's Status section has the detail. Choices made without asking, to overrule freely:
+
+- **Recipes** (`src/data/crafting.json`): rocket boots are a casing of 3 metal (copper, tin,
+  iron, gold, starsilver) and a core of 2 coal or ember crystal. The heat suit is a shell of 4
+  (clay, stone, slate, mudstone, basalt, obsidian, elderstone, copper, iron) and a lining of 2
+  (spore-silk, rootwood, glowcap, clay). So a fresh player can make boots from copper and coal,
+  and a suit from stone and rootwood, near the top. Both are discovered like the others.
+- **Boots numbers** (`tuning.json` `boots`): thrust = 80 + core fuel × 4 − casing weight × 3,
+  against gravity 50. Seconds of thrust = casing toughness × 0.3. Copper and coal: thrust 98
+  and 1.5 s; iron lasts 2.1 s but is weaker; starsilver and ember crystal is the best. A tap fires
+  for 0.15 s, the first touch cancels 60% of the fall speed (one tap nearly stops a full-speed
+  fall), the climb is capped at 10 tiles/s, and the meter refills in 0.6 s. A full hold
+  takes copper boots about 14 tiles up.
+- **Where boots fire:** any finger landing in the air, in dig mode only, including a second
+  finger while the first steers. That touch is never also a tap (no torch pick-ups by
+  accident) or a long press. The meter refills on the ground and also while clinging to a wall
+  or climbing a shaft. Opening the fan or stopping time cuts the boots.
+- **Suit numbers** (`suit`): the shell raises where heat starts to hurt by (heat limit − 5) ×
+  20°: clay, stone and slate 160°, basalt 180°, obsidian and elderstone 200°, iron 140°, copper
+  100°. The lining cuts heat and hot-fluid damage (lava, flame, molten metal) by 80% × (1 −
+  (conductivity − 1) / 5): spore-silk 80%, rootwood and glowcap 64%, clay 48%. Spore gas isn't
+  cut. The sweat, haze and crackle warnings move up with the suit.
+- **Falls** (`player.fallSafeSpeed`, `vitals.fallSafeTiles`, `fallDamagePerTile`): a fall
+  counts from the last moment the mole was held up or moving slower than 8 tiles/s. Past 5
+  tiles, each tile costs 7 hp (a 10-tile drop costs about 30). Landing in water, grabbing a
+  wall or a burst of the boots resets it. A hard landing makes a heavy thump and a dust burst,
+  and the red flash.
+- **Gear in the pack:** worn gear weighs nothing; in the pack it weighs 5 (boots) or 8 (suit).
+  Gear is never the held block. Tapping it in the fan wears it.
+- **Looks:** boots are chunky blocks over the claws in the casing's colour with two flame jets
+  while firing; the suit is an apron and shoulder pad in the shell's colour with a stripe of
+  the lining. A thrust bar sits to the left of the mole while it isn't full, gold while firing,
+  blinking red when empty.
+- **No keyboard key** for the boots yet; on desktop a mouse click in the air fires them.
+
+Checked in the browser pane (test world): crafting both from a fresh pack through the craft
+sheet ("Thrust 98 · 1.5 s" and "Safe to 160° · 64% less burn" on the silhouettes), wearing them
+from the pack sheet, gear surviving a reload, a jump then a held touch climbing about 9 tiles at
+the cap with the meter half used, the drop back costing 22 hp, the meter refilling on landing,
+and the flame and exhaust art mid-boost. Not checked: none of it on a phone, so not how a thumb
+tap in the air feels, or the roar and other new sounds (no audio in the pane).
+
+### Questions to ask before slice 6 (furnace, kiln and quenching)
+
+- The furnace: what it's built from, how it's placed (a block, or a 2×2), and what it burns.
+- Smelting: which ores need it (copper and iron already work raw for crafting), what an ingot
+  adds over raw ore, and how the heat band shows to the player.
+- The kiln: clay into brick, sand into glass. Is that this slice, and what are brick and glass for?
+- Quenching: hot metal into water raises toughness. Is that a step on crafted items (the pick,
+  the boots) or on ingots?
+- The slice 5 choices above: boots strength and meter, fall damage, suit numbers, recipes.

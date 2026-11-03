@@ -8,7 +8,7 @@ import type { WorldDims } from '@/core/world/constants';
  * When a record's shape changes: bump SAVE_VERSION and add a migration from the
  * previous version. Never edit an existing migration.
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface WorldMeta {
   saveVersion: number;
@@ -53,12 +53,15 @@ const chunkMigrations: Record<number, Migration> = {
   3: (r) => r,
   // v5 added torches, which keep their burn time in the damage byte; nothing to change.
   4: (r) => r,
+  // v6 added gear, which only the player record holds.
+  5: (r) => r,
 };
 const metaMigrations: Record<number, Migration> = {
   1: (r) => r,
   2: (r) => r,
   3: (r) => r,
   4: (r) => r,
+  5: (r) => r,
 };
 const entityMigrations: Record<number, Migration> = {
   1: (r) => r,
@@ -71,6 +74,8 @@ const entityMigrations: Record<number, Migration> = {
   // v5 added the pick, known recipes and chests to the player; old saves start with a
   // fresh pick, nothing known and no chests, which restore does when they're missing.
   4: (r) => r,
+  // v6 added worn gear; old saves wear nothing, which restore does when it's missing.
+  5: (r) => r,
 };
 
 function migrate<T>(record: { saveVersion: number }, migrations: Record<number, Migration>): T {

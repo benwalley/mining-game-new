@@ -28,7 +28,8 @@
     "landSquashMinSpeed": 6,
     "landSquashTime": 0.12,
     "gripTime": 1.0,
-    "gripSlideSpeed": 0.8
+    "gripSlideSpeed": 0.8,
+    "fallSafeSpeed": 8
   },
   "dig": {
     "secondsPerHardness": 1.0,
@@ -122,7 +123,28 @@
     "drownDamagePerSecond": 12,
     "hurtEventInterval": 0.4,
     "heatDamageFrom": 100,
-    "heatDamagePerDegree": 0.15
+    "heatDamagePerDegree": 0.15,
+    "fallSafeTiles": 5,
+    "fallDamagePerTile": 7
+  },
+  "boots": {
+    "notes": "Thrust (tiles/s², against gravity 50) = base + core fuel × perFuel − casing weight × perWeight. Seconds of full thrust = casing toughness × secondsPerToughness. A tap fires for burstSeconds; the first touch also cancels kick of the fall speed.",
+    "base": 80,
+    "perFuel": 4,
+    "perWeight": 3,
+    "secondsPerToughness": 0.3,
+    "refillSeconds": 0.6,
+    "burstSeconds": 0.15,
+    "kick": 0.6,
+    "maxRiseSpeed": 10,
+    "airAccel": 55
+  },
+  "suit": {
+    "notes": "The shell raises where heat damage starts by (shell heat limit − raiseFromLimit) × raisePerLimit degrees. The lining cuts the damage left (heat and hot fluids) by maxCut × (1 − (lining conductivity − 1) / cutSpan).",
+    "raiseFromLimit": 5,
+    "raisePerLimit": 20,
+    "maxCut": 0.8,
+    "cutSpan": 5
   },
   "heat": {
     "rate": 0.25,

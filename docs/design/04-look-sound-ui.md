@@ -48,6 +48,10 @@ No numbers appear in the HUD. Numbers are fine inside the crafting sheet and jou
 > the game, and so does build mode. The full pack is a
 > full-screen, scrollable list where the player rearranges and discards items, and inspects
 > them.
+>
+> **Decided since (owner, 2026-11-02):** the full pack opens with a **gear row**: an Air slot
+> (rocket boots) and a Body slot (heat suit). Gear in the list has a Wear button instead of
+> Hold, tapping a worn slot takes it off, and tapping gear in the fan wears it.
 
 ### Talking to creatures
 

@@ -10,6 +10,7 @@ import type { GameEvents } from '../events';
 import { Player } from '../player/Player';
 import { ChunkMirror } from '../world/ChunkMirror';
 import { itemKey } from '../craft/itemKey';
+import { Gear } from '../gear/Gear';
 import { Chests } from './Chests';
 import { MODES, type Mode } from './modes';
 import { Pack } from './Pack';
@@ -56,6 +57,7 @@ function setup(dirtCount = 5) {
     player,
     pack,
     chests,
+    gear: new Gear(materials, { ...tuning, heatDamageFrom: tuning.vitals.heatDamageFrom }),
     chestRange: tuning.chest.openRangeTiles,
     liquidAt: () => false,
     view: () => ({ x0: 0, y0: 0, x1: 32, y1: 32 }),

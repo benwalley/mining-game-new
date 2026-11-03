@@ -3,7 +3,7 @@ import tuningData from '@/data/tuning.json';
 import { loadCrafting } from '@/content/crafting';
 import { loadMaterials } from '@/content/materials';
 import { Pack } from '../pack/Pack';
-import { keyMaterial, keyVariant } from './itemKey';
+import { itemKey, keyMaterial, keyVariant, keyVariant2 } from './itemKey';
 import { craft, matchSlots, Recipes } from './recipes';
 
 const materials = loadMaterials();
@@ -11,7 +11,38 @@ const { templates } = loadCrafting(materials);
 const id = (key: string) => materials.require(key).numId;
 const newPack = () => new Pack(tuningData.pack, (k) => materials.get(keyMaterial(k))?.weight ?? 0);
 
+describe('itemKey', () => {
+  it('keeps old torch keys and round-trips two materials', () => {
+    expect(itemKey(24, 7)).toBe(24 | (7 << 10));
+    const k = itemKey(id('rocket-boots'), id('starsilver'), id('ember-crystal'));
+    expect([keyMaterial(k), keyVariant(k), keyVariant2(k)]).toEqual([
+      id('rocket-boots'),
+      id('starsilver'),
+      id('ember-crystal'),
+    ]);
+    expect(keyVariant2(itemKey(24, 7))).toBe(0);
+  });
+});
+
 describe('matchSlots', () => {
+  it('makes rocket boots from metal and coal, and a heat suit from rock and a lining', () => {
+    const boots = matchSlots([id('coal'), id('copper'), null], templates)!;
+    expect(boots.template.key).toBe('rocket-boots');
+    expect([keyVariant(boots.result), keyVariant2(boots.result)]).toEqual([
+      id('copper'),
+      id('coal'),
+    ]);
+    expect(boots.cost.get(id('copper'))).toBe(3);
+    const suit = matchSlots([id('rootwood'), id('stone'), null], templates)!;
+    expect(suit.template.key).toBe('heat-suit');
+    expect([keyVariant(suit.result), keyVariant2(suit.result)]).toEqual([
+      id('stone'),
+      id('rootwood'),
+    ]);
+    // Torches still win wherever rootwood could be a shaft.
+    expect(matchSlots([id('rootwood'), id('coal'), null], templates)?.template.key).toBe('torch');
+  });
+
   it('finds a torch whichever slot holds the fuel, and keeps the fuel on the item', () => {
     for (const slots of [
       [id('rootwood'), id('coal'), null],
@@ -81,7 +112,7 @@ describe('craft', () => {
       key: 'test',
       makes: id('iron'),
       yield: 1,
-      variantPart: null,
+      variantParts: [],
       parts: [{ key: 'a', name: 'A', count: 1, accepts: [id('dirt')] }],
     };
     const m = matchSlots([id('dirt')], [heavy])!;

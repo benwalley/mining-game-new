@@ -56,6 +56,8 @@ export function drawMaterialTile(
   // Torches and chests are objects drawn over the backdrop, not tiles that fill their square.
   if (v.pattern === 'torch') return drawTorch(ctx, v, ox, oy);
   if (v.pattern === 'chest') return drawChest(ctx, v, ox, oy);
+  if (v.pattern === 'boots') return drawBoots(ctx, v, ox, oy);
+  if (v.pattern === 'suit') return drawSuit(ctx, v, ox, oy);
   px(ctx, v.base, ox, oy, N, N);
 
   switch (v.pattern) {
@@ -160,6 +162,33 @@ function drawChest(ctx: Ctx2D, v: MaterialVisual, ox: number, oy: number): void 
   px(ctx, band, ox + 12, oy + 4, 2, 11);
   px(ctx, v.dark, ox + 6, oy + 6, 4, 4);
   px(ctx, latch, ox + 7, oy + 7, 2, 2);
+}
+
+/** The rocket boots' icon: a boot with a nozzle under the heel and a lick of flame. */
+function drawBoots(ctx: Ctx2D, v: MaterialVisual, ox: number, oy: number): void {
+  px(ctx, v.dark, ox + 3, oy + 2, 7, 10);
+  px(ctx, v.dark, ox + 3, oy + 8, 11, 5);
+  px(ctx, v.base, ox + 4, oy + 3, 5, 9);
+  px(ctx, v.base, ox + 4, oy + 9, 9, 3);
+  px(ctx, v.light, ox + 4, oy + 3, 5, 1);
+  px(ctx, v.light, ox + 4, oy + 9, 9, 1);
+  px(ctx, v.accent ?? v.light, ox + 4, oy + 6, 5, 1);
+  // Nozzle and flame.
+  px(ctx, v.dark, ox + 4, oy + 13, 3, 1);
+  px(ctx, v.accentLight ?? v.light, ox + 4, oy + 14, 3, 1);
+  px(ctx, v.accent ?? v.light, ox + 5, oy + 15, 1, 1);
+}
+
+/** The heat suit's icon: a heavy coat with a glowing seam down the front. */
+function drawSuit(ctx: Ctx2D, v: MaterialVisual, ox: number, oy: number): void {
+  px(ctx, v.dark, ox + 2, oy + 2, 12, 13);
+  px(ctx, v.base, ox + 3, oy + 3, 10, 11);
+  px(ctx, v.dark, ox + 6, oy + 2, 4, 2);
+  px(ctx, v.light, ox + 3, oy + 3, 3, 1);
+  px(ctx, v.light, ox + 10, oy + 3, 3, 1);
+  px(ctx, v.accent ?? v.light, ox + 7, oy + 5, 2, 9);
+  px(ctx, v.accentLight ?? v.light, ox + 7, oy + 5, 1, 9);
+  px(ctx, v.dark, ox + 3, oy + 10, 10, 1);
 }
 
 /** Background wall shown behind dug-out and cave tiles underground. */

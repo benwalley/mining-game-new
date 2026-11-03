@@ -42,6 +42,8 @@ async function boot(): Promise<void> {
         select: (n) => game?.packActions.select(n),
         moveItem: (a, b) => game?.packActions.moveItem(a, b),
         discard: (n, c) => game?.packActions.discard(n, c),
+        wear: (key) => game?.packActions.wear(key),
+        takeOff: (slot) => game?.packActions.takeOff(slot),
         setMode: (m) => game?.packActions.setMode(m),
         closeChest: () => game?.packActions.closeChest(),
         stow: (k, n, into) => game?.packActions.stow(k, n, into),

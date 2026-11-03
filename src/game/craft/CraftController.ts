@@ -163,7 +163,8 @@ export class CraftController {
       count: match.count,
       known: recipes.has(match.template.key),
       affordable: canAfford(match, pack),
-      stats: this.describe(match.template, match),
+      // Gear describes itself from its materials (thrust, safe temperature).
+      stats: item.stats ? [item.stats] : this.describe(match.template, match),
       cost: [...match.cost].map(([m, need]) => ({ item: this.d.itemView(m, pack.count(m)), need })),
     };
   }

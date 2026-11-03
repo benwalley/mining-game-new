@@ -1,5 +1,5 @@
 import type { EventBus } from '@/core/events/EventBus';
-import type { MaterialRegistry } from '@/content/materials';
+import type { GearSlotKind, MaterialRegistry } from '@/content/materials';
 import { palette } from '@/content/palette';
 import type { PlacingTuning } from '@/content/tuning';
 import type { SimClient } from '@/protocol/SimClient';
@@ -7,13 +7,15 @@ import type { GhostBlock } from '@/render/Renderer';
 import {
   chestView,
   fanView,
+  gearView,
   modeView,
   packView,
   sheetOpen,
   undoView,
   type PackItemView,
 } from '@/ui/stores/gameStore';
-import { itemKey, keyMaterial, keyVariant } from '../craft/itemKey';
+import { itemKey, keyMaterial, keyVariant, keyVariant2 } from '../craft/itemKey';
+import type { Gear } from '../gear/Gear';
 import type { GameEvents } from '../events';
 import type { Player } from '../player/Player';
 import { fluidAmount, fluidType, type ChunkMirror } from '../world/ChunkMirror';
@@ -40,6 +42,7 @@ export interface PackControllerDeps {
   player: Player;
   pack: Pack;
   chests: Chests;
+  gear: Gear;
   /** How far from the body a chest can be opened, in tiles. */
   chestRange: number;
   /** Holding water, lava or another liquid (not gas). */
@@ -92,6 +95,7 @@ export class PackController {
   private paused = false;
   private pulse = 0;
   private shownRevision = -1;
+  private gearRevision = -1;
   private ghostTile: Point | null = null;
   /** Where the held finger came down, and the tile the ghost started on. */
   private holdFrom: Point = { x: 0, y: 0 };
@@ -170,6 +174,7 @@ export class PackController {
     if (this.ghostTile) this.ghostValid = this.canPlace(this.ghostTile.x, this.ghostTile.y);
     if (this.gesture.animate(this.now())) this.publishFan();
     if (this.d.pack.revision !== this.shownRevision) this.publish();
+    if (this.d.gear.revision !== this.gearRevision) this.publishGear();
     if (this.chest && this.d.chests.version !== this.chestRevision) this.publishChest();
   }
 
@@ -340,6 +345,24 @@ export class PackController {
     this.publish();
   }
 
+  /** Puts on gear from the pack, swapping out what that slot had. */
+  wear(key: number): void {
+    const slot = this.d.gear.slotOf(key);
+    if (slot && this.d.gear.wear(key, this.d.pack)) this.d.events.emit('gearWorn', { key, slot });
+    else this.d.events.emit('craftDenied', {});
+    this.publish();
+    this.publishGear();
+  }
+
+  takeOff(slot: GearSlotKind): void {
+    const key = this.d.gear.get(slot);
+    if (key !== null && this.d.gear.takeOff(slot, this.d.pack)) {
+      this.d.events.emit('gearRemoved', { key, slot });
+    } else this.d.events.emit('craftDenied', {});
+    this.publish();
+    this.publishGear();
+  }
+
   discard(numId: number, count: number): void {
     this.d.pack.take(numId, Math.min(count, this.d.pack.count(numId)));
     this.publish();
@@ -360,10 +383,12 @@ export class PackController {
     return Math.abs(x - b.x) <= r && Math.abs(y - b.y) <= r;
   }
 
+  /** A fan entry: blocks become the held one, and gear is put on. */
   private pick(index: number): void {
     const item = this.d.pack.items[index];
-    if (item) this.d.pack.select(item.numId);
-    else this.setSheet(true);
+    if (!item) this.setSheet(true);
+    else if (this.kindOf(item.numId) === 'gear') this.wear(item.numId);
+    else this.d.pack.select(item.numId);
   }
 
   private setSheet(open: boolean): void {
@@ -508,20 +533,33 @@ export class PackController {
     }
   }
 
+  private publishGear(): void {
+    const { gear } = this.d;
+    this.gearRevision = gear.revision;
+    const view = (slot: GearSlotKind) => {
+      const key = gear.get(slot);
+      return key === null ? null : this.itemView(key, 1);
+    };
+    gearView.value = { air: view('air'), body: view('body') };
+  }
+
   /** How the UI shows one stack, of a material or a crafted item. */
   itemView(key: number, count: number): PackItemView {
     const { materials } = this.d;
     const m = materials.get(keyMaterial(key));
-    const variant = keyVariant(key);
     const base = m?.visual?.base;
-    const of = variant ? materials.get(variant)?.name : undefined;
+    const of = [keyVariant(key), keyVariant2(key)]
+      .map((v) => (v ? materials.get(v)?.name.toLowerCase() : undefined))
+      .filter(Boolean);
     return {
       numId: key,
-      name: `${m?.name ?? '?'}${of ? ` (${of.toLowerCase()})` : ''}`,
+      name: `${m?.name ?? '?'}${of.length ? ` (${of.join(', ')})` : ''}`,
       color: base ? palette[base] : palette.stone,
       icon: this.d.iconOf(keyMaterial(key)),
       count,
       unitWeight: m?.weight ?? 0,
+      wearable: m?.kind === 'gear',
+      stats: this.d.gear.describe(key),
     };
   }
 

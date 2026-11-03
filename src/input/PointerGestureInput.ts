@@ -12,6 +12,13 @@ export interface GestureHandlers {
   onHoldEnd(x: number, y: number, commit: boolean): void;
   /** First user gesture: the moment browsers allow audio to start. */
   onGesture(): void;
+  /**
+   * Any finger went down, including a second one. Return true to claim it (the
+   * rocket boots do, in the air): it then isn't a tap, but the first finger
+   * still steers. `onRelease` follows when a claimed finger lifts.
+   */
+  onPress?(x: number, y: number): boolean;
+  onRelease?(): void;
 }
 
 /**
@@ -34,6 +41,8 @@ export class PointerGestureInput {
   /** Build mode: how far a thumb may wander and still count as a tap or a hold. */
   private buildSlopPx = 0;
   private holdActive = false;
+  /** Fingers claimed by `onPress`; the primary one then never counts as a tap. */
+  private readonly claimed = new Set<number>();
 
   constructor(
     private readonly element: HTMLElement,
@@ -88,7 +97,11 @@ export class PointerGestureInput {
 
   private readonly onDown = (e: PointerEvent): void => {
     this.handlers.onGesture();
-    if (this.pointerId !== null) return; // One finger drives; extra touches are ignored.
+    const at = this.local(e);
+    if (this.buildHoldMs === null && this.handlers.onPress?.(at.x, at.y)) {
+      this.claimed.add(e.pointerId);
+    }
+    if (this.pointerId !== null) return; // One finger drives; extra touches only fire the boots.
     e.preventDefault();
     this.pointerId = e.pointerId;
     try {
@@ -96,7 +109,7 @@ export class PointerGestureInput {
     } catch {
       // Pointer already gone (or synthetic); we still track it via element events.
     }
-    const { x, y } = this.local(e);
+    const { x, y } = at;
     this.originX = this.curX = x;
     this.originY = this.curY = y;
     this.downAt = e.timeStamp;
@@ -104,7 +117,8 @@ export class PointerGestureInput {
     this.longPressFired = false;
     clearTimeout(this.longPressTimer);
     this.longPressTimer = setTimeout(() => {
-      if (this.pointerId === null || this.movedFar) return;
+      // Holding a finger down to keep the boots firing isn't a long press.
+      if (this.pointerId === null || this.movedFar || this.claimed.has(this.pointerId)) return;
       this.longPressFired = true;
       if (this.buildHoldMs !== null) {
         this.holdActive = true;
@@ -130,6 +144,7 @@ export class PointerGestureInput {
   };
 
   private readonly onUp = (e: PointerEvent): void => {
+    const claimed = this.unclaim(e.pointerId);
     if (e.pointerId !== this.pointerId) return;
     if (this.holdActive) {
       const { x, y } = this.local(e);
@@ -137,12 +152,16 @@ export class PointerGestureInput {
       this.handlers.onHoldEnd(x, y, true);
     }
     const isTap =
-      !this.movedFar && !this.longPressFired && e.timeStamp - this.downAt < this.tuning.tapMaxMs;
+      !claimed &&
+      !this.movedFar &&
+      !this.longPressFired &&
+      e.timeStamp - this.downAt < this.tuning.tapMaxMs;
     if (isTap) this.handlers.onTap(this.originX, this.originY);
     this.release();
   };
 
   private readonly onCancel = (e: PointerEvent): void => {
+    this.unclaim(e.pointerId);
     if (e.pointerId !== this.pointerId) return;
     if (this.holdActive) {
       this.holdActive = false;
@@ -150,6 +169,12 @@ export class PointerGestureInput {
     }
     this.release();
   };
+
+  private unclaim(pointerId: number): boolean {
+    if (!this.claimed.delete(pointerId)) return false;
+    this.handlers.onRelease?.();
+    return true;
+  }
 
   private release(): void {
     this.pointerId = null;

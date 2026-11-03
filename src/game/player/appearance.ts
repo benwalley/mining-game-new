@@ -1,8 +1,9 @@
 /**
  * What the player is wearing, by slot. Values are gear art ids drawn by the
- * renderer. Later, crafted items (armor, packs, a jetpack) fill these slots.
+ * renderer: the helmet, and crafted gear (rocket boots on the feet, the heat
+ * suit on the body).
  */
-export type GearSlot = 'head' | 'body' | 'back';
+export type GearSlot = 'head' | 'body' | 'back' | 'feet';
 
 export type Appearance = Partial<Record<GearSlot, string>>;
 

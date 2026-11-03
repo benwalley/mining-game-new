@@ -105,3 +105,10 @@ Crafting from nearby storage chests (within about 8 tiles) is required. Making p
 > climbing and wall clinging cover them. Vertical travel gear will be **rocket boots** and a
 > **parachute** instead (templates not yet designed). The winch elevator stays as a later
 > build.
+>
+> **Decided since (owner, 2026-11-02):** slice 5 adds **rocket boots** (casing + core) and the
+> **heat suit** (shell + lining), worn from a gear row in the full pack. The parachute is left
+> out for now. Boots sit in an **air** slot for tools fired by tapping in the air; later air
+> tools would swap into it. The suit both raises the temperature where heat starts to hurt
+> (from the shell) and cuts the damage above it (from the lining). Recipes and numbers are in
+> [`docs/status.md`](../status.md).

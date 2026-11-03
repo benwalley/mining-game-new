@@ -49,6 +49,12 @@ flat test world instead (each keeps its own save).
   through the whole cloud and burns anyone inside. Blocks are never broken. Water pushes
   gas out of its way, thin gas fades, and gas reaching open sky blows away.
 - **Nothing falls:** sand, rock and ceilings stay put however much you dig under them.
+- **Gear and falls:** a fall of more than 5 tiles hurts on landing. With rocket boots worn, a
+  touch that lands while the mole is in the air fires them: a quick tap gives a short burst
+  that brakes a fall hard, and holding keeps them firing (steer with the same drag, or with a
+  second finger while the first one moves). A bar beside the mole shows the thrust left; it
+  refills on the ground or on a wall. Wear gear from the full pack's gear row, or tap it in
+  the fan.
 - **Desktop:** arrows or WASD to move and dig, Up or Space to jump. Mouse drag works like
   touch. `` ` `` toggles the debug overlay, `G` the tile grid, `L` darkness, `H` the heat
   map (every tile colored by temperature; the overlay's "heat" button on phones), `[` and `]`
@@ -248,6 +254,31 @@ its burn left returns as a fresh torch of its fuel (the fuel is kept in the tile
 byte), a burnt-down one is spent. Torches fade over their last 60 s (`torch.dimSeconds`).
 `takeTorch`/`torchTaken` and a `damage` field on tile changes are `PROTOCOL_VERSION` 11; the
 save format didn't change.
+
+**Phase 2, slice 5 (done):** gear (`src/game/gear/`). Two new
+templates in `crafting.json`: **rocket boots** (casing: 3 of a metal, core: 2 coal or ember
+crystal) and the **heat suit** (shell: 4 of clay, stone, slate, mudstone, basalt, obsidian,
+elderstone, copper or iron; lining: 2 of spore-silk, rootwood, glowcap or clay). Both keep both
+materials on the item: `itemKey` now has a second variant above bit 20, so old torch keys are
+unchanged, and templates say which parts they keep with `keeps`. Gear is a new material kind
+(numIds 26 and 27, `gearSlot` air or body) that's worn, never placed or held. `Gear` holds one
+item per slot and saves with the player (`SAVE_VERSION` 6, `PROTOCOL_VERSION` 12); worn gear
+weighs nothing. Boots (`tuning.json` `boots`): thrust = 80 + core fuel × 4 − casing weight × 3
+against gravity 50, seconds of thrust = casing toughness × 0.3 (copper and coal: 98, 1.5 s).
+`Boots` is the state machine: `PointerGestureInput.onPress` hands it every finger that lands,
+and a press in the air is claimed, so it isn't also a tap or a long press. The first touch
+cancels 60% of the fall speed, a tap fires for 0.15 s, a hold fires until the meter's empty,
+rise is capped at 10 tiles/s, and the meter refills in 0.6 s on the ground, a wall or in a
+shaft. Time stopping cuts the boots. Suit (`suit`): the shell raises where heat starts to hurt
+by (heat limit − 5) × 20° (stone: safe to 160°, obsidian 200°), and the lining cuts heat and
+hot-fluid damage by up to 80%, less the more it conducts (spore-silk 80%, rootwood 64%, clay
+48%); the heat warnings move up with it. Falls (`player.fallSafeSpeed`, `vitals.fallSafeTiles`,
+`fallDamagePerTile`) are measured from the last moment the mole was held up or moving slower
+than 8 tiles/s, so a burst or a wall grab shortens one; past 5 tiles each tile costs 7 hp, with
+a heavy thump and a dust burst. The boots draw over the claws with flame jets while firing and
+throw exhaust; the suit is an apron in its shell's colour with a stripe of the lining; both
+have pack icons. Sounds: ignition, a looping roar, a sputter when empty, a click when the meter
+is full, a clank when gear goes on.
 
 Not built yet (later phases): creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

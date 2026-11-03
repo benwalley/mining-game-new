@@ -70,7 +70,19 @@ export interface PackItemView {
   icon: string;
   count: number;
   unitWeight: number;
+  /** Gear is worn from the pack instead of held. */
+  wearable: boolean;
+  /** What gear does, in one line. */
+  stats: string | null;
 }
+
+/** Worn gear, by slot. */
+export interface GearView {
+  air: PackItemView | null;
+  body: PackItemView | null;
+}
+
+export const gearView = signal<GearView>({ air: null, body: null });
 
 export interface PackView {
   items: PackItemView[];

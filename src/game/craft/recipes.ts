@@ -41,12 +41,12 @@ export function toMatch(template: TemplateDef, materials: readonly number[]): Ma
     const m = materials[i]!;
     cost.set(m, (cost.get(m) ?? 0) + part.count);
   });
-  const variant = template.variantPart === null ? 0 : materials[template.variantPart]!;
+  const [a, b] = template.variantParts.map((i) => materials[i]!);
   return {
     template,
     materials: [...materials],
     cost,
-    result: itemKey(template.makes, variant),
+    result: itemKey(template.makes, a, b),
     count: template.yield,
   };
 }

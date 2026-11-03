@@ -184,10 +184,35 @@ export class CanvasRenderer implements Renderer {
       drawPlayer(ctx, p);
       ctx.restore();
     }
+    if (frame.boots) this.drawBootsMeter(frame.boots, px, py, scale, frame.time);
 
     if (frame.tint) this.drawTint(frame.tint, ox, oy, tile);
     if (frame.ghost) this.drawGhost(frame.ghost, ox, oy, tile);
     if (frame.debug.grid) this.drawGrid(ox, oy, tile);
+  }
+
+  /**
+   * The boots' thrust left, as an upright bar beside the mole while it isn't
+   * full. It glows while firing and blinks red when it's empty.
+   */
+  private drawBootsMeter(
+    boots: { meter: number; firing: boolean },
+    px: number,
+    py: number,
+    scale: number,
+    time: number,
+  ): void {
+    if (boots.meter >= 1 && !boots.firing) return;
+    const ctx = this.ctx;
+    const h = 12;
+    const fill = Math.round(boots.meter * (h - 2));
+    const x = px - 11 * scale;
+    const y = py - 14 * scale;
+    const empty = boots.meter <= 0 && Math.floor(time * 6) % 2 === 0;
+    ctx.fillStyle = empty ? palette.blood : palette.ink;
+    ctx.fillRect(x, y, 4 * scale, h * scale);
+    ctx.fillStyle = boots.firing ? palette.gold : palette.ember;
+    ctx.fillRect(x + scale, y + (h - 1 - fill) * scale, 2 * scale, fill * scale);
   }
 
   /** Drawn once per material at twice the tile size, crisp, and kept. */

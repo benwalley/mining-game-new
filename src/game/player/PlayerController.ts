@@ -1,7 +1,7 @@
 import { approach } from '@/core/math/util';
 import type { EventBus } from '@/core/events/EventBus';
 import type { FluidRegistry } from '@/content/fluids';
-import type { InputTuning, PlayerTuning, SwimTuning } from '@/content/tuning';
+import type { BootsTuning, InputTuning, PlayerTuning, SwimTuning } from '@/content/tuning';
 import type { GameEvents } from '../events';
 import { NO_FLUID, senseFluid, type FluidContact, type FluidFn } from '../physics/fluidContact';
 import {
@@ -35,6 +35,8 @@ export interface Contact {
 export interface SwimOptions {
   swim: SwimTuning;
   fluids: FluidRegistry;
+  /** How the rocket boots fly; without it, thrust has no speed cap. */
+  boots?: Pick<BootsTuning, 'maxRiseSpeed' | 'airAccel'>;
 }
 
 const noFluidAt: FluidFn = () => 0;
@@ -49,7 +51,10 @@ const PUSH = 0.15;
  * starts a short grip timer; the player only falls once it runs out. Clinging
  * follows corners going up: wall to ceiling, and around a ceiling's edge onto
  * the wall above it. In fluid the player swims: idle sinks slowly, a drag
- * swims that way, and holding up at the surface jumps out.
+ * swims that way, and holding up at the surface jumps out. Rocket boots push
+ * against gravity while they fire (`player.thrust`). A fall is measured from
+ * the last moment the mole was held up or moving slower than `fallSafeSpeed`,
+ * so braking with the boots or grabbing a wall shortens it.
  */
 export class PlayerController {
   private readonly jumpVelocity: number;
@@ -161,6 +166,9 @@ export class PlayerController {
         player.vy = -jump * swim.exitJumpScale;
         player.jumping = true;
       }
+    } else if (player.thrust > 0) {
+      const rise = this.fluids.boots?.maxRiseSpeed ?? Infinity;
+      player.vy = Math.max(-rise, player.vy + (t.gravity - player.thrust) * dt);
     } else {
       player.vy = Math.min(player.vy + t.gravity * dt, t.maxFallSpeed);
     }
@@ -207,7 +215,9 @@ export class PlayerController {
           ? intent.x !== 0
             ? t.groundAccel
             : t.groundDecel
-          : t.airAccel;
+          : player.thrust > 0
+            ? (this.fluids.boots?.airAccel ?? t.airAccel)
+            : t.airAccel;
       player.vx = approach(player.vx, target, accel * dt);
       this.moveHorizontal(player, solid, dt);
     }
@@ -216,6 +226,7 @@ export class PlayerController {
     player.y = resY.value;
     if (resY.hit) {
       if (player.vy > 0) {
+        player.landedDrop = player.y - player.fallFromY;
         if (player.vy >= t.landSquashMinSpeed) {
           player.squashTimer = t.landSquashTime;
           this.events.emit('landed', { speed: player.vy });
@@ -225,6 +236,9 @@ export class PlayerController {
       player.vy = 0;
       player.jumping = false;
     }
+
+    const held = player.grounded || player.climbing || player.cling !== 'none' || swimming;
+    if (held || player.vy < t.fallSafeSpeed) player.fallFromY = player.y;
 
     this.splash(player, contact.fluid);
     this.animate(player, dt);
