@@ -62,6 +62,7 @@ export const hud = signal<HudState>({ health: 100, maxHealth: 100, breath: 1, he
 export const hurtPulse = signal(0);
 
 export interface PackItemView {
+  /** The pack key: a material's numId, or a crafted item's key (see `itemKey`). */
   numId: number;
   name: string;
   color: string;
@@ -74,7 +75,7 @@ export interface PackItemView {
 export interface PackView {
   items: PackItemView[];
   /** The block that tapping places. Its stack may be empty (the button greys it out). */
-  held: { numId: number; name: string; color: string; icon: string; count: number } | null;
+  held: PackItemView | null;
   weight: number;
   capacity: number;
   /** Weight over capacity; past 1 the pack is overloaded. */
@@ -129,3 +130,67 @@ export const modeView = signal<ModeView>({
 export const undoView = signal<{ id: number; ms: number } | null>(null);
 /** The full-screen pack. */
 export const sheetOpen = signal(false);
+
+/** The chest open beside the pack, or null. */
+export interface ChestView {
+  x: number;
+  y: number;
+  items: PackItemView[];
+  weight: number;
+  capacity: number;
+}
+
+export const chestView = signal<ChestView | null>(null);
+
+export interface CraftResultView {
+  name: string;
+  item: PackItemView;
+  count: number;
+  /** Made before; an unknown result shows as a silhouette until it's made. */
+  known: boolean;
+  affordable: boolean;
+  stats: string[];
+  cost: { item: PackItemView; need: number }[];
+}
+
+export interface PickPartView {
+  material: PackItemView;
+  /** How many of a new material swapping this part takes. */
+  cost: number;
+  /** Materials in the pack that fit, with what they'd change: power steps and speed in percent. */
+  options: { item: PackItemView; affordable: boolean; power: number; speed: number }[];
+}
+
+export interface CraftView {
+  slots: (PackItemView | null)[];
+  result: CraftResultView | null;
+  /** Something is in the slots (so "nothing comes of that" can show). */
+  tried: boolean;
+  known: { key: string; name: string; icon: string; affordable: boolean }[];
+  /** Plain materials in the pack, to tap into slots. */
+  materials: PackItemView[];
+  pick: {
+    head: PickPartView;
+    handle: PickPartView;
+    power: number;
+    /** Swing speed against the starting pick, in percent. */
+    speed: number;
+    /** 1 sharp down to 0 dullest. */
+    sharpness: number;
+    dull: boolean;
+    sharpen: { item: PackItemView; count: number };
+  };
+}
+
+export const craftView = signal<CraftView | null>(null);
+
+/** Short-lived message over the play area ("New recipe: Torch"). `id` changes each time. */
+export const toastView = signal<{ id: number; text: string } | null>(null);
+
+/** The pick as the dig mode button shows it: its parts' colors and how sharp it is. */
+export const pickView = signal<{ head: string; handle: string; sharpness: number; dull: boolean }>({
+  head: '#6e6a72',
+  handle: '#7a5532',
+  sharpness: 1,
+  dull: false,
+});

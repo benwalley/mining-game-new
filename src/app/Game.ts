@@ -3,6 +3,7 @@ import { lerp } from '@/core/math/util';
 import { createRng } from '@/core/random/rng';
 import { CHUNK_SHIFT } from '@/core/world/constants';
 import type { FluidRegistry } from '@/content/fluids';
+import { loadCrafting } from '@/content/crafting';
 import type { MaterialRegistry } from '@/content/materials';
 import type { Tuning } from '@/content/tuning';
 import { AudioService } from '@/feedback/AudioService';
@@ -10,6 +11,10 @@ import { FeedbackDirector } from '@/feedback/FeedbackDirector';
 import { createHaptics, type Haptics } from '@/feedback/haptics';
 import { Particles } from '@/fx/Particles';
 import { Camera } from '@/game/camera/Camera';
+import { CraftController } from '@/game/craft/CraftController';
+import { keyMaterial } from '@/game/craft/itemKey';
+import { Pick } from '@/game/craft/Pick';
+import { Recipes } from '@/game/craft/recipes';
 import { DigSystem } from '@/game/dig/DigSystem';
 import type { GameEvents } from '@/game/events';
 import { Player } from '@/game/player/Player';
@@ -17,6 +22,7 @@ import { PlayerController, type MoveIntent } from '@/game/player/PlayerControlle
 import { HeatSense } from '@/game/player/HeatSense';
 import { Vitals } from '@/game/player/Vitals';
 import { LightField } from '@/game/light/LightField';
+import { Chests } from '@/game/pack/Chests';
 import { Pack } from '@/game/pack/Pack';
 import { PackController } from '@/game/pack/PackController';
 import { ChunkMirror, fluidAmount, fluidType } from '@/game/world/ChunkMirror';
@@ -39,6 +45,8 @@ import {
   debugVisible,
   hud,
   hurtPulse,
+  pickView,
+  toastView,
   toolPower,
 } from '@/ui/stores/gameStore';
 import type { PackActions } from '@/ui/pack/packActions';
@@ -74,7 +82,11 @@ export class Game {
   private readonly heat: HeatSense;
   private readonly dig: DigSystem;
   private readonly pack: Pack;
+  private readonly pick: Pick;
+  private readonly recipes = new Recipes();
+  private readonly chests: Chests;
   private readonly packCtl: PackController;
+  private readonly craftCtl: CraftController;
   private readonly camera: Camera;
   private readonly particles: Particles;
   private readonly audio = new AudioService();
@@ -93,7 +105,11 @@ export class Game {
   private lastSyncedX = NaN;
   private lastSyncedY = NaN;
   private lastSyncedHealth = NaN;
-  private lastSyncedPack = -1;
+  /** Pack, pick, recipes and chests together, to tell when the save needs them again. */
+  private lastSyncedStuff = '';
+  private toastId = 0;
+  private pickShown = -1;
+  private wasDull = false;
   private hidden = false;
   /** When the time-stop ring last started, on real time (gameplay time is what's frozen). */
   private freezeRingAt = -Infinity;
@@ -117,6 +133,10 @@ export class Game {
     if (player) {
       game.player.restore(player);
       if (player.pack) game.pack.restore(player.pack);
+      if (player.pick) game.pick.restore(player.pick);
+      if (player.recipes) game.recipes.restore(player.recipes);
+      if (player.chests) game.chests.restore(player.chests);
+      game.wasDull = game.pick.dull;
     } else game.player.placeAt(world.spawn.x + 0.5, world.spawn.y);
     game.camera.snapTo(game.player.x, game.player.y - game.player.h / 2);
     game.streamTick();
@@ -156,7 +176,18 @@ export class Game {
     this.vitals = new Vitals(tuning.vitals, fluids, this.events);
     this.heat = new HeatSense(tuning.heat, this.events, createRng(`heat/${world.seed}`));
     this.events.on('hurt', () => (hurtPulse.value += 1));
-    this.pack = new Pack(tuning.pack, (id) => materials.get(id)?.weight ?? 0);
+    const weightOf = (key: number) => materials.get(keyMaterial(key))?.weight ?? 0;
+    const crafting = loadCrafting(materials);
+    this.pack = new Pack(tuning.pack, weightOf);
+    this.pick = new Pick(tuning.pick, materials, crafting.pick);
+    this.chests = new Chests(
+      {
+        ...tuning.pack,
+        capacity: tuning.pack.capacity * tuning.chest.capacityTimesPack,
+        hardLimit: 1,
+      },
+      weightOf,
+    );
     this.dig = new DigSystem(
       tuning.dig,
       tuning.input,
@@ -165,7 +196,13 @@ export class Game {
       sim,
       this.events,
       this.pack,
+      this.pick,
+      (x, y) => this.chests.isLocked(x, y),
     );
+    const chest = materials.require('chest').numId;
+    this.events.on('tileBroken', (e) => {
+      if (e.material === chest) this.chests.remove(e.x, e.y);
+    });
     toolPower.value = this.dig.toolPower;
     this.camera = new Camera(tuning.camera, tuning.player, world.dims);
     this.packCtl = new PackController({
@@ -176,6 +213,12 @@ export class Game {
       events: this.events,
       player: this.player,
       pack: this.pack,
+      chests: this.chests,
+      chestRange: tuning.chest.openRangeTiles,
+      liquidAt: (x, y) => {
+        const f = this.mirror.fluidAt(x, y);
+        return fluidAmount(f) > 0 && !fluids.isGas(fluidType(f));
+      },
       view: () => {
         const v = this.renderer.viewTiles;
         return {
@@ -192,18 +235,33 @@ export class Game {
       tilePx: () => canvas.clientWidth / this.renderer.viewTiles.w,
       iconOf: (numId) => this.renderer.tileIcon(numId),
       onPausedChange: () => this.syncSimPause(),
-      onModeChange: (mode) => {
+      onModeChange: (mode, from) => {
         // Leaving dig mode saves a half-dug tile; build mode turns touches on the world into placing.
+        // Build and craft both stop time, so only going to or from dig mode plays the ring.
         this.dig.flush();
-        this.freezeRingAt = performance.now();
-        this.freezeRingDir = mode === 'build' ? 1 : -1;
-        this.events.emit(mode === 'build' ? 'timeFrozen' : 'timeResumed', {});
+        if (mode === 'dig' || from === 'dig') {
+          this.freezeRingAt = performance.now();
+          this.freezeRingDir = mode === 'dig' ? -1 : 1;
+          this.events.emit(mode === 'dig' ? 'timeResumed' : 'timeFrozen', {});
+        }
+        if (mode === 'craft') this.craftCtl.publish();
         this.pointer.setBuildMode(
           mode === 'build' ? tuning.placing.holdMs : null,
           tuning.placing.holdSlopPx,
         );
       },
     });
+    this.craftCtl = new CraftController({
+      crafting,
+      materials,
+      pack: this.pack,
+      pick: this.pick,
+      recipes: this.recipes,
+      events: this.events,
+      tuning,
+      itemView: (key, count) => this.packCtl.itemView(key, count),
+    });
+    this.wireToasts();
     this.particles = new Particles(256, createRng(`fx/${world.seed}`), tuning.fx.particleGravity);
     this.haptics = createHaptics();
     new FeedbackDirector(
@@ -247,7 +305,9 @@ export class Game {
         this.mirror.addChunk(chunk);
       }),
       sim.on('tilesChanged', ({ changes }) => this.mirror.applyChanges(changes)),
-      sim.on('placeRejected', ({ x, y, material }) => this.packCtl.refund(x, y, material)),
+      sim.on('placeRejected', ({ x, y, material, variant }) =>
+        this.packCtl.refund(x, y, material, variant),
+      ),
       sim.on('fluidsChanged', ({ patches }) => this.mirror.applyFluids(patches)),
       sim.on('heatChanged', ({ patches }) => this.mirror.applyHeat(patches)),
       sim.on('simEvents', ({ events }) => {
@@ -346,10 +406,51 @@ export class Game {
     benchReport.value = bench.report();
   }
 
-  /** Debug: change the pick's dig power (1–10). */
+  /** Debug: dig with this power (1–10) instead of the pick's. */
   setToolPower(power: number): void {
-    this.dig.toolPower = Math.max(1, Math.min(10, Math.round(power)));
+    this.dig.powerOverride = Math.max(1, Math.min(10, Math.round(power)));
     toolPower.value = this.dig.toolPower;
+  }
+
+  private publishPick(): void {
+    const { materials } = this.deps;
+    const pick = this.pick;
+    this.pickShown = pick.revision;
+    const next = {
+      head: materials.colorOf(pick.head, 'light'),
+      handle: materials.colorOf(pick.handle, 'light'),
+      sharpness: Math.round(pick.sharpness * 20) / 20,
+      dull: pick.dull,
+    };
+    // Digging bumps the revision every tile; only redraw the button when what it shows changes.
+    const cur = pickView.value;
+    const same =
+      cur.head === next.head &&
+      cur.handle === next.handle &&
+      cur.sharpness === next.sharpness &&
+      cur.dull === next.dull;
+    if (!same) pickView.value = next;
+  }
+
+  /** Short messages for moments a sound alone could miss: a new recipe, a locked chest, a dull pick. */
+  private wireToasts(): void {
+    const toast = (text: string) => (toastView.value = { id: ++this.toastId, text });
+    this.events.on('crafted', (e) => {
+      if (e.first) toast(`New recipe: ${this.packCtl.itemView(e.result, 0).name}`);
+    });
+    let lockedAt = -Infinity;
+    this.events.on('digLocked', () => {
+      if (performance.now() - lockedAt < 2500) return;
+      lockedAt = performance.now();
+      toast('Empty the chest to pick it up');
+    });
+    this.events.on('tileBroken', () => {
+      if (this.pick.dull && !this.wasDull)
+        toast('Your pick is getting dull. Sharpen it in craft mode.');
+      this.wasDull = this.pick.dull;
+    });
+    this.events.on('sharpened', () => (this.wasDull = false));
+    this.events.on('upgraded', () => (this.wasDull = false));
   }
 
   /** Debug: delete this world's save and start fresh. */
@@ -390,6 +491,16 @@ export class Game {
       select: (numId) => this.packCtl.select(numId),
       moveItem: (from, to) => this.packCtl.moveItem(from, to),
       discard: (numId, count) => this.packCtl.discard(numId, count),
+      setMode: (mode) => this.packCtl.setMode(mode),
+      closeChest: () => this.packCtl.closeChest(),
+      stow: (key, n, into) => this.packCtl.stow(key, n, into),
+      stowAll: () => this.packCtl.stowAll(),
+      craftPut: (key) => this.craftCtl.put(key),
+      craftClearSlot: (i) => this.craftCtl.clearSlot(i),
+      craftFill: (template) => this.craftCtl.fill(template),
+      craftMake: () => this.craftCtl.make(),
+      sharpen: () => this.craftCtl.sharpen(),
+      upgrade: (part, material) => this.craftCtl.upgrade(part, material),
     };
   }
 
@@ -414,6 +525,8 @@ export class Game {
   private update(dt: number): void {
     const solid = this.mirror.isSolid;
     this.packCtl.update();
+    if (this.packCtl.mode === 'craft') this.craftCtl.update();
+    if (this.pick.revision !== this.pickShown) this.publishPick();
     // The fan and the full pack freeze the world; only the ghost and the UI keep moving.
     // Particles hang in the air too.
     if (this.packCtl.isPaused) {
@@ -460,10 +573,10 @@ export class Game {
     // In build mode every tap on the world is for placing.
     if (this.packCtl.building) return this.packCtl.tapWorld(cssX, cssY);
     if (this.packCtl.isPaused) return;
-    const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
-    // No other context actions yet (talk, use); debug can pour fluid.
+    // Taps open chests and place torches and chests; debug can pour fluid instead.
     const pour = debugPour.value;
-    if (pour === 'off') return;
+    if (pour === 'off') return this.packCtl.tapWorld(cssX, cssY);
+    const t = this.renderer.screenToTile(cssX, cssY, this.camera.x, this.camera.y);
     const fluid = this.deps.fluids.require(pour).id;
     // A 3×3 block, enough to start a real flood.
     for (let dy = -1; dy <= 1; dy++) {
@@ -489,16 +602,26 @@ export class Game {
       p.x === this.lastSyncedX &&
       p.y === this.lastSyncedY &&
       health === this.lastSyncedHealth &&
-      this.pack.revision === this.lastSyncedPack;
+      this.stuffStamp() === this.lastSyncedStuff;
     if (same && !force) return;
     this.lastSyncedX = p.x;
     this.lastSyncedY = p.y;
     this.lastSyncedHealth = health;
-    this.lastSyncedPack = this.pack.revision;
+    this.lastSyncedStuff = this.stuffStamp();
     this.deps.sim.send({
       type: 'playerState',
-      player: { ...p.snapshot(), pack: this.pack.snapshot() },
+      player: {
+        ...p.snapshot(),
+        pack: this.pack.snapshot(),
+        pick: this.pick.snapshot(),
+        recipes: this.recipes.snapshot(),
+        chests: this.chests.snapshot(),
+      },
     });
+  }
+
+  private stuffStamp(): string {
+    return `${this.pack.revision}/${this.pick.revision}/${this.recipes.revision}/${this.chests.version}`;
   }
 
   private streamTick(): void {
@@ -569,7 +692,7 @@ export class Game {
     const ringT = (performance.now() - this.freezeRingAt) / t.ringMs;
     const ring = ringT < 1 ? ringT : null;
     const closing = ring !== null && this.freezeRingDir === -1;
-    if (!this.packCtl.building && !closing) return null;
+    if (this.packCtl.mode === 'dig' && !closing) return null;
     return { desaturate: t.desaturate, tint: t.tint, x, y, ring, ringDir: this.freezeRingDir };
   }
 

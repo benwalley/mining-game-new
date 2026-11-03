@@ -26,3 +26,9 @@ The player's first camp sits on the surface. Players can build more camps anywhe
 ### Building for colonies
 
 Colonies ask for help by showing an icon of what they need (a wall, a pump, light, a bridge). The player builds it in the world, and colony members actually use it. A pump the player built keeps their homes dry for good, and they remember who built it.
+
+> **Decided since (owner, 2026-11-02):** torches and chests are held from the same fan as
+> blocks and placed with a tap in dig mode (blocks still go down in build mode). Torches burn
+> out after a time set by their fuel. A chest holds a few times the pack's weight, opens with
+> a tap into a two-list sheet beside the pack, and can be dug up only when empty. Crafting
+> doesn't read from chests. There's no camp yet, and a new world starts with nothing placed.

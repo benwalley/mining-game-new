@@ -16,15 +16,15 @@ built.
 - **The 60 fps phone run.** The owner still needs to run **bench** in the debug overlay on a
   phone (test world) and send the screenshot. Phase 1's gate isn't formally passed until then.
 
-## Phase 2, Hands (slice 1 done; wait for the owner's go-ahead on slice 2)
+## Phase 2, Hands (slices 1 and 2 done; wait for the owner's go-ahead on slice 3)
 
 Planned slices, in order:
 
 1. **Pack and corner fan (done):** dug material goes into the pack, there's a weight limit, a corner
    fan replaces the hotbar, and blocks can be placed. Decisions are below.
-2. **Workbench and crafting:** templates, parts and the crafting sheet. Crafting draws from
-   chests within about 8 tiles. Chests and the first camp come in this slice too.
-3. **Torches and ladders:** the first placeable things.
+2. **Crafting, chests and torches (done):** a craft mode, the pick (upgrade and sharpen), chests and
+   torches. No workbench and no camp yet. Decisions are below.
+3. **Ladders:** the next placeable thing.
 4. **Fire and melting:** tiles burn or melt at their heat limit (N×100°), and heat starts to
    do damage. Suits may come here too.
 5. **Furnace, kiln and quenching:** processing stations and process quality.
@@ -81,19 +81,76 @@ messages (`PROTOCOL_VERSION` 9), and the sim accepts them while paused. The mode
 - **Build mode doesn't pan,** so building further means leaving it and walking.
 - **Left-handed mirroring** (a Could) isn't built.
 
-### Questions to ask before slice 2
+### Decided for slice 2 (owner, 2026-11-02)
 
-Ask these; don't assume the answers. Read [design 08](design/08-crafting.md) and
-[09](design/09-building.md) first.
+- **Crafting happens anywhere, but only simple things.** Better things need special places
+  found in the world later (creature cities, forges); rocket boots or x-ray vision need
+  special equipment. What you can make should make sense for where you are.
+- **Craft mode** is a third mode on the control button (dig → build → craft). It opens the
+  crafting sheet and freezes time, like build mode.
+- **No workbench in this slice.** Craft mode works anywhere for the simple set.
+- **Recipes are stumbled on.** You can make anything your place and abilities allow, even
+  without knowing it. The sheet has open slots: put materials in, and if they fit a template
+  that can be made here, its silhouette and stats appear and you can craft it. Once made, a
+  template is remembered and listed by name, and the sheet fills its slots next time. You
+  don't start knowing everything. Parts aren't items: you pick a material per slot and craft
+  in one step.
+- **Slice 2 crafts the pick, the chest and the torch.**
+- **The pick:** you always have one; picks don't break. You start with a stone head and wood
+  handle, which digs like today (power 3). Digging slowly dulls it, so dig time goes up to a
+  limit. In craft mode, **sharpen** costs a little stone and restores it, and **upgrade**
+  swaps a part's material (a harder head digs harder rock) using that material, through the
+  pick's stat formulas in design 08.
+- **Torches** are shaft plus fuel. They light the area through the existing light system and
+  burn out after a time set by the fuel.
+- **Placing items:** torches and chests are held from the same fan as blocks. In **dig mode**
+  a tap on a reachable tile places the held torch or chest. With a block held, a tap in dig
+  mode still does nothing; blocks are placed in build mode as before.
+- **Chests** have their own weight limit, a few times the pack's (start at 5×). Tap a chest
+  in reach in dig mode to open a paused sheet with the pack on one side and the chest on the
+  other: tap a stack to move it across, hold to choose an amount, and "store all" moves
+  everything but the held item. A chest can be dug only when empty (otherwise it thuds and
+  shows a lock); then it goes back into the pack.
+- **Crafting uses only the pack,** never chests. Chests just hold things. This overrides the
+  design doc's "crafting reads from chests within about 8 tiles".
+- **The pack gets bigger:** capacity goes from 200 to 1000 weight.
+- **No camp yet.** A new world starts with nothing placed.
+- **Slice 1 feedback:** the `placing` numbers are fine, and up and down buttons for
+  reordering the full pack are fine.
 
-- **The workbench.** Is it a placed object you stand near, or a tab of the pack? How big is the
-  starting recipe set, and how are recipes learned (known from the start, or found)?
-- **Chests and the first camp.** What does a chest hold (its own weight limit, or none)? Does
-  the camp (bed, chest, light) exist from the start of a new world, and where?
-- **Crafting from chests within about 8 tiles.** Does it take from the pack first or the chests
-  first, and does the sheet show both?
-- **Placeable things beyond blocks.** The fan only holds materials for now. When items such as
-  chests and workbenches exist, do they sit in the same fan, or in a section of it, and does
-  placing them need build mode?
-- **Slice 1 feedback.** What the owner found when playtesting the fan on a phone: the numbers
-  in `placing`, and whether the full pack needs drag to reorder.
+### What slice 2 built, and choices made for the owner to check
+
+The README's Status section has the detail. Choices made without asking, to overrule freely:
+
+- **Recipes** (`src/data/crafting.json`): a torch is a rootwood shaft plus one fuel (coal,
+  rootwood, glowcap, spore-silk or ember crystal) and makes 4; a chest is 6 of rootwood, stone,
+  clay, slate, mudstone, copper or iron. Torches of different fuels stack apart ("Torch (coal)").
+- **The pick** (`tuning.json` `pick`): power is head hardness − 1, so the stone head digs like
+  the old power 3. Speed comes from head plus handle weight, against the starting pick. Wear
+  per tile is 0.01 ÷ head toughness (stone: fully dull after 500 tiles), and full dullness
+  makes digging 60% slower. Sharpen costs 2 stone; a new head costs 3, a new handle 2, and the
+  old part isn't returned. Heads take stone and harder rock, metals and crystals; handles take
+  rootwood and metals. Binding (design 08) is left out for now. The dig button's pick turns
+  grey with an orange sharpness bar once it's a quarter dull, and a message says to sharpen.
+- **Torches** (`tuning.json` `torch`): burn `fuel × 60` s (rootwood 5 min, coal 9 min), light
+  level 12, go out in liquid with a fizzle and smoke. Placed in dig or build mode; they hang on
+  any solid neighbour and the player can stand in them. They can't be picked up again.
+- **Chests** (`tuning.json` `chest`): hold 5000 weight, open within 3 tiles, need a floor.
+  Their contents live with the pack on the main thread and save with the player, not in the
+  sim, so moving things is instant. The design rule that crafting reads nearby chests is off,
+  per the owner.
+- **Discovery**: an unknown match shows as a glowing grey silhouette, "Something new…", with
+  its stats and cost; making it shows "New recipe: …" and a chime.
+
+Not checked: none of it on a phone. In the browser pane, crafting a chest from clay, placing
+it from the fan with a tap, opening it, "store all", and the locked-dig message all worked.
+The torch sprite and its light were not seen in the browser (no coal turned up); tests cover
+placing and burning out. No flicker animation on torches yet.
+
+### Questions to ask before slice 3
+
+- Ladders: what they're made of, how they're placed (tap in dig mode like torches?), and
+  whether a ladder can be climbed sideways or only up and down.
+- The slice 2 numbers above: recipes, pick dulling and sharpening cost, torch burn times.
+- Should torches be picked back up (dig them), and should they flicker or dim as they burn
+  down?

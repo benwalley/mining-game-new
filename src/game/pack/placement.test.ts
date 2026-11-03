@@ -60,6 +60,8 @@ describe('placeBlocker', () => {
     return {
       isLoaded: () => true,
       solid,
+      isEmpty: () => true,
+      liquid: () => false,
       box,
       view,
       reach: reachMask(bodyTile(box), solid, view),
@@ -76,6 +78,21 @@ describe('placeBlocker', () => {
     expect(placeBlocker(9, 1, ctx())).toBe('offscreen');
     expect(placeBlocker(3, 0, ctx({ isLoaded: () => false }))).toBe('unloaded');
     expect(placeBlocker(0, 1, ctx())).toBe('occupied');
+    expect(placeBlocker(1, 0, ctx({ isEmpty: () => false }))).toBe('taken');
+  });
+
+  it('hangs a torch only next to something solid, out of liquid, even where the player stands', () => {
+    // (1,1) touches the block at (2,1); (1,0) touches nothing.
+    expect(placeBlocker(1, 1, ctx(), 'torch')).toBeNull();
+    expect(placeBlocker(1, 0, ctx(), 'torch')).toBe('unsupported');
+    expect(placeBlocker(1, 1, ctx({ liquid: () => true }), 'torch')).toBe('wet');
+    expect(placeBlocker(0, 1, ctx(), 'torch')).toBe('unsupported');
+    expect(placeBlocker(0, 2, ctx(), 'torch')).toBeNull();
+  });
+
+  it('stands a chest only on a floor', () => {
+    expect(placeBlocker(4, 2, ctx(), 'chest')).toBeNull();
+    expect(placeBlocker(4, 1, ctx(), 'chest')).toBe('unsupported');
   });
 
   it('allows a tile it could only reach by going around a block', () => {

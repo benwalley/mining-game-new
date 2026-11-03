@@ -53,6 +53,9 @@ export function drawMaterialTile(
   oy: number,
 ): void {
   const rng = createRng(`tile/${key}`);
+  // Torches and chests are objects drawn over the backdrop, not tiles that fill their square.
+  if (v.pattern === 'torch') return drawTorch(ctx, v, ox, oy);
+  if (v.pattern === 'chest') return drawChest(ctx, v, ox, oy);
   px(ctx, v.base, ox, oy, N, N);
 
   switch (v.pattern) {
@@ -121,6 +124,42 @@ export function drawMaterialTile(
       }
       break;
   }
+}
+
+/** A stick with a wrapped head and a flame, on a clear tile. */
+function drawTorch(ctx: Ctx2D, v: MaterialVisual, ox: number, oy: number): void {
+  const flame = v.accent ?? 'ember';
+  const core = v.accentLight ?? 'gold';
+  px(ctx, v.dark, ox + 6, oy + 7, 4, 9);
+  px(ctx, v.base, ox + 7, oy + 8, 2, 8);
+  px(ctx, v.light, ox + 7, oy + 8, 1, 7);
+  // The wrapped head.
+  px(ctx, v.dark, ox + 5, oy + 6, 6, 3);
+  px(ctx, 'soil', ox + 6, oy + 7, 4, 1);
+  // The flame: a teardrop of ember around a gold core.
+  px(ctx, flame, ox + 6, oy + 3, 4, 3);
+  px(ctx, flame, ox + 7, oy + 1, 2, 2);
+  px(ctx, flame, ox + 5, oy + 4, 1, 2);
+  px(ctx, flame, ox + 10, oy + 4, 1, 2);
+  px(ctx, core, ox + 7, oy + 3, 2, 3);
+  px(ctx, 'bone', ox + 7, oy + 4, 1, 1);
+}
+
+/** A banded wooden box with a lid seam and a latch, standing on the tile's floor. */
+function drawChest(ctx: Ctx2D, v: MaterialVisual, ox: number, oy: number): void {
+  const band = v.accent ?? v.dark;
+  const latch = v.accentLight ?? v.light;
+  px(ctx, v.dark, ox + 1, oy + 3, 14, 13);
+  px(ctx, v.base, ox + 2, oy + 4, 12, 11);
+  // Planks.
+  for (let y = 7; y < 15; y += 3) px(ctx, v.dark, ox + 2, oy + y, 12, 1);
+  px(ctx, v.light, ox + 2, oy + 4, 12, 1);
+  // The lid's seam, then the metal corners and the latch.
+  px(ctx, v.dark, ox + 1, oy + 7, 14, 1);
+  px(ctx, band, ox + 2, oy + 4, 2, 11);
+  px(ctx, band, ox + 12, oy + 4, 2, 11);
+  px(ctx, v.dark, ox + 6, oy + 6, 4, 4);
+  px(ctx, latch, ox + 7, oy + 7, 2, 2);
 }
 
 /** Background wall shown behind dug-out and cave tiles underground. */

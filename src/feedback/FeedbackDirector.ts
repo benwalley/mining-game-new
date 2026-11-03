@@ -57,6 +57,15 @@ export class FeedbackDirector {
     events.on('placed', (e) => {
       const m = this.materials.get(e.material);
       if (!m) return;
+      if (m.kind === 'torch') {
+        this.audio.torchLit();
+        this.particles.burst(e.x + 0.5, e.y + 0.3, 6, [palette.ember, palette.gold], {
+          speed: 3,
+          life: 0.4,
+          dirY: -1,
+        });
+        return;
+      }
       this.audio.place(m);
       this.haptics.tick();
       this.debris(e.x, e.y, e.material, 5, 2);
@@ -78,6 +87,28 @@ export class FeedbackDirector {
       this.particles.burst(e.x + 0.5, e.y + 0.5, 2, [palette.bone, palette.ember], {
         speed: 5,
         life: 0.25,
+      });
+    });
+    events.on('digLocked', (e) => {
+      this.audio.blocked();
+      this.particles.burst(e.x + 0.5, e.y + 0.5, 3, [palette.gold, palette.bone], {
+        speed: 4,
+        life: 0.3,
+      });
+    });
+    events.on('crafted', (e) => this.audio.crafted(e.first));
+    events.on('craftDenied', () => this.audio.blocked());
+    events.on('sharpened', () => this.audio.sharpened());
+    events.on('upgraded', () => this.audio.upgraded());
+    events.on('chestOpened', () => this.audio.chestOpen());
+    events.on('chestClosed', () => this.audio.chestClose());
+    events.on('stowed', () => this.audio.stow());
+    events.on('torchOut', (e) => {
+      this.throttled('hiss', () => this.audio.torchOut());
+      this.particles.burst(e.x + 0.5, e.y + 0.3, 4, [palette.pebble, palette.fog], {
+        speed: 1.5,
+        life: 0.8,
+        dirY: -1,
       });
     });
     events.on('landed', (e) => this.audio.land(e.speed));

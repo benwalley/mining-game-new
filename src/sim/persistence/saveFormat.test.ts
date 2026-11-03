@@ -20,7 +20,7 @@ describe('saveFormat', () => {
   });
 
   it('upgrades v1 and v2 chunks, ending without the dropped origin field', () => {
-    expect(SAVE_VERSION).toBe(4);
+    expect(SAVE_VERSION).toBe(5);
     const current = encodeChunk('w', createChunk(0, 0));
     const v2 = {
       ...current,

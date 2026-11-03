@@ -4,7 +4,7 @@ import { Pack } from './Pack';
 
 // Weights: 1 = dirt (3), 2 = stone (6).
 const weights: Record<number, number> = { 1: 3, 2: 6 };
-const make = () => new Pack(tuningData.pack, (id) => weights[id] ?? 1);
+const make = () => new Pack({ ...tuningData.pack, capacity: 200 }, (id) => weights[id] ?? 1);
 
 describe('Pack', () => {
   it('adds stacks in the order they first arrive and sums weight', () => {

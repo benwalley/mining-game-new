@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "notes": "Templates the player can make, by part. A slot takes one material; count is how many of it the part uses. place is where a template can be made: anywhere for now, later creature cities, forges and so on. variantFrom names the part whose material is kept on the item (a torch remembers its fuel). The pick isn't crafted here: there's always one, upgraded part by part. Its parts list which materials fit.",
+  "slots": 3,
+  "templates": [
+    {
+      "key": "torch",
+      "name": "Torch",
+      "makes": "torch",
+      "yield": 4,
+      "place": "anywhere",
+      "variantFrom": "fuel",
+      "parts": [
+        { "key": "shaft", "name": "Shaft", "count": 1, "accepts": ["rootwood"] },
+        {
+          "key": "fuel",
+          "name": "Fuel",
+          "count": 1,
+          "accepts": ["coal", "rootwood", "glowcap", "spore-silk", "ember-crystal"]
+        }
+      ]
+    },
+    {
+      "key": "chest",
+      "name": "Chest",
+      "makes": "chest",
+      "yield": 1,
+      "place": "anywhere",
+      "parts": [
+        {
+          "key": "body",
+          "name": "Body",
+          "count": 6,
+          "accepts": ["rootwood", "stone", "clay", "slate", "mudstone", "copper", "iron"]
+        }
+      ]
+    }
+  ],
+  "pick": {
+    "head": [
+      "stone",
+      "mudstone",
+      "copper",
+      "tin",
+      "slate",
+      "quartz",
+      "iron",
+      "basalt",
+      "obsidian",
+      "ember-crystal",
+      "gold",
+      "starsilver",
+      "elderstone"
+    ],
+    "handle": ["rootwood", "copper", "iron", "gold", "starsilver"]
+  }
+}

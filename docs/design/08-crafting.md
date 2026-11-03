@@ -90,3 +90,14 @@ Tools and suits wear with use. Repairing needs some of the original material at 
 4. Confirm to craft. If a station is needed and not nearby, the sheet says which one.
 
 Crafting from nearby storage chests (within about 8 tiles) is required. Making players shuffle items to their pack first is tedium.
+
+> **Decided since (owner, 2026-11-02):** crafting happens anywhere through a **craft** mode
+> on the pack button, which freezes time, but only simple things can be made anywhere. Better
+> things need special places found in the world (creature cities, forges) or special
+> equipment. There is no workbench yet. Recipes aren't listed up front: the sheet has open
+> slots, and putting materials in that fit a template shows it (as a silhouette until it's
+> been made once). Once made, a template is remembered. Parts aren't items; each slot takes
+> one material. Crafting uses only the pack, never nearby chests. The pick never breaks:
+> there is always one, it dulls with digging (slower digging, up to a limit), and in craft
+> mode it can be sharpened for a little stone or have a part swapped for a new material.
+> Details and numbers are in [`docs/status.md`](../status.md).

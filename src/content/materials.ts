@@ -2,7 +2,21 @@ import materialsData from '@/data/materials.json';
 import { isColorName, palette, type ColorName } from './palette';
 
 export type TilePattern =
-  'bedrock' | 'soil' | 'grain' | 'smooth' | 'fiber' | 'block' | 'vein' | 'crystal' | 'spots';
+  | 'bedrock'
+  | 'soil'
+  | 'grain'
+  | 'smooth'
+  | 'fiber'
+  | 'block'
+  | 'vein'
+  | 'crystal'
+  | 'spots'
+  | 'torch'
+  | 'chest';
+
+/** How a material is placed: blocks in build mode; torches and chests with a tap. */
+export type MaterialKind = 'block' | 'torch' | 'chest';
+const KINDS: readonly MaterialKind[] = ['block', 'torch', 'chest'];
 
 export interface MaterialVisual {
   base: ColorName;
@@ -31,6 +45,7 @@ export interface MaterialDef {
   trait: string | null;
   /** Light emitted by the tile itself, 0–15. */
   light: number;
+  kind: MaterialKind;
   visual: MaterialVisual | null;
 }
 
@@ -44,6 +59,8 @@ const PATTERNS: readonly TilePattern[] = [
   'vein',
   'crystal',
   'spots',
+  'torch',
+  'chest',
 ];
 
 /** Lookup of all materials by numeric id and by key. */
@@ -119,6 +136,8 @@ export function loadMaterials(): MaterialRegistry {
     if (!(raw.conductivity >= 1 && raw.conductivity <= 10)) {
       throw new Error(`Material "${raw.key}": conductivity must be 1–10`);
     }
+    const kind = ('kind' in raw ? raw.kind : 'block') as MaterialKind;
+    if (!KINDS.includes(kind)) throw new Error(`Material "${raw.key}": unknown kind "${kind}"`);
     return {
       numId: raw.numId,
       key: raw.key,
@@ -133,6 +152,7 @@ export function loadMaterials(): MaterialRegistry {
       fuel: raw.fuel,
       trait: raw.trait,
       light: 'light' in raw ? Number(raw.light) : 0,
+      kind,
       visual: parseVisual(raw),
     };
   });

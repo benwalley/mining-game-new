@@ -6,12 +6,24 @@ export interface GameEvents {
   digHit: { x: number; y: number; material: number; stage: number; dir: DigDirection };
   digBlocked: { x: number; y: number; material: number };
   tileBroken: { x: number; y: number; material: number };
+  /** A chest with things in it: empty it before digging it up. */
+  digLocked: { x: number; y: number; material: number };
   /** A dig that can't finish because the pack is at its hard limit. */
   packFull: { x: number; y: number; material: number };
   /** The player put a block into the world. */
   placed: { x: number; y: number; material: number };
   /** The player took the last placed block back. */
   unplaced: { x: number; y: number; material: number };
+  /** Something was made in craft mode; `first` when it's a new find. */
+  crafted: { result: number; count: number; first: boolean };
+  /** A craft, sharpen or upgrade that couldn't happen (short of materials, or no room). */
+  craftDenied: Record<string, never>;
+  sharpened: Record<string, never>;
+  upgraded: { part: 'head' | 'handle'; material: number };
+  chestOpened: { x: number; y: number };
+  chestClosed: Record<string, never>;
+  /** Things moved between the pack and a chest. */
+  stowed: { key: number; count: number; into: 'chest' | 'pack' };
   /** A tap or release on a tile that can't take a block. */
   placeDenied: { x: number; y: number };
   /** Build mode began: the world stops. */
@@ -33,4 +45,5 @@ export interface GameEvents {
   quench: SimEvent;
   ignite: SimEvent;
   vent: SimEvent;
+  torchOut: SimEvent;
 }

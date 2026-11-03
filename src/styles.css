@@ -531,3 +531,432 @@ body {
     opacity: 0;
   }
 }
+
+/* Craft mode, chests and the pick */
+
+.pack-button.mode-craft {
+  border-color: #e8c048;
+}
+
+.pick-glyph path {
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mode-glyph .spark {
+  stroke: #e8c048;
+}
+
+.dig-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.dig-face.dull .pick-glyph {
+  filter: saturate(0.4) brightness(0.8);
+}
+
+.face-sharp {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -5px;
+  height: 3px;
+  border-radius: 2px;
+  background: #4a4550;
+  overflow: hidden;
+}
+
+.face-sharp span {
+  display: block;
+  height: 100%;
+  background: #ff8a3a;
+}
+
+.craft-sheet {
+  /* Under the pack button, so a tap on it still moves on to the next mode. */
+  z-index: 2;
+}
+
+.craft-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 10px;
+  /* Room for the pack button in the corner. */
+  padding-bottom: 84px;
+}
+
+.craft-card {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #2f2a33;
+  border-radius: 12px;
+  background: #1a161d;
+}
+
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pick-art {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #0d0b10;
+}
+
+.pick-art.dull {
+  filter: saturate(0.4) brightness(0.8);
+}
+
+.pick-stats {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.pick-stats small {
+  color: var(--fog);
+  font-size: 12px;
+}
+
+.sharp-bar {
+  height: 6px;
+  margin: 6px 0 3px;
+  border-radius: 3px;
+  background: #2f2a33;
+  overflow: hidden;
+}
+
+.sharp-fill {
+  height: 100%;
+  background: #b8f070;
+  transition: width 0.3s;
+}
+
+.sharp-fill.dull {
+  background: #ff8a3a;
+}
+
+.sheet button.sharpen,
+.sheet button.make {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.sheet button.sharpen small {
+  color: var(--fog);
+  font-size: 11px;
+}
+
+.part {
+  margin-top: 8px;
+}
+
+.part-row,
+.part-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.part-label {
+  width: 52px;
+  color: var(--fog);
+  font-size: 13px;
+}
+
+.part-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.part-name small {
+  font-size: 12px;
+}
+
+.part-options {
+  margin: 6px 0 0 60px;
+  padding: 0;
+  list-style: none;
+}
+
+.part-options li {
+  padding: 4px 0;
+}
+
+.delta {
+  color: var(--fog);
+}
+
+.delta.up {
+  color: #b8f070;
+}
+
+.delta.down {
+  color: #ff8a3a;
+}
+
+.bench {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sheet button.slot,
+.slot {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px dashed #4a4550;
+  border-radius: 12px;
+  background: #0d0b10;
+}
+
+.sheet button.slot.filled {
+  border-style: solid;
+  border-color: #97929a;
+}
+
+.slot .tile-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.slot.result {
+  border-style: solid;
+}
+
+.slot.result.known {
+  border-color: #e8c048;
+}
+
+.slot.result.new {
+  border-color: #b8f070;
+  animation: find-glow 1.2s ease-in-out infinite alternate;
+}
+
+.tile-icon.silhouette {
+  /* A grey shape with a green glow: the outline of what it is, not what it's called. */
+  filter: brightness(0) invert(0.32) drop-shadow(0 0 4px #b8f070);
+  box-shadow: none;
+}
+
+.bench-arrow {
+  color: var(--fog);
+  font-size: 20px;
+}
+
+.bench-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  margin: 8px 0;
+  text-align: center;
+}
+
+.bench-text small {
+  color: var(--fog);
+  font-size: 12px;
+}
+
+.bench-name {
+  font-size: 16px;
+}
+
+.sheet button.make {
+  width: 100%;
+  border-color: #e8c048;
+  color: #e8c048;
+  font-size: 16px;
+}
+
+.sheet button.make:disabled {
+  border-color: #4a4550;
+  color: var(--bone);
+}
+
+.known {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sheet button.known-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet button.known-chip.short {
+  opacity: 0.55;
+}
+
+.mat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.sheet button.mat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 56px;
+  padding: 0;
+}
+
+.sheet button.mat small {
+  font-size: 11px;
+  color: var(--fog);
+}
+
+.chest-cols {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chest-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chest-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2f2a33;
+  font-size: 15px;
+}
+
+.chest-col-head small {
+  color: var(--fog);
+  font-size: 12px;
+}
+
+.chest-col .sheet-list li {
+  padding: 3px 0;
+}
+
+.sheet button.stack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.sheet button.stack.held .stack-name {
+  color: #b8f070;
+}
+
+.stack-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.sheet button.store-all {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.amount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.amount-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.amount-n {
+  min-width: 32px;
+  text-align: center;
+}
+
+.sheet button.amount-go {
+  border-color: #e8c048;
+  color: #e8c048;
+}
+
+.toast {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 48px);
+  left: 50%;
+  z-index: 5;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border: 1px solid rgba(232, 192, 72, 0.5);
+  border-radius: 10px;
+  background: rgba(13, 11, 16, 0.9);
+  color: var(--bone);
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: toast 2.8s ease forwards;
+}
+
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  10%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes find-glow {
+  from {
+    box-shadow: 0 0 0 rgba(184, 240, 112, 0);
+  }
+  to {
+    box-shadow: 0 0 14px rgba(184, 240, 112, 0.55);
+  }
+}

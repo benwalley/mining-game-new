@@ -1,3 +1,4 @@
+import type { MaterialKind } from '@/content/materials';
 import type { Box, SolidFn } from '../physics/tileCollision';
 
 /** A rectangle of tiles, half-open: `x1` and `y1` are one past the last tile. */
@@ -66,25 +67,45 @@ export function isReachable(reach: ReachMask, x: number, y: number): boolean {
   return inside(view, x, y) && mask[(y - view.y0) * (view.x1 - view.x0) + (x - view.x0)] === 1;
 }
 
-export type PlaceBlocker = 'unloaded' | 'solid' | 'offscreen' | 'occupied' | 'unreachable';
+export type PlaceBlocker =
+  'unloaded' | 'solid' | 'taken' | 'offscreen' | 'occupied' | 'unreachable' | 'unsupported' | 'wet';
 
 export interface PlaceContext {
   isLoaded(x: number, y: number): boolean;
   solid: SolidFn;
+  /** Open and holding nothing (not a torch). */
+  isEmpty(x: number, y: number): boolean;
+  /** Holding water, lava or another liquid. */
+  liquid(x: number, y: number): boolean;
   box: Box;
   view: TileView;
   reach: ReachMask;
 }
 
-/** Why a block can't go at this tile, or null if it can. */
-export function placeBlocker(x: number, y: number, ctx: PlaceContext): PlaceBlocker | null {
+/**
+ * Why a block, torch or chest can't go at this tile, or null if it can. A torch
+ * hangs on any solid neighbor and never goes into liquid; a chest stands on a
+ * floor. Neither blocks the player, so only a block can't overlap them.
+ */
+export function placeBlocker(
+  x: number,
+  y: number,
+  ctx: PlaceContext,
+  kind: MaterialKind = 'block',
+): PlaceBlocker | null {
   if (!inside(ctx.view, x, y)) return 'offscreen';
   if (!ctx.isLoaded(x, y)) return 'unloaded';
   if (ctx.solid(x, y)) return 'solid';
+  if (!ctx.isEmpty(x, y)) return 'taken';
   const b = ctx.box;
   const overlaps = x + 1 > b.x - b.w / 2 && x < b.x + b.w / 2 && y + 1 > b.y - b.h && y < b.y;
-  if (overlaps) return 'occupied';
+  if (overlaps && kind !== 'torch') return 'occupied';
   if (!isReachable(ctx.reach, x, y)) return 'unreachable';
+  if (kind === 'torch') {
+    if (ctx.liquid(x, y)) return 'wet';
+    if (!STEPS.some(([dx, dy]) => ctx.solid(x + dx, y + dy))) return 'unsupported';
+  }
+  if (kind === 'chest' && !ctx.solid(x, y + 1)) return 'unsupported';
   return null;
 }
 

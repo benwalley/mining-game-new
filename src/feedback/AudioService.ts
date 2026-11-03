@@ -138,6 +138,59 @@ export class AudioService {
     }
   }
 
+  /** Something made: two bright hammer clinks. A new find adds a rising three-note chime. */
+  crafted(first: boolean): void {
+    this.tone(1250, 0.18, 0.22, 'triangle');
+    this.noiseBurst(3200, 2, 0.06, 0.25);
+    this.tone(1660, 0.22, 0.18, 'triangle', 0.11);
+    this.noiseBurst(3600, 2, 0.05, 0.2, 0.11);
+    if (!first) return;
+    [660, 880, 1320].forEach((hz, i) => this.tone(hz, 0.5, 0.16, 'sine', 0.26 + i * 0.09));
+  }
+
+  /** Whetstone on the pick: two rasping strokes. */
+  sharpened(): void {
+    this.noiseBurst(5200, 1.2, 0.22, 0.32);
+    this.noiseBurst(6200, 1.2, 0.26, 0.28, 0.24);
+    this.tone(2100, 0.3, 0.08, 'sine', 0.5);
+  }
+
+  /** A new part fitted: a heavy clank and a ring. */
+  upgraded(): void {
+    this.noiseBurst(900, 1, 0.1, 0.45);
+    this.tone(520, 0.4, 0.2, 'triangle');
+    this.tone(1040, 0.5, 0.1, 'sine', 0.05);
+  }
+
+  /** The lid creaks up. */
+  chestOpen(): void {
+    this.sweep(180, 320, 0.22, 0.18);
+    this.noiseBurst(700, 3, 0.18, 0.18);
+  }
+
+  /** The lid drops shut. */
+  chestClose(): void {
+    this.sweep(140, 60, 0.12, 0.4);
+    this.noiseBurst(500, 1, 0.08, 0.35);
+  }
+
+  /** Things set down in a chest or taken out. */
+  stow(): void {
+    this.noiseBurst(1100, 1.2, 0.08, 0.3);
+    this.sweep(260, 160, 0.07, 0.2);
+  }
+
+  /** A torch catching as it's set on the wall. */
+  torchLit(): void {
+    this.noiseBurst(1500, 0.6, 0.3, 0.3);
+    this.sweep(300, 700, 0.18, 0.12);
+  }
+
+  /** A torch burning out: a soft fizzle. */
+  torchOut(): void {
+    this.noiseBurst(this.rng.range(3500, 4500), 0.8, 0.4, 0.18);
+  }
+
   hurt(): void {
     this.sweep(260, 110, 0.18, 0.35);
     this.noiseBurst(420, 1, 0.08, 0.3);
@@ -181,16 +234,17 @@ export class AudioService {
     src.start(r.ctx.currentTime + delay, offset, decay + 0.02);
   }
 
-  private tone(hz: number, decay: number, gain: number, type: OscillatorType): void {
+  private tone(hz: number, decay: number, gain: number, type: OscillatorType, delay = 0): void {
     const r = this.ready();
     if (!r) return;
     const osc = r.ctx.createOscillator();
     osc.type = type;
     osc.frequency.value = hz;
-    const env = this.envelope(r.ctx, gain, decay);
+    const env = this.envelope(r.ctx, gain, decay, delay);
     osc.connect(env).connect(r.out);
-    osc.start();
-    osc.stop(r.ctx.currentTime + decay + 0.02);
+    const t = r.ctx.currentTime + delay;
+    osc.start(t);
+    osc.stop(t + decay + 0.02);
   }
 
   private sweep(fromHz: number, toHz: number, decay: number, gain: number): void {

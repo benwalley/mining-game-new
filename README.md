@@ -191,7 +191,7 @@ with fire, torches and furnaces.
 
 **Phase 2, slice 1 (done):** the pack and the modes (`src/game/pack/`, `src/ui/pack/`).
 Every dug tile goes into the pack, which is limited by weight only (`tuning.json` `pack`:
-capacity 200). Past capacity you slow down and jump lower, down to 45% at 1.5×, where digging
+capacity 200, raised to 1000 in slice 2). Past capacity you slow down and jump lower, down to 45% at 1.5×, where digging
 is blocked. There's no hotbar. The pack button in the bottom-right corner shows the held block
 and the mode, with a ring that fills with weight. It is a round window onto an endless strip of
 modes (`src/game/pack/modes.ts`: dig shows the pick, build shows the held block): tap it to slide
@@ -207,8 +207,28 @@ behind it (the mole stays in colour, particles hang), and leaving pulls the colo
 block picker is a quarter-circle track of tile icons that scrolls, flicks and settles on an
 entry. The fan and the full pack freeze the world too. On desktop, B toggles build mode, U undoes and
 Esc returns to dig. Gestures live in the pure `PackGesture` state machine, and
-`PackController` ties it to the world. The pack is saved with the player (`SAVE_VERSION` 4);
-`placeTile` and `unplaceTile` are sim messages (`PROTOCOL_VERSION` 9).
+`PackController` ties it to the world. The pack is saved with the player; `placeTile` and
+`unplaceTile` are sim messages.
 
-Not built yet (later phases): crafting, chests, creatures, world traits, the world list,
+**Phase 2, slice 2 (done):** crafting, the pick, torches and chests (`src/game/craft/`,
+`src/data/crafting.json`, `src/sim/torch/`). A third mode, **craft**, sits after build on the
+button's strip (hammer icon, gold border) and freezes time. Its sheet has three open slots: tap
+pack materials into them, and if they fit a template it shows as a glowing silhouette with its
+stats until it has been made once; after that it's listed by name, and a tap refills the slots.
+Nothing is known at the start. Crafting uses only the pack. Slice 2 makes torches (a rootwood
+shaft plus a fuel; four per craft, burning `fuel × 60` s) and chests (six of a sturdy
+material). The pick is always there and never breaks: a stone head on a rootwood handle (power
+3, as before). Each tile dug dulls it (tougher heads dull slower), slowing digging up to 60%;
+sharpening costs 2 stone, and swapping the head or handle costs 3 or 2 of the new material and
+comes sharp. Stats follow design 08 (`tuning.json` `pick`). Torches and chests are held from the
+fan like blocks; in dig mode a tap on a reachable tile places them (torches hang on any solid
+neighbour, never in liquid; chests need a floor), and build mode places them too. Tap a chest
+within 3 tiles to open it beside the pack: tap a stack to move it, hold to pick an amount,
+"store all" keeps the held item. A chest holds 5× the pack and can be dug only when empty.
+Torches keep their burn steps in the tile's damage byte and go out in water. Chests' contents,
+the pick and known recipes are saved with the player (`SAVE_VERSION` 5); `placeTile` carries a
+`variant` (the torch's fuel, `PROTOCOL_VERSION` 10). Pack keys for crafted items are in
+`src/game/craft/itemKey.ts`.
+
+Not built yet (later phases): creatures, world traits, the world list,
 the service worker/PWA, and cavern camera zoom.

@@ -2,26 +2,44 @@ import { useEffect, useRef } from 'preact/hooks';
 import { tuning } from '@/content/tuning';
 import { stripPositions } from '@/game/pack/carousel';
 import type { Mode } from '@/game/pack/modes';
-import { fanView, modeView, packView, undoView, type PackView } from '../stores/gameStore';
+import {
+  fanView,
+  modeView,
+  packView,
+  pickView,
+  undoView,
+  type PackView,
+} from '../stores/gameStore';
 import { Fan } from './Fan';
 import type { PackActions } from './packActions';
+import { CraftGlyph, PickGlyph } from './PickGlyph';
 
 const RING = 2 * Math.PI * 24;
 const UNDO_RING = 2 * Math.PI * 9;
 const point = (e: PointerEvent) => ({ x: e.clientX, y: e.clientY });
 
-const MODE_LABEL: Record<Mode, string> = { dig: 'Dig', build: 'Build' };
+const MODE_LABEL: Record<Mode, string> = { dig: 'Dig', build: 'Build', craft: 'Craft' };
 
-/** What each mode shows in the button's window: the pick for digging, the held block for building. */
+/**
+ * What each mode shows in the button's window: the pick for digging (in its
+ * materials' colors, with a sharpness bar once it's dulling), the held block for
+ * building, a hammer for crafting.
+ */
 function ModeFace({ mode, held }: { mode: Mode; held: PackView['held'] }) {
   if (mode === 'dig') {
+    const pick = pickView.value;
     return (
-      <svg viewBox="0 0 24 24" width="26" height="26" class="mode-glyph" aria-hidden="true">
-        <path d="M5 19 L15 9" />
-        <path d="M11 5 Q19 5 19 13 L15 9 Z" />
-      </svg>
+      <span class={`dig-face${pick.dull ? ' dull' : ''}`}>
+        <PickGlyph head={pick.head} handle={pick.handle} />
+        {pick.dull && (
+          <span class="face-sharp">
+            <span style={{ width: `${pick.sharpness * 100}%` }} />
+          </span>
+        )}
+      </span>
     );
   }
+  if (mode === 'craft') return <CraftGlyph />;
   if (!held) return <span class="pack-glyph" />;
   return (
     <img

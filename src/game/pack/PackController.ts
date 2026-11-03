@@ -4,12 +4,22 @@ import { palette } from '@/content/palette';
 import type { PlacingTuning } from '@/content/tuning';
 import type { SimClient } from '@/protocol/SimClient';
 import type { GhostBlock } from '@/render/Renderer';
-import { fanView, modeView, packView, sheetOpen, undoView } from '@/ui/stores/gameStore';
+import {
+  chestView,
+  fanView,
+  modeView,
+  packView,
+  sheetOpen,
+  undoView,
+  type PackItemView,
+} from '@/ui/stores/gameStore';
+import { itemKey, keyMaterial, keyVariant } from '../craft/itemKey';
 import type { GameEvents } from '../events';
 import type { Player } from '../player/Player';
 import { fluidAmount, fluidType, type ChunkMirror } from '../world/ChunkMirror';
 import type { Point } from './fanLayout';
 import { DEFAULT_MODE, freezesWorld, MODES, type Mode } from './modes';
+import { storeAll, transfer, type Chests } from './Chests';
 import type { Pack } from './Pack';
 import { PackGesture } from './PackGesture';
 import {
@@ -29,6 +39,11 @@ export interface PackControllerDeps {
   events: EventBus<GameEvents>;
   player: Player;
   pack: Pack;
+  chests: Chests;
+  /** How far from the body a chest can be opened, in tiles. */
+  chestRange: number;
+  /** Holding water, lava or another liquid (not gas). */
+  liquidAt(x: number, y: number): boolean;
   /** The tiles on screen. */
   view(): TileView;
   /** The tile under a point on screen, in CSS pixels. */
@@ -39,7 +54,7 @@ export interface PackControllerDeps {
   iconOf(numId: number): string;
   /** The fan, the full pack or build mode started or stopped freezing the world. */
   onPausedChange(paused: boolean): void;
-  onModeChange(mode: Mode): void;
+  onModeChange(mode: Mode, from: Mode): void;
   now?(): number;
 }
 
@@ -53,7 +68,8 @@ const UNDO_CHIP_DX_PX = 81;
 interface Placed {
   x: number;
   y: number;
-  material: number;
+  /** The pack key, which may carry a variant (a torch's fuel). */
+  key: number;
   fluidType: number;
   fluidAmount: number;
   at: number;
@@ -67,7 +83,7 @@ interface Placed {
  */
 export class PackController {
   readonly gesture: PackGesture;
-  private mode: Mode = DEFAULT_MODE;
+  private currentMode: Mode = DEFAULT_MODE;
   private preview: Mode | null = null;
   /** While scrubbing, how far the strip of modes has slid, in modes. */
   private progress = 0;
@@ -86,10 +102,12 @@ export class PackController {
   private undoId = 0;
   private reach: ReachMask | null = null;
   private reachStale = true;
+  private chest: { x: number; y: number } | null = null;
+  private chestRevision = -1;
 
   constructor(private readonly d: PackControllerDeps) {
     this.gesture = new PackGesture(d.tuning, {
-      nextMode: () => this.setMode(MODES[(MODES.indexOf(this.mode) + 1) % MODES.length]!),
+      nextMode: () => this.setMode(MODES[(MODES.indexOf(this.currentMode) + 1) % MODES.length]!),
       scrub: (i) => this.setPreview(MODES[i] ?? null),
       scrubMove: (p) => {
         this.progress = p;
@@ -113,18 +131,22 @@ export class PackController {
   }
 
   get building(): boolean {
-    return this.mode === 'build';
+    return this.currentMode === 'build';
+  }
+
+  get mode(): Mode {
+    return this.currentMode;
   }
 
   /** The block being aimed, or a red flash where a tap was refused. */
   get ghost(): GhostBlock | null {
     const held = this.d.pack.held;
     if (this.ghostTile && held !== null) {
-      return { ...this.ghostTile, material: held, valid: this.ghostValid };
+      return { ...this.ghostTile, material: keyMaterial(held), valid: this.ghostValid };
     }
     const flash = this.flash;
     if (flash && held !== null && this.now() < flash.until) {
-      return { x: flash.x, y: flash.y, material: held, valid: false };
+      return { x: flash.x, y: flash.y, material: keyMaterial(held), valid: false };
     }
     return null;
   }
@@ -148,24 +170,38 @@ export class PackController {
     if (this.ghostTile) this.ghostValid = this.canPlace(this.ghostTile.x, this.ghostTile.y);
     if (this.gesture.animate(this.now())) this.publishFan();
     if (this.d.pack.revision !== this.shownRevision) this.publish();
+    if (this.chest && this.d.chests.version !== this.chestRevision) this.publishChest();
   }
 
   setMode(mode: Mode): void {
-    if (mode === this.mode) return;
-    this.mode = mode;
+    if (mode === this.currentMode) return;
+    const from = this.currentMode;
+    this.currentMode = mode;
     this.ghostTile = null;
     this.flash = null;
     this.clearUndo();
     this.reachStale = true;
-    this.d.onModeChange(mode);
+    this.d.onModeChange(mode, from);
     this.publish();
   }
 
-  /** A tap on the world. In build mode it places the held block, or flashes where it can't. */
+  /**
+   * A tap on the world. In build mode it places whatever is held, or flashes where
+   * it can't. In dig mode it opens a chest in reach, or places a held torch or
+   * chest; with a block held it does nothing, since blocks go down in build mode.
+   */
   tapWorld(cssX: number, cssY: number): void {
-    if (!this.building) return;
+    if (this.isPaused && !this.building) return;
     const t = this.d.tileAt(cssX, cssY);
-    this.tryPlace(t.x, t.y);
+    if (this.building) return this.tryPlace(t.x, t.y);
+    if (this.d.chests.get(t.x, t.y) && this.isChestTile(t.x, t.y)) {
+      if (this.chestInRange(t.x, t.y)) return this.openChest(t.x, t.y);
+      this.flash = { x: t.x, y: t.y, until: this.now() + FLASH_MS };
+      this.d.events.emit('placeDenied', t);
+      return;
+    }
+    const held = this.d.pack.held;
+    if (held !== null && this.kindOf(held) !== 'block') this.tryPlace(t.x, t.y);
   }
 
   /**
@@ -208,25 +244,71 @@ export class PackController {
     if (!u) return;
     const { pack, mirror, sim, events, materials } = this.d;
     this.clearUndo();
+    const material = keyMaterial(u.key);
     sim.send({
       type: 'unplaceTile',
       x: u.x,
       y: u.y,
-      material: u.material,
+      material,
       fluidType: u.fluidType,
       fluidAmount: u.fluidAmount,
     });
     mirror.setMaterial(u.x, u.y, materials.air.numId);
-    pack.add(u.material);
-    events.emit('unplaced', { x: u.x, y: u.y, material: u.material });
+    pack.add(u.key);
+    if (this.kindOf(u.key) === 'chest') this.d.chests.remove(u.x, u.y);
+    events.emit('unplaced', { x: u.x, y: u.y, material });
     this.reachStale = true;
   }
 
-  /** The sim refused a block: it goes back in the pack, and can't be undone. */
-  refund(x: number, y: number, material: number): void {
-    this.d.pack.add(material);
+  /** The sim refused a placement: it goes back in the pack, and can't be undone. */
+  refund(x: number, y: number, material: number, variant: number): void {
+    const key = itemKey(material, variant);
+    this.d.pack.add(key);
+    if (this.kindOf(key) === 'chest') this.d.chests.remove(x, y);
     if (this.last && this.last.x === x && this.last.y === y) this.clearUndo();
     this.reachStale = true;
+  }
+
+  get chestOpen(): boolean {
+    return this.chest !== null;
+  }
+
+  openChest(x: number, y: number): void {
+    if (!this.d.chests.get(x, y)) return;
+    this.chest = { x, y };
+    this.gesture.reset();
+    this.d.events.emit('chestOpened', { x, y });
+    this.publish();
+  }
+
+  closeChest(): void {
+    if (!this.chest) return;
+    this.chest = null;
+    this.d.events.emit('chestClosed', {});
+    this.publish();
+  }
+
+  /** Moves up to `n` of a stack between the pack and the open chest. */
+  stow(key: number, n: number, into: 'chest' | 'pack'): void {
+    const chest = this.chest && this.d.chests.get(this.chest.x, this.chest.y);
+    if (!chest) return;
+    const [from, to] = into === 'chest' ? [this.d.pack, chest] : [chest, this.d.pack];
+    const moved = transfer(from, to, key, n);
+    if (moved > 0) this.d.events.emit('stowed', { key, count: moved, into });
+    else this.d.events.emit('craftDenied', {});
+    this.publish();
+  }
+
+  /** Everything but the held item goes into the open chest. */
+  stowAll(): void {
+    const chest = this.chest && this.d.chests.get(this.chest.x, this.chest.y);
+    if (!chest) return;
+    const before = this.d.pack.weight;
+    storeAll(this.d.pack, chest, this.d.pack.held);
+    if (this.d.pack.weight < before) {
+      this.d.events.emit('stowed', { key: -1, count: 0, into: 'chest' });
+    } else this.d.events.emit('craftDenied', {});
+    this.publish();
   }
 
   closeSheet(): void {
@@ -246,6 +328,20 @@ export class PackController {
   discard(numId: number, count: number): void {
     this.d.pack.take(numId, Math.min(count, this.d.pack.count(numId)));
     this.publish();
+  }
+
+  private kindOf(key: number) {
+    return this.d.materials.get(keyMaterial(key))?.kind ?? 'block';
+  }
+
+  private isChestTile(x: number, y: number): boolean {
+    return this.kindOf(this.d.mirror.materialAt(x, y)) === 'chest';
+  }
+
+  private chestInRange(x: number, y: number): boolean {
+    const b = bodyTile(this.d.player.box);
+    const r = this.d.chestRange;
+    return Math.abs(x - b.x) <= r && Math.abs(y - b.y) <= r;
   }
 
   private pick(index: number): void {
@@ -291,15 +387,23 @@ export class PackController {
   }
 
   private canPlace(x: number, y: number): boolean {
-    const { mirror, player } = this.d;
+    const { mirror, player, pack, materials } = this.d;
+    const kind = pack.held === null ? 'block' : this.kindOf(pack.held);
     return (
-      placeBlocker(x, y, {
-        isLoaded: (tx, ty) => mirror.isLoaded(tx, ty),
-        solid: mirror.isSolid,
-        box: player.box,
-        view: this.d.view(),
-        reach: this.reachNow(),
-      }) === null
+      placeBlocker(
+        x,
+        y,
+        {
+          isLoaded: (tx, ty) => mirror.isLoaded(tx, ty),
+          solid: mirror.isSolid,
+          isEmpty: (tx, ty) => mirror.materialAt(tx, ty) === materials.air.numId,
+          liquid: (tx, ty) => this.d.liquidAt(tx, ty),
+          box: player.box,
+          view: this.d.view(),
+          reach: this.reachNow(),
+        },
+        kind,
+      ) === null
     );
   }
 
@@ -308,7 +412,7 @@ export class PackController {
     this.publish();
   }
 
-  /** Places the held block, or says why not. */
+  /** Places the held block, torch or chest, or says why not. */
   private tryPlace(x: number, y: number): void {
     const { pack, events } = this.d;
     const held = pack.held;
@@ -320,15 +424,17 @@ export class PackController {
     }
     const { mirror, sim } = this.d;
     const packed = mirror.fluidAt(x, y);
+    const material = keyMaterial(held);
     pack.take(held);
-    mirror.setMaterial(x, y, held);
-    sim.send({ type: 'placeTile', x, y, material: held });
-    events.emit('placed', { x, y, material: held });
-    // Only the last block can be undone.
+    mirror.setMaterial(x, y, material);
+    if (this.kindOf(held) === 'chest') this.d.chests.create(x, y);
+    sim.send({ type: 'placeTile', x, y, material, variant: keyVariant(held) });
+    events.emit('placed', { x, y, material });
+    // Only the last thing placed can be undone.
     this.last = {
       x,
       y,
-      material: held,
+      key: held,
       fluidType: fluidType(packed),
       fluidAmount: fluidAmount(packed),
       at: this.now(),
@@ -350,7 +456,7 @@ export class PackController {
   /** Just the mode signal, so a drag across the button doesn't rebuild the whole pack view. */
   private publishMode(): void {
     modeView.value = {
-      mode: this.mode,
+      mode: this.currentMode,
       preview: this.preview,
       modes: MODES,
       pulse: this.pulse,
@@ -360,35 +466,14 @@ export class PackController {
   }
 
   private publish(): void {
-    const { pack, materials } = this.d;
+    const { pack } = this.d;
     this.shownRevision = pack.revision;
     this.gesture.setLayout(this.button, pack.kinds + 1);
-    this.gesture.setModes(MODES.indexOf(this.mode), MODES.length);
+    this.gesture.setModes(MODES.indexOf(this.currentMode), MODES.length);
 
-    const colorOf = (numId: number): string => {
-      const base = materials.get(numId)?.visual?.base;
-      return base ? palette[base] : palette.stone;
-    };
-    const nameOf = (numId: number): string => materials.get(numId)?.name ?? '?';
     packView.value = {
-      items: pack.items.map(({ numId, count }) => ({
-        numId,
-        name: nameOf(numId),
-        color: colorOf(numId),
-        icon: this.d.iconOf(numId),
-        count,
-        unitWeight: materials.get(numId)?.weight ?? 0,
-      })),
-      held:
-        pack.held === null
-          ? null
-          : {
-              numId: pack.held,
-              name: nameOf(pack.held),
-              color: colorOf(pack.held),
-              icon: this.d.iconOf(pack.held),
-              count: pack.count(pack.held),
-            },
+      items: pack.items.map(({ numId, count }) => this.itemView(numId, count)),
+      held: pack.held === null ? null : this.itemView(pack.held, pack.count(pack.held)),
       weight: pack.weight,
       capacity: pack.capacity,
       load: pack.load,
@@ -399,10 +484,45 @@ export class PackController {
     sheetOpen.value = this.sheet;
     this.publishMode();
 
-    const paused = freezesWorld(this.mode) || g.fanOpen || this.sheet;
+    this.publishChest();
+    const paused = freezesWorld(this.currentMode) || g.fanOpen || this.sheet || this.chest !== null;
     if (paused !== this.paused) {
       this.paused = paused;
       this.d.onPausedChange(paused);
     }
+  }
+
+  /** How the UI shows one stack, of a material or a crafted item. */
+  itemView(key: number, count: number): PackItemView {
+    const { materials } = this.d;
+    const m = materials.get(keyMaterial(key));
+    const variant = keyVariant(key);
+    const base = m?.visual?.base;
+    const of = variant ? materials.get(variant)?.name : undefined;
+    return {
+      numId: key,
+      name: `${m?.name ?? '?'}${of ? ` (${of.toLowerCase()})` : ''}`,
+      color: base ? palette[base] : palette.stone,
+      icon: this.d.iconOf(keyMaterial(key)),
+      count,
+      unitWeight: m?.weight ?? 0,
+    };
+  }
+
+  private publishChest(): void {
+    const at = this.chest;
+    const chest = at && this.d.chests.get(at.x, at.y);
+    this.chestRevision = this.d.chests.version;
+    if (!at || !chest) {
+      if (chestView.value) chestView.value = null;
+      return;
+    }
+    chestView.value = {
+      x: at.x,
+      y: at.y,
+      items: chest.items.map(({ numId, count }) => this.itemView(numId, count)),
+      weight: chest.weight,
+      capacity: chest.capacity,
+    };
   }
 }

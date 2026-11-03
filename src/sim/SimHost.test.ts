@@ -16,7 +16,7 @@ const materials = loadMaterials();
 const fluids = loadFluids(materials);
 const WORLD = 'w1';
 
-function createHost(store: SaveStore) {
+function createHost(store: SaveStore, clock = { ms: 1000 }) {
   const out: FromSim[] = [];
   const host = new SimHost({
     port: { post: (m) => out.push(m), onMessage: () => {} },
@@ -27,7 +27,7 @@ function createHost(store: SaveStore) {
     createGenerator: (seed) =>
       new TestWorldGenerator(testWorldConfig as TestWorldConfig, seed, materials, fluids),
     newSeed: () => 'fixed-seed',
-    now: () => 1000,
+    now: () => clock.ms,
   });
   const send = (msg: ToSim) => host.handle(msg);
   const last = <K extends FromSim['type']>(type: K) =>
@@ -103,7 +103,66 @@ describe.each([
       x: spawn.x,
       y: spawn.y,
       material: stone,
+      variant: 0,
     });
+  });
+
+  it('places a torch that burns for a time set by its fuel, then goes out', async () => {
+    const clock = { ms: 1000 };
+    const host = createHost(await makeStore(), clock);
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-torch`,
+    });
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const torch = materials.require('torch').numId;
+    const rootwood = materials.require('rootwood');
+    await host.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+    await host.send({
+      type: 'placeTile',
+      x: spawn.x,
+      y: spawn.y,
+      material: torch,
+      variant: rootwood.numId,
+    });
+    expect(host.last('tilesChanged')?.changes).toEqual([
+      { x: spawn.x, y: spawn.y, material: torch },
+    ]);
+
+    const burnMs = rootwood.fuel * tuning.torch.secondsPerFuel * 1000;
+    host.host.tick();
+    for (let t = 0; t < burnMs - 2000; t += 500) {
+      clock.ms += 500;
+      host.host.tick();
+    }
+    expect(host.out.some((m) => m.type === 'simEvents')).toBe(false);
+    for (let t = 0; t < 2 * tuning.torch.secondsPerStep * 1000; t += 500) {
+      clock.ms += 500;
+      host.host.tick();
+    }
+    expect(host.last('simEvents')?.events).toEqual([{ kind: 'torchOut', x: spawn.x, y: spawn.y }]);
+    expect(host.last('tilesChanged')?.changes).toEqual([
+      { x: spawn.x, y: spawn.y, material: materials.air.numId },
+    ]);
+  });
+
+  it("won't put a torch into water", async () => {
+    const host = createHost(await makeStore());
+    await host.send({
+      type: 'init',
+      protocol: PROTOCOL_VERSION,
+      kind: 'test',
+      worldId: `${WORLD}-torch-water`,
+    });
+    await host.send({ type: 'requestChunks', chunks: [spawnChunk] });
+    const torch = materials.require('torch').numId;
+    const water = fluids.require('water').id;
+    await host.send({ type: 'digTile', x: spawn.x, y: spawn.y, toolPower: 3 });
+    await host.send({ type: 'pourFluid', x: spawn.x, y: spawn.y, fluid: water, amount: 6 });
+    await host.send({ type: 'placeTile', x: spawn.x, y: spawn.y, material: torch, variant: 7 });
+    expect(host.last('placeRejected')?.variant).toBe(7);
   });
 
   it('undoes a placement, putting back the fluid it pushed out', async () => {

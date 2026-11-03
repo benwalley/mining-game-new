@@ -58,6 +58,13 @@ export class Pack {
     return this.weight + this.weightOf(numId) * n <= this.tuning.capacity * this.tuning.hardLimit;
   }
 
+  /** How many more of this fit under the hard limit. */
+  room(numId: number): number {
+    const w = this.weightOf(numId);
+    const left = this.tuning.capacity * this.tuning.hardLimit - this.weight;
+    return w <= 0 ? Infinity : Math.max(0, Math.floor(left / w + 1e-9));
+  }
+
   add(numId: number, n = 1): boolean {
     if (!this.canAdd(numId, n)) return false;
     const have = this.counts.get(numId);

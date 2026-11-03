@@ -8,6 +8,8 @@ import { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
 import { NO_FLUID } from '../physics/fluidContact';
 import { Player } from '../player/Player';
+import { loadCrafting } from '@/content/crafting';
+import { Pick } from '../craft/Pick';
 import { Pack } from '../pack/Pack';
 import { ChunkMirror } from '../world/ChunkMirror';
 import { DigSystem } from './DigSystem';
@@ -27,7 +29,19 @@ function setup() {
   const pack = new Pack(tuning.pack, (id) => materials.get(id)?.weight ?? 0);
   const sent: ToSim[] = [];
   const sim = new SimClient({ post: (m) => sent.push(m), onMessage: () => {} });
-  const dig = new DigSystem(tuning.dig, tuning.input, materials, mirror, sim, events, pack);
+  const pick = new Pick(tuning.pick, materials, loadCrafting(materials).pick);
+  const locked = new Set<string>();
+  const dig = new DigSystem(
+    tuning.dig,
+    tuning.input,
+    materials,
+    mirror,
+    sim,
+    events,
+    pack,
+    pick,
+    (x, y) => locked.has(`${x},${y}`),
+  );
   const player = new Player(tuning.player, tuning.vitals);
   player.placeAt(5.5, 10);
   const contact = {
@@ -41,7 +55,7 @@ function setup() {
   const run = (seconds: number, intent: { x: number; y: number }) => {
     for (let i = 0; i < Math.round(seconds * 60); i++) dig.update(player, intent, contact, 1 / 60);
   };
-  return { mirror, dig, run, sent, dirt, pack, events };
+  return { mirror, dig, run, sent, dirt, pack, events, pick, locked };
 }
 
 describe('DigSystem', () => {
@@ -71,12 +85,32 @@ describe('DigSystem', () => {
 
   it("won't finish a tile when the pack is at its hard limit", () => {
     const { mirror, run, pack, dirt, events } = setup();
-    pack.add(dirt, 100); // 300 weight: exactly the limit.
+    pack.add(dirt, pack.room(dirt)); // Exactly the limit.
     let announced = 0;
     events.on('packFull', () => announced++);
     run(2, { x: 0, y: 1 });
     expect(mirror.materialAt(5, 10)).toBe(dirt);
-    expect(pack.count(dirt)).toBe(100);
+    expect(pack.count(dirt)).toBe((tuning.pack.capacity * tuning.pack.hardLimit) / 3);
     expect(announced).toBeGreaterThan(0);
+  });
+
+  it("won't dig a locked tile (a chest with things in it)", () => {
+    const { mirror, run, locked, dirt, events } = setup();
+    locked.add('5,10');
+    let announced = 0;
+    events.on('digLocked', () => announced++);
+    run(2, { x: 0, y: 1 });
+    expect(mirror.materialAt(5, 10)).toBe(dirt);
+    expect(announced).toBeGreaterThan(0);
+  });
+
+  it('dulls the pick with each tile, and a dull pick digs slower', () => {
+    const { dig, run, pick } = setup();
+    const stone = materials.require('stone');
+    const sharpTime = dig.digTime(stone);
+    run(2, { x: 0, y: 1 });
+    expect(pick.wear).toBeGreaterThan(0);
+    pick.wear = tuning.pick.maxWear;
+    expect(dig.digTime(stone)).toBeCloseTo(sharpTime * (1 + tuning.pick.dullSlowdown));
   });
 });

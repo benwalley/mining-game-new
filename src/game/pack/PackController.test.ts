@@ -9,6 +9,8 @@ import { fanView, modeView, packView, undoView } from '@/ui/stores/gameStore';
 import type { GameEvents } from '../events';
 import { Player } from '../player/Player';
 import { ChunkMirror } from '../world/ChunkMirror';
+import { itemKey } from '../craft/itemKey';
+import { Chests } from './Chests';
 import { MODES, type Mode } from './modes';
 import { Pack } from './Pack';
 import { PackController } from './PackController';
@@ -37,7 +39,9 @@ function setup(dirtCount = 5) {
   }
   const player = new Player(tuning.player, tuning.vitals);
   player.placeAt(5.5, 10);
-  const pack = new Pack(tuning.pack, (id) => materials.get(id)?.weight ?? 0);
+  const weightOf = (key: number) => materials.get(key & 1023)?.weight ?? 0;
+  const pack = new Pack(tuning.pack, weightOf);
+  const chests = new Chests({ ...tuning.pack, hardLimit: 1 }, weightOf);
   pack.add(dirt, dirtCount);
   pack.select(dirt);
   const pauses: boolean[] = [];
@@ -51,6 +55,9 @@ function setup(dirtCount = 5) {
     events,
     player,
     pack,
+    chests,
+    chestRange: tuning.chest.openRangeTiles,
+    liquidAt: () => false,
     view: () => ({ x0: 0, y0: 0, x1: 32, y1: 32 }),
     tileAt: (x, y) => ({ x: Math.floor(x / TILE_PX), y: Math.floor(y / TILE_PX) }),
     tilePx: () => TILE_PX,
@@ -76,25 +83,31 @@ function setup(dirtCount = 5) {
     dirt,
     build,
     placeTiles,
+    chests,
   };
 }
 
 const air = materials.air.numId;
 
 describe('PackController modes', () => {
-  it('cycles modes when the button is tapped, and build mode freezes the world', () => {
+  it('cycles modes when the button is tapped, and build and craft freeze the world', () => {
     const { ctl, pauses, modes } = setup();
     const g = ctl.gesture;
-    g.down(BUTTON, 0);
-    g.up();
+    const tap = () => {
+      g.down(BUTTON, 0);
+      g.up();
+    };
+    tap();
     expect(modeView.value.mode).toBe('build');
     expect(ctl.isPaused).toBe(true);
     expect(pauses).toEqual([true]);
-    g.down(BUTTON, 0);
-    g.up();
+    tap();
+    expect(modeView.value.mode).toBe('craft');
+    expect(pauses).toEqual([true]);
+    tap();
     expect(modeView.value.mode).toBe('dig');
     expect(ctl.isPaused).toBe(false);
-    expect(modes).toEqual(['build', 'dig']);
+    expect(modes).toEqual(['build', 'craft', 'dig']);
   });
 
   it('scrubs to a mode and previews it on the way', () => {
@@ -157,7 +170,7 @@ describe('PackController build mode', () => {
     ctl.tapWorld(at(3), at(9));
     expect(mirror.materialAt(3, 9)).toBe(dirt);
     expect(pack.count(dirt)).toBe(4);
-    expect(placeTiles()).toEqual([{ type: 'placeTile', x: 3, y: 9, material: dirt }]);
+    expect(placeTiles()).toEqual([{ type: 'placeTile', x: 3, y: 9, material: dirt, variant: 0 }]);
     expect(seen).toEqual(['placed']);
   });
 
@@ -334,8 +347,92 @@ describe('PackController undo', () => {
     const { ctl, pack, build, dirt } = setup();
     build();
     ctl.tapWorld(at(3), at(9));
-    ctl.refund(3, 9, dirt);
+    ctl.refund(3, 9, dirt, 0);
     expect(pack.count(dirt)).toBe(5);
     expect(undoView.value).toBeNull();
+  });
+});
+
+describe('PackController items in dig mode', () => {
+  const torch = materials.require('torch').numId;
+  const chest = materials.require('chest').numId;
+  const coal = materials.require('coal').numId;
+
+  it('places a held torch with a tap, sending its fuel along', () => {
+    const { ctl, pack, mirror, placeTiles } = setup();
+    const key = itemKey(torch, coal);
+    pack.add(key, 2);
+    pack.select(key);
+    // (4,9) is open, beside the player, with dirt below to hang on.
+    ctl.tapWorld(at(4), at(9));
+    expect(mirror.materialAt(4, 9)).toBe(torch);
+    expect(placeTiles()).toEqual([
+      { type: 'placeTile', x: 4, y: 9, material: torch, variant: coal },
+    ]);
+    expect(pack.count(key)).toBe(1);
+    // Hanging in mid-air: refused.
+    ctl.tapWorld(at(4), at(5));
+    expect(mirror.materialAt(4, 5)).toBe(materials.air.numId);
+  });
+
+  it('does nothing with a held block: blocks go down in build mode', () => {
+    const { ctl, mirror, placeTiles } = setup();
+    ctl.tapWorld(at(4), at(9));
+    expect(mirror.materialAt(4, 9)).toBe(materials.air.numId);
+    expect(placeTiles()).toEqual([]);
+  });
+
+  it("won't put a block over a torch", () => {
+    const { ctl, pack, mirror, build } = setup();
+    pack.add(torch, 1);
+    pack.select(torch);
+    ctl.tapWorld(at(4), at(9));
+    pack.select(materials.require('dirt').numId);
+    build();
+    ctl.tapWorld(at(4), at(9));
+    expect(mirror.materialAt(4, 9)).toBe(torch);
+  });
+
+  it('places a chest that starts empty, and undo takes it back', () => {
+    const { ctl, pack, chests } = setup();
+    pack.add(chest, 1);
+    pack.select(chest);
+    ctl.tapWorld(at(4), at(9));
+    expect(chests.get(4, 9)?.kinds).toBe(0);
+    ctl.undo();
+    expect(chests.get(4, 9)).toBeUndefined();
+    expect(pack.count(chest)).toBe(1);
+  });
+
+  it('opens a chest in reach with a tap, pausing, and moves stacks both ways', () => {
+    const { ctl, pack, chests, pauses, dirt } = setup();
+    pack.add(chest, 1);
+    pack.select(chest);
+    ctl.tapWorld(at(4), at(9));
+    ctl.tapWorld(at(4), at(9));
+    expect(ctl.chestOpen).toBe(true);
+    expect(pauses.at(-1)).toBe(true);
+    ctl.stow(dirt, 3, 'chest');
+    expect(pack.count(dirt)).toBe(2);
+    expect(chests.isLocked(4, 9)).toBe(true);
+    ctl.stow(dirt, 99, 'pack');
+    expect(pack.count(dirt)).toBe(5);
+    ctl.closeChest();
+    expect(pauses.at(-1)).toBe(false);
+  });
+
+  it("won't open a chest out of reach", () => {
+    const { ctl, chests, mirror } = setup();
+    mirror.setMaterial(20, 9, chest);
+    chests.create(20, 9);
+    ctl.tapWorld(at(20), at(9));
+    expect(ctl.chestOpen).toBe(false);
+  });
+
+  it('freezes the world in craft mode', () => {
+    const { ctl, pauses } = setup();
+    ctl.setMode('craft');
+    expect(pauses.at(-1)).toBe(true);
+    expect(MODES).toContain('craft');
   });
 });

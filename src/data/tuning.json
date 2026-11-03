@@ -40,7 +40,7 @@
     "flushTolerance": 0.05
   },
   "pack": {
-    "capacity": 200,
+    "capacity": 1000,
     "hardLimit": 1.5,
     "minSpeedFactor": 0.45,
     "minJumpFactor": 0.45
@@ -136,5 +136,29 @@
     "crackleEverySeconds": [1.2, 0.3],
     "shimmerFrom": 80,
     "shimmerFull": 320
+  },
+  "pick": {
+    "startHead": "stone",
+    "startHandle": "rootwood",
+    "powerOffset": -1,
+    "weightDivisor": 20,
+    "wearPerTile": 0.01,
+    "maxWear": 1,
+    "dullSlowdown": 0.6,
+    "dullShownAt": 0.25,
+    "sharpenMaterial": "stone",
+    "sharpenCount": 2,
+    "headCount": 3,
+    "handleCount": 2
+  },
+  "torch": {
+    "secondsPerFuel": 60,
+    "secondsPerStep": 4,
+    "lowFraction": 0.2
+  },
+  "chest": {
+    "capacityTimesPack": 5,
+    "openRangeTiles": 3,
+    "holdMs": 450
   }
 }

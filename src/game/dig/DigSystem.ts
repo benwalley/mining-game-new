@@ -5,6 +5,7 @@ import type { SimClient } from '@/protocol/SimClient';
 import type { GameEvents } from '../events';
 import type { Contact, MoveIntent } from '../player/PlayerController';
 import type { Player } from '../player/Player';
+import type { Pick } from '../craft/Pick';
 import type { Pack } from '../pack/Pack';
 import type { ChunkMirror } from '../world/ChunkMirror';
 import { crackStage, damageFromProgress, MAX_DAMAGE } from './crack';
@@ -39,7 +40,8 @@ export function canDig(material: MaterialDef, toolPower: number, t: DigTuning): 
  * mirror immediately and sent to the sim.
  */
 export class DigSystem {
-  toolPower: number;
+  /** Debug: dig with this power instead of the pick's. */
+  powerOverride: number | null = null;
   private target: DigTarget | null = null;
   private progress = 0;
   private swingTimer = 0;
@@ -55,8 +57,19 @@ export class DigSystem {
     private readonly sim: SimClient,
     private readonly events: EventBus<GameEvents>,
     private readonly pack: Pack,
-  ) {
-    this.toolPower = tuning.defaultToolPower;
+    private readonly pick: Pick,
+    /** A tile that can't be dug yet, such as a chest with things in it. */
+    private readonly isLocked: (x: number, y: number) => boolean = () => false,
+  ) {}
+
+  get toolPower(): number {
+    return this.powerOverride ?? this.pick.stats.power;
+  }
+
+  /** Seconds to dig this material with the pick as it is now, dulled or not. */
+  digTime(material: MaterialDef): number {
+    const { heft, dullness } = this.pick.stats;
+    return digTimeFor(material, this.toolPower, this.tuning) * heft * dullness;
   }
 
   get isDigging(): boolean {
@@ -73,7 +86,7 @@ export class DigSystem {
       progress: this.progress,
       stage: this.stage,
       blocked: this.blocked,
-      digTime: material ? digTimeFor(material, this.toolPower, this.tuning) : 0,
+      digTime: material ? this.digTime(material) : 0,
     };
   }
 
@@ -135,6 +148,12 @@ export class DigSystem {
       return;
     }
 
+    if (this.isLocked(target.x, target.y)) {
+      this.blocked = true;
+      if (swing) this.events.emit('digLocked', { ...tilePos(target), material: material.numId });
+      return;
+    }
+
     // Past the hard limit nothing more fits: the tile stays where it is until there's room.
     if (!this.pack.canAdd(material.numId)) {
       this.blocked = true;
@@ -143,7 +162,7 @@ export class DigSystem {
     }
 
     const stageBefore = this.stage;
-    this.progress += dt / digTimeFor(material, this.toolPower, this.tuning);
+    this.progress += dt / this.digTime(material);
     if (this.progress >= 1) {
       this.breakTile(target, material);
       return;
@@ -168,6 +187,7 @@ export class DigSystem {
     this.pendingDamage.delete(`${target.x},${target.y}`);
     this.mirror.setMaterial(target.x, target.y, this.materials.air.numId);
     this.pack.add(material.numId);
+    this.pick.wearOne();
     this.sim.send({ type: 'digTile', x: target.x, y: target.y, toolPower: this.toolPower });
     this.events.emit('tileBroken', { ...tilePos(target), material: material.numId });
     this.target = null;

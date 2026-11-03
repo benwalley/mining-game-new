@@ -23,9 +23,9 @@ export interface FluidReaction {
 
 /**
  * World events the sim reports for feedback: lava quenched; firedamp ignited;
- * gas hissing out of a dug-open pocket.
+ * gas hissing out of a dug-open pocket; a torch burning out or drowned.
  */
-export type SimEventKind = 'quench' | 'ignite' | 'vent';
+export type SimEventKind = 'quench' | 'ignite' | 'vent' | 'torchOut';
 
 export type FluidKind = 'liquid' | 'gas';
 

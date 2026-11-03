@@ -1,6 +1,8 @@
 import type { ChunkData } from '@/core/world/chunk';
 import type { WorldDims } from '@/core/world/constants';
 import type { SimEventKind } from '@/content/fluids';
+import type { PickSnapshot } from '@/game/craft/Pick';
+import type { ChestsSnapshot } from '@/game/pack/Chests';
 
 /**
  * Messages between the main thread (input, rendering, player) and the
@@ -8,7 +10,7 @@ import type { SimEventKind } from '@/content/fluids';
  * plain, structured-cloneable data so the same protocol could later be carried
  * over a network.
  */
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 /** Which generator builds a world: the real layered world or the flat test world. */
 export type WorldKind = 'layered' | 'test';
@@ -28,6 +30,10 @@ export interface PlayerSnapshot {
   breath?: number;
   /** Missing in saves from before the pack; restore starts empty. */
   pack?: PackSnapshot;
+  /** Missing in saves from before crafting (v5 adds them): a fresh pick, nothing known, no chests. */
+  pick?: PickSnapshot;
+  recipes?: [template: string, materials: number[]][];
+  chests?: ChestsSnapshot;
 }
 
 export interface WorldInfo {
@@ -90,8 +96,12 @@ export type ToSim =
   | { type: 'digTile'; x: number; y: number; toolPower: number }
   /** Partial dig progress, so half-dug tiles stay half-dug. */
   | { type: 'damageTiles'; changes: DamageChange[] }
-  /** Put a block into an empty tile. Works while paused. Answered with `tilesChanged`, or `placeRejected`. */
-  | { type: 'placeTile'; x: number; y: number; material: number }
+  /**
+   * Put a block, torch or chest into an empty tile. Works while paused. `variant` is
+   * the material an item remembers (a torch's fuel). Answered with `tilesChanged`, or
+   * `placeRejected`.
+   */
+  | { type: 'placeTile'; x: number; y: number; material: number; variant?: number }
   /** Undo a `placeTile`: take the block out again and put back the fluid it pushed aside. */
   | {
       type: 'unplaceTile';
@@ -115,7 +125,7 @@ export type FromSim =
   /** Authoritative tile values; the main thread overwrites its mirror with these. */
   | { type: 'tilesChanged'; changes: TileChange[] }
   /** A `placeTile` the sim refused (solid or unloaded tile); the block goes back in the pack. */
-  | { type: 'placeRejected'; x: number; y: number; material: number }
+  | { type: 'placeRejected'; x: number; y: number; material: number; variant: number }
   /** Fluid that moved this tick, for chunks the main thread holds. */
   | { type: 'fluidsChanged'; patches: FluidPatch[] }
   /** Temperatures that changed, a few times a second, for chunks the main thread holds. */

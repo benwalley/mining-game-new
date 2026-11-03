@@ -28,6 +28,8 @@ export class ChunkCache implements MirrorListener {
   private readonly entries = new Map<number, CacheEntry>();
   private readonly pool: { canvas: Surface; ctx: Ctx2D }[] = [];
   private readonly drawable: Uint8Array;
+  /** Objects (torches, chests) drawn over the backdrop instead of filling their tile. */
+  private readonly sprite: Uint8Array;
 
   constructor(
     private readonly mirror: ChunkMirror,
@@ -38,6 +40,8 @@ export class ChunkCache implements MirrorListener {
   ) {
     this.drawable = new Uint8Array(materials.maxNumId + 1);
     for (const m of materials.all) this.drawable[m.numId] = m.visual ? 1 : 0;
+    this.sprite = new Uint8Array(materials.maxNumId + 1);
+    for (const m of materials.all) this.sprite[m.numId] = m.kind === 'block' ? 0 : 1;
   }
 
   get(cx: number, cy: number): Surface | undefined {
@@ -119,6 +123,11 @@ export class ChunkCache implements MirrorListener {
     if (m < 0) return;
 
     const solid = mirror.isSolid;
+    if (this.sprite[m] === 1) {
+      if (y >= this.surfaceY) this.atlas.drawBackdrop(ctx, px, py);
+      this.atlas.drawMaterial(ctx, m, px, py);
+      return;
+    }
     if (this.drawable[m] === 1) {
       this.atlas.drawMaterial(ctx, m, px, py);
       // Outline faces exposed to open space so tunnels read clearly.
